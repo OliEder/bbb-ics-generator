@@ -20,35 +20,32 @@ jobs:
     - name: Install dependencies
       run: npm install
 
-    - name: Create public/ics directory
+    - name: Create public directory
       run: mkdir -p public/ics
 
     - name: Update ICS Calendars
       env:
         TEAM_ID: "167881"
       run: |
-        npm run update || echo "Update fehlgeschlagen, prüfe Logs"
-        ls -la public/ics/
+        npm run update || echo "Update fehlgeschlagen"
+        ls -la public/
 
-    - name: Check if ICS files exist
-      id: check_files
+    - name: Generate HTML page
+      run: npm run generate-html
+
+    - name: List generated files
       run: |
-        if [ -n "$(ls -A public/ics/*.ics 2>/dev/null)" ]; then
-          echo "files_exist=true" >> $GITHUB_OUTPUT
-        else
-          echo "files_exist=false" >> $GITHUB_OUTPUT
-          echo "Keine ICS-Dateien gefunden!"
-        fi
+        echo "=== Generated files ==="
+        ls -la public/
+        ls -la public/ics/ || echo "Kein ics Ordner"
 
-    - name: Deploy ICS to gh-pages
-      if: steps.check_files.outputs.files_exist == 'true'
+    - name: Deploy to gh-pages
       run: |
         git config --global user.email "bbb-api@oliver-eder.de"
         git config --global user.name "GitHub Actions"
         git checkout --orphan gh-pages
         git rm -rf .
-        cp -r public/ics/* .
+        cp -r public/* .
         git add .
         git commit -m "Deploy ICS Kalender $(date +'%Y-%m-%d %H:%M:%S')"
         git push -f origin gh-pages
-
