@@ -21,7 +21,7 @@ jobs:
 
       - name: Kalender aktualisieren
         env:
-          TEAM_ID: "<DEIN_TEAM_ID>"
+          TEAM_ID: "167881"
         run: npm run update
 
       - name: ICS Dateien zum GitHub Repo hinzufügen
