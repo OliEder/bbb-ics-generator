@@ -1,6 +1,6 @@
 const axios = require('axios');
 
-const BASE_URL = 'https://api.basketball-bund.net/rest';
+const BASE_URL = 'https://www.basketball-bund.net/rest';
 
 async function fetchTeamMatches(teamId) {
   const url = `${BASE_URL}/team/id/${teamId}/matches`;
