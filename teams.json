@@ -5,7 +5,22 @@
     "ageGroup": "U10"
   },
   {
-    "id": "167883",
+    "id": "167890",
+    "name": "Fibalon Baskets Neumarkt 2 - Senioren männlich",
+    "ageGroup": "Senioren"
+  },
+  {
+    "id": "320847",
+    "name": "Fibalon Baskets Neumarkt - U20 männlich",
+    "ageGroup": "U20"
+  },
+  {
+    "id": "167889",
+    "name": "Fibalon Baskets Neumarkt - Senioren männlich",
+    "ageGroup": "Senioren"
+  },
+  {
+    "id": "167882",
     "name": "Fibalon Baskets Neumarkt - U12 mix",
     "ageGroup": "U12"
   }
