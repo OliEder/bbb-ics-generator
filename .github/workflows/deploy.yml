@@ -30,6 +30,9 @@ jobs:
         
       - name: Generate HTML
         run: npm run generate-html
+
+      - name: List output (debug)
+        run: ls -l generated/
         
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
