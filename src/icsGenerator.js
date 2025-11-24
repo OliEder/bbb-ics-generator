@@ -73,7 +73,7 @@ async function buildEvent(match, matchInfo, teamId) {
     feld.strasse || '',
     `${feld.plz || ''} ${feld.ort || ''}`.trim(),
     `Spielbeginn: ${formatKickoff(dateStr, timeStr)}`,
-    `Summary: ${summaryClean}`,
+    `letztes Update: ${new Date().toLocaleString('de-DE')}`,
   ].filter(Boolean).join('\n');
 
   // Trigger validieren, Fallback einbauen
@@ -107,7 +107,7 @@ async function generateICS(matches, details, teamId) {
   if (!events.length) return null;
 
   // Debug vor createEvents
-  events.forEach((e, i) => console.log(`Event ${i} summary: "${e.summary}"`));
+  events.forEach((e, i) => console.log(`Event ${i} summary: "${e.title}"`));
 
   return new Promise((resolve, reject) => {
     createEvents(events, (error, value) => {
