@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Basketball Kalender Abonnements</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #e74c3c;
+            text-align: center;
+        }
+        .team-card {
+            background: white;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 20px 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .team-header {
+            border-bottom: 2px solid #e74c3c;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        .team-name {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+        .team-info {
+            color: #666;
+            margin-top: 5px;
+        }
+        .calendar-links {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        .cal-button {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #e74c3c;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        .cal-button:hover {
+            background: #c0392b;
+        }
+        .cal-button.home {
+            background: #3498db;
+        }
+        .cal-button.home:hover {
+            background: #2980b9;
+        }
+        .cal-button.away {
+            background: #95a5a6;
+        }
+        .cal-button.away:hover {
+            background: #7f8c8d;
+        }
+        .update-info {
+            margin-top: 15px;
+            font-size: 12px;
+            color: #999;
+        }
+        .stats {
+            margin-top: 10px;
+            color: #666;
+            font-size: 14px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            color: #999;
+            font-size: 14px;
+        }
+        .instructions {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🏀 Basketball Kalender Abonnements</h1>
+    
+    <div class="instructions">
+        <strong>So abonnierst du einen Kalender:</strong>
+        <ol>
+            <li>Rechtsklick auf den gewünschten Kalender-Link</li>
+            <li>Kopiere die Link-Adresse</li>
+            <li>Füge die Adresse in deiner Kalender-App als "Kalender abonnieren" ein</li>
+        </ol>
+    </div>
+
+    
+    
+    <p style="text-align:center; color:#999;">Noch keine Teams konfiguriert.</p>
+    
+    <div class="footer">
+        Automatisch generiert • Aktualisierung alle 6 Stunden
+    </div>
+</body>
+</html>
