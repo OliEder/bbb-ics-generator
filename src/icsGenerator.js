@@ -2,11 +2,11 @@ const { createEvents } = require('ics');
 
 function dateToArr(d) {
   return [
-    d.getFullYear(),
-    d.getMonth() + 1,
-    d.getDate(),
-    d.getHours(),
-    d.getMinutes(),
+    Number(d.getFullYear()),
+    Number(d.getMonth() + 1),
+    Number(d.getDate()),
+    Number(d.getHours()),
+    Number(d.getMinutes()),
   ];
 }
 
@@ -32,8 +32,8 @@ async function buildEvent(match, matchInfo, teamId) {
   const guestTeamId = Number(guestTeamObj.teamPermanentId);
   const ownTeamId = Number(teamId);
 
-  const homeNameTitle = getTeamNameForSummary(homeTeamObj);
-  const guestNameTitle = getTeamNameForSummary(guestTeamObj);
+  const homeNameSummary = getTeamNameForSummary(homeTeamObj);
+  const guestNameSummary = getTeamNameForSummary(guestTeamObj);
 
   const homeNameDesc = getTeamNameForDescription(homeTeamObj);
   const guestNameDesc = getTeamNameForDescription(guestTeamObj);
@@ -41,30 +41,26 @@ async function buildEvent(match, matchInfo, teamId) {
   const isHome = homeTeamId === ownTeamId;
   const isAway = guestTeamId === ownTeamId;
 
-  const title = isHome
-    ? `HEIM: ${homeNameTitle} vs. ${guestNameTitle} (Spiel ${matchInfo?.matchNo || match.matchNo})`
+  const summary = isHome
+    ? `HEIM: ${homeNameSummary} vs. ${guestNameSummary} (Spiel ${matchInfo?.matchNo || match.matchNo})`
     : isAway
-    ? `AUSWÄRTS: ${homeNameTitle} vs. ${guestNameTitle} (Spiel ${matchInfo?.matchNo || match.matchNo})`
-    : `${homeNameTitle} vs. ${guestNameTitle} (Spiel ${matchInfo?.matchNo || match.matchNo})`;
+    ? `AUSWÄRTS: ${homeNameSummary} vs. ${guestNameSummary} (Spiel ${matchInfo?.matchNo || match.matchNo})`
+    : `${homeNameSummary} vs. ${guestNameSummary} (Spiel ${matchInfo?.matchNo || match.matchNo})`;
 
-  const cleanTitle = (text) =>
-    typeof text === 'string' ? text.replace(/[\r\n]+/g, ' ').trim() : 'Untitled event';
-
-  const titleClean = cleanTitle(title);
+  const cleanSummary = (text) => (typeof text === 'string' ? text.replace(/[\r\n]+/g, ' ').trim() : 'Untitled event');
+  const summaryClean = cleanSummary(summary);
 
   const dateStr = matchInfo?.kickoffDate || match.kickoffDate;
   const timeStr = matchInfo?.kickoffTime || match.kickoffTime;
   const kickoff = new Date(`${dateStr}T${timeStr}:00`);
-
-  const startArray = dateToArr(kickoff);
-  const duration = { hours: 3, minutes: 30 };
+  const dtstart = new Date(kickoff.getTime() - 60 * 60 * 1000);
+  const dtend = new Date(kickoff.getTime() + 2.5 * 60 * 60 * 1000);
 
   const feld = matchInfo?.matchInfo?.spielfeld || match.spielfeld || {};
 
-  const location =
-    feld.strasse && feld.plz && feld.ort
-      ? `${feld.strasse}, ${feld.plz} ${feld.ort}, Deutschland`
-      : 'Ort unbekannt';
+  const location = feld.strasse && feld.plz && feld.ort
+    ? `${feld.strasse}, ${feld.plz} ${feld.ort}, Deutschland`
+    : 'Ort unbekannt';
 
   const description = [
     `Wettbewerb: ${matchInfo?.ligaData.liganame || match.ligaData.liganame || 'Unbekannt'}`,
@@ -77,19 +73,18 @@ async function buildEvent(match, matchInfo, teamId) {
     feld.strasse || '',
     `${feld.plz || ''} ${feld.ort || ''}`.trim(),
     `Spielbeginn: ${formatKickoff(dateStr, timeStr)}`,
-    `Title: ${titleClean}`,
-  ]
-    .filter(Boolean)
-    .join('\n');
+    `Summary: ${summaryClean}`,
+  ].filter(Boolean).join('\n');
 
+  // Trigger validieren, Fallback einbauen
   const alarmTriggerMinutes = isHome ? 30 : 60;
 
-  return {
+  const event = {
     uid: `${match.matchId}@basketball-bund.net`,
-    title: titleClean,
+    title: summaryClean,
     description,
-    start: startArray,
-    duration,
+    start: dateToArr(dtstart),
+    end: dateToArr(dtend),
     location,
     alarms: [
       {
@@ -99,9 +94,11 @@ async function buildEvent(match, matchInfo, teamId) {
       },
     ],
   };
+
+  return event;
 }
 
-async function generateICS(matches, details, teamId, teamData, type = 'all') {
+async function generateICS(matches, details, teamId) {
   const events = [];
   for (const match of matches) {
     const matchInfo = details[match.matchId];
@@ -109,18 +106,11 @@ async function generateICS(matches, details, teamId, teamData, type = 'all') {
   }
   if (!events.length) return null;
 
-  const calendarNames = {
-    all: `Spielplan: ${teamData.teamName} ${teamData.teamAkj} ${teamData.teamGender}`,
-    home: `Heimspiele: ${teamData.teamName} ${teamData.teamAkj} ${teamData.teamGender}`,
-    away: `Auswärtsspiele: ${teamData.teamName} ${teamData.teamAkj} ${teamData.teamGender}`,
-  };
-
-  const calName = calendarNames[type] || calendarNames.all;
-
-  events.forEach((e, i) => console.log(`Event ${i} title: "${e.title}"`));
+  // Debug vor createEvents
+  events.forEach((e, i) => console.log(`Event ${i} summary: "${e.summary}"`));
 
   return new Promise((resolve, reject) => {
-    createEvents(events, { calName }, (error, value) => {
+    createEvents(events, (error, value) => {
       if (error) reject(error);
       else resolve(value);
     });
