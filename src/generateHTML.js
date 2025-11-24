@@ -1,5 +1,10 @@
 const fs = require('fs');
 const path = require('path');
+function makeWebcalLink(filename) {
+  const baseUrl = 'https://olieder.github.io/bbb-ics-server/';
+  const icsUrl = baseUrl + filename;
+  return icsUrl.replace(/^https:/, 'webcal:');
+}
 
 function genHTML() {
   const metaPath = path.resolve(__dirname, '../generated/metadata.json');
@@ -24,9 +29,9 @@ function genHTML() {
       <small>Letztes Update: ${new Date(t.lastUpdate).toLocaleString('de-DE')}</small><br/>
       ${t.matchCount} Spiele, Heim: ${t.homeMatchCount}, Auswärts: ${t.awayMatchCount}<br/>
       <div class="buttons">
-        <a href="${t.teamId}_all.ics">Alle Spiele abonnieren</a>
-        <a href="${t.teamId}_home.ics">Nur Heimspiele</a>
-        <a href="${t.teamId}_away.ics">Nur Auswärts</a>
+        <a href="${makeWebcalLink(t.teamId+"_all.ics")}">Alle Spiele abonnieren</a>
+        <a href="${makeWebcalLink(t.teamId+"_home.ics")}">Nur Heimspiele abonieren</a>
+        <a href="${makeWebcalLink(t.teamId+"_away.ics")}">Nur Auswärts abonieren</a>
       </div>
     </div>
   `).join('')}
