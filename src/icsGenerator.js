@@ -1,18 +1,5 @@
 const { createEvents } = require('ics');
 
-// Umlaute und Sonderzeichen ersetzen für bessere Kompatibilität
-function sanitize(text) {
-  if (!text) return '';
-  return text
-    .replace(/ä/g, 'ae')
-    .replace(/ö/g, 'oe')
-    .replace(/ü/g, 'ue')
-    .replace(/Ä/g, 'Ae')
-    .replace(/Ö/g, 'Oe')
-    .replace(/Ü/g, 'Ue')
-    .replace(/ß/g, 'ss');
-}
-
 function dateToArr(d) {
   return [
     Number(d.getFullYear()),
@@ -57,13 +44,13 @@ async function buildEvent(match, matchInfo, teamId, calendarType = 'all') {
   // Prefix nur bei "all" Kalender
   let prefix = '';
   if (calendarType === 'all') {
-    prefix = isHome ? 'HEIM: ' : isAway ? 'AUSWAERTS: ' : '';
+    prefix = isHome ? '🏠 ' : isAway ? '🚗 ' : '🏀 ';
   }
 
   const summary = `${prefix}${homeNameSummary} vs. ${guestNameSummary} (Spiel ${matchInfo?.matchNo || match.matchNo})`;
 
   const cleanSummary = (text) => (typeof text === 'string' ? text.replace(/[\r\n]+/g, ' ').trim() : 'Untitled event');
-  const summaryClean = sanitize(cleanSummary(summary));
+  const summaryClean = cleanSummary(summary);
 
   // Kickoff-Zeit korrekt parsen (deutsche Zeit)
   const dateStr = matchInfo?.kickoffDate || match.kickoffDate;
@@ -81,7 +68,7 @@ async function buildEvent(match, matchInfo, teamId, calendarType = 'all') {
     ? `${feld.strasse}, ${feld.plz} ${feld.ort}, Deutschland`
     : 'Ort unbekannt';
 
-  const description = sanitize([
+  const description = [
     `Wettbewerb: ${matchInfo?.ligaData.liganame || match.ligaData.liganame || 'Unbekannt'}`,
     `Saison: ${matchInfo?.ligaData.seasonName || match.ligaData.seasonName || 'Unbekannt'}`,
     `Spiel ${matchInfo?.matchNo || match.matchNo || '?'}`,
@@ -91,7 +78,7 @@ async function buildEvent(match, matchInfo, teamId, calendarType = 'all') {
     feld.strasse && feld.ort ? `${feld.strasse}, ${feld.plz} ${feld.ort}` : '',
     `Anpfiff: ${formatKickoff(dateStr, timeStr)}`,
     `Update: ${new Date().toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })}`,
-  ].filter(Boolean).join(' | '));
+  ].filter(Boolean).join(' | ');
 
   // Trigger validieren, Fallback einbauen
   const alarmTriggerMinutes = isHome ? 30 : 60;
@@ -138,18 +125,36 @@ async function generateICS(matches, details, teamId, type = 'all') {
   const teamName = team?.name || 'Basketball Team';
   
   const typeLabel = type === 'home' ? ' - Heimspiele' : 
-                    type === 'away' ? ' - Auswaertsspiele' : '';
+                    type === 'away' ? ' - Auswärtsspiele' : '';
   
-  const calendarName = sanitize(`${teamName}${typeLabel}`);
+  const calendarName = `${teamName}${typeLabel}`;
 
   return new Promise((resolve, reject) => {
     createEvents(events, (error, value) => {
       if (error) {
         reject(error);
       } else {
-        // Kalendername und Timezone manuell hinzufügen
-        const withCalName = `X-WR-CALNAME:${calendarName}\r\nX-WR-TIMEZONE:Europe/Berlin\r\nX-WR-CALDESC:Basketball-Spielplan generiert von bbb-ics-generator\r\n${value}`;
-        resolve(withCalName);
+        // Header korrekt einfügen
+        const lines = value.split('\n');
+        const vcalendarIndex = lines.findIndex(line => line.trim() === 'BEGIN:VCALENDAR');
+        
+        if (vcalendarIndex !== -1) {
+          // Füge Header nach BEGIN:VCALENDAR ein
+          const header = [
+            ...lines.slice(0, vcalendarIndex + 1),
+            'PRODID:-//bbb-ics-generator//DE',
+            'METHOD:PUBLISH',
+            'X-WR-CALNAME:' + calendarName,
+            'X-WR-TIMEZONE:Europe/Berlin',
+            'X-WR-CALDESC:Basketball-Spielplan',
+            ...lines.slice(vcalendarIndex + 1)
+          ];
+          resolve(header.join('\r\n'));
+        } else {
+          // Fallback: Füge vor dem Content ein
+          const withHeaders = `X-WR-CALNAME:${calendarName}\r\nX-WR-TIMEZONE:Europe/Berlin\r\nX-WR-CALDESC:Basketball-Spielplan\r\n${value}`;
+          resolve(withHeaders);
+        }
       }
     });
   });
