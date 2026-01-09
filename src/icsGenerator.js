@@ -122,7 +122,7 @@ async function buildEvent(match, matchInfo, teamId, calendarType = 'all') {
     uid: `${match.matchId}@basketball-bund.net`,
     title: summaryClean,
     description,
-    htmlDescription, // Temporär für später
+//    htmlDescription, // Temporär für später
     start: dateToArr(dtstart),
     startInputType: 'local',
     startOutputType: 'local',
