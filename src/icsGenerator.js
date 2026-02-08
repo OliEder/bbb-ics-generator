@@ -72,7 +72,7 @@ async function buildEvent(match, matchInfo, teamId, calendarType = 'all') {
   // Prefix mit Emojis
   let prefix = '';
   if (calendarType === 'all') {
-    prefix = isHome ? '🏠 ' : isAway ? '✈️ ' : '';
+    prefix = isHome ? 'HEIM: ' : isAway ? 'AUSWÄRTS: ' : '';
   }
 
   const summary = `${prefix}${homeNameSummary} vs. ${guestNameSummary} (Spiel ${matchInfo?.matchNo || match.matchNo})`;
