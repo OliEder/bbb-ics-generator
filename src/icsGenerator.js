@@ -106,8 +106,8 @@ async function buildEvent(match, matchInfo, teamId, calendarType = 'all') {
 
   // Description als Array mit echten Zeilenumbrüchen
   const descriptionLines = [
-    `Wettbewerb: ${matchInfo?.ligaData.liganame || match.ligaData.liganame || 'Unbekannt'}`,
-    `Saison: ${matchInfo?.ligaData.seasonName || match.ligaData.seasonName || 'Unbekannt'}`,
+    `Wettbewerb: ${matchInfo?.ligaData?.liganame || match.ligaData?.liganame || 'Unbekannt'}`,
+    `Saison: ${matchInfo?.ligaData?.seasonName || match.ligaData?.seasonName || 'Unbekannt'}`,
     `Spiel ${matchInfo?.matchNo || match.matchNo || '?'}`,
     `Heim: ${homeNameDesc || 'Unbekannt'}`,
     `Gast: ${guestNameDesc || 'Unbekannt'}`,
