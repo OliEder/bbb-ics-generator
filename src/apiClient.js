@@ -32,7 +32,7 @@ async function fetchClubTeams(clubId) {
     const teams = [];
     for (const match of matches) {
       for (const teamObj of [match.homeTeam, match.guestTeam]) {
-        if (!teamObj || Number(teamObj.clubId) !== Number(clubId)) continue;
+        if (!teamObj || !teamObj.teamPermanentId || Number(teamObj.clubId) !== Number(clubId)) continue;
         const id = String(teamObj.teamPermanentId);
         if (seen.has(id)) continue;
         seen.add(id);
