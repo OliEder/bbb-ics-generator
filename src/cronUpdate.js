@@ -90,4 +90,8 @@ async function updateAll() {
   fs.writeFileSync(path.resolve(__dirname, '../generated/metadata.json'), JSON.stringify(meta, null, 2));
 }
 
-updateAll();
+module.exports = { getTeams, updateAll };
+
+if (require.main === module) {
+  updateAll();
+}

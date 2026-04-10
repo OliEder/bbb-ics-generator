@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const ICS_DIR = path.resolve(__dirname, '../generated');
+const ICS_DIR = process.env.BBB_ICS_DIR || path.resolve(__dirname, '../generated');
 if (!fs.existsSync(ICS_DIR)) fs.mkdirSync(ICS_DIR, { recursive: true });
 
 const VALID_TYPES = new Set(['all', 'home', 'away']);

@@ -5,12 +5,17 @@
   "scripts": {
     "start": "node src/server.js",
     "update": "node src/cronUpdate.js",
-    "generate-html": "node src/generateHTML.js"
+    "generate-html": "node src/generateHTML.js",
+    "test": "node --test 'tests/e2e/*.test.js'",
+    "test:watch": "node --watch --test 'tests/e2e/*.test.js'"
   },
   "dependencies": {
     "axios": "^1.7.9",
     "ics": "^3.8.1",
     "express": "^4.21.2",
     "node-cron": "^3.0.3"
+  },
+  "devDependencies": {
+    "sinon": "^17.0.0"
   }
 }

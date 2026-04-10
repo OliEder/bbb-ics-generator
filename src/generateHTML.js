@@ -1,13 +1,31 @@
 const fs = require('fs');
 const path = require('path');
+
+const BASE_URL = 'https://olieder.github.io/bbb-ics-generator/';
+
 function makeWebcalLink(filename) {
-  const baseUrl = 'https://olieder.github.io/bbb-ics-generator/';
-  const icsUrl = baseUrl + filename;
-  return icsUrl.replace(/^https:/, 'webcal:');
+  return BASE_URL.replace(/^https:/, 'webcal:') + filename;
+}
+
+function makeHttpsLink(filename) {
+  return BASE_URL + filename;
+}
+
+function makeGoogleCalLink(filename) {
+  return 'https://www.google.com/calendar/render?cid=' + encodeURIComponent(makeWebcalLink(filename));
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 function genHTML() {
-  const metaPath = path.resolve(__dirname, '../generated/metadata.json');
+  const generatedDir = process.env.BBB_GENERATED_DIR || path.resolve(__dirname, '../generated');
+  const metaPath = path.join(generatedDir, 'metadata.json');
   const teams = fs.existsSync(metaPath) ? JSON.parse(fs.readFileSync(metaPath)) : [];
 
   const content = `<!DOCTYPE html>
@@ -25,19 +43,33 @@ function genHTML() {
   <p>Kalender werden automatisch alle 2-6h aktualisiert. Stand: ${new Date().toLocaleString('de-DE')}</p>
   ${teams.map(t => `
     <div class="team">
-      <strong>${t.teamName}</strong> (${t.ageGroup})<br/>
+      <strong>${escapeHtml(t.teamName)}</strong> (${escapeHtml(t.ageGroup)})<br/>
       <small>Letztes Update: ${new Date(t.lastUpdate).toLocaleString('de-DE')}</small><br/>
-      ${t.matchCount} Spiele, Heim: ${t.homeMatchCount}, Auswärts: ${t.awayMatchCount}<br/>
+      ${Number(t.matchCount)} Spiele, Heim: ${Number(t.homeMatchCount)}, Auswärts: ${Number(t.awayMatchCount)}<br/>
       <div class="buttons">
-        <a href="${makeWebcalLink(t.teamId+"_all.ics")}">Alle Spiele abonnieren</a>
-        <a href="${makeWebcalLink(t.teamId+"_home.ics")}">Nur Heimspiele abonieren</a>
-        <a href="${makeWebcalLink(t.teamId+"_away.ics")}">Nur Auswärts abonieren</a>
+        <a href="${escapeHtml(makeWebcalLink(t.teamId+"_all.ics"))}">iOS/Mac: Alle Spiele</a>
+        <a href="${escapeHtml(makeWebcalLink(t.teamId+"_home.ics"))}">iOS/Mac: Heimspiele</a>
+        <a href="${escapeHtml(makeWebcalLink(t.teamId+"_away.ics"))}">iOS/Mac: Auswärts</a>
+      </div>
+      <div class="buttons">
+        <a href="${escapeHtml(makeGoogleCalLink(t.teamId+"_all.ics"))}">Android: Alle Spiele</a>
+        <a href="${escapeHtml(makeGoogleCalLink(t.teamId+"_home.ics"))}">Android: Heimspiele</a>
+        <a href="${escapeHtml(makeGoogleCalLink(t.teamId+"_away.ics"))}">Android: Auswärts</a>
+      </div>
+      <div class="buttons">
+        <a href="${escapeHtml(makeHttpsLink(t.teamId+"_all.ics"))}">ICS Download: Alle</a>
+        <a href="${escapeHtml(makeHttpsLink(t.teamId+"_home.ics"))}">ICS Download: Heim</a>
+        <a href="${escapeHtml(makeHttpsLink(t.teamId+"_away.ics"))}">ICS Download: Auswärts</a>
       </div>
     </div>
   `).join('')}
 </body>
 </html>`;
-  fs.writeFileSync(path.resolve(__dirname, '../generated/index.html'), content);
+  fs.writeFileSync(path.join(generatedDir, 'index.html'), content);
 }
 
-genHTML();
+module.exports = { genHTML };
+
+if (require.main === module) {
+  genHTML();
+}
