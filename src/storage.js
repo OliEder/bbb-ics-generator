@@ -30,9 +30,13 @@ function saveTeamsCache(teams) {
 
 function loadTeamsCache() {
   if (!fs.existsSync(TEAMS_CACHE_FILE)) return { teams: null, stale: false };
-  const raw = JSON.parse(fs.readFileSync(TEAMS_CACHE_FILE, 'utf8'));
-  const age = Date.now() - new Date(raw.cachedAt).getTime();
-  return { teams: raw.teams, stale: age >= CACHE_TTL_MS };
+  try {
+    const raw = JSON.parse(fs.readFileSync(TEAMS_CACHE_FILE, 'utf8'));
+    const age = Date.now() - new Date(raw.cachedAt).getTime();
+    return { teams: raw.teams, stale: age >= CACHE_TTL_MS };
+  } catch {
+    return { teams: null, stale: true };
+  }
 }
 
 module.exports = { ICS_DIR, saveICS, readICS, saveTeamsCache, loadTeamsCache };
