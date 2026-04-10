@@ -1,12 +1,34 @@
-const { fetchTeamMatches, fetchMatchInfo } = require('./apiClient'); // Beispiel: deine API-Abfragen
+const { fetchTeamMatches, fetchMatchInfo, fetchClubTeams } = require('./apiClient');
 const { generateICS } = require('./icsGenerator');
-const { saveICS } = require('./storage');
-const teams = require('../teams.json');
+const { saveICS, saveTeamsCache, loadTeamsCache } = require('./storage');
+const { clubId } = require('../config.json');
 const fs = require('fs');
 const path = require('path');
 
+async function getTeams() {
+  const { teams: cached, stale } = loadTeamsCache();
+  if (cached && !stale) {
+    console.log(`[DEBUG] Teams aus Cache geladen (${cached.length} Teams)`);
+    return cached;
+  }
+  console.log(`[DEBUG] Lade Teams von API für Club ${clubId}...`);
+  const fresh = await fetchClubTeams(clubId);
+  if (fresh && fresh.length > 0) {
+    saveTeamsCache(fresh);
+    console.log(`[DEBUG] ${fresh.length} Teams gecacht`);
+    return fresh;
+  }
+  if (cached) {
+    console.warn('[WARN] Club-API fehlgeschlagen, verwende abgelaufenen Cache');
+    return cached;
+  }
+  console.error('[ERROR] Keine Teams verfügbar — weder API noch Cache');
+  return [];
+}
+
 async function updateAll() {
   const meta = [];
+  const teams = await getTeams();
 
   for (const t of teams) {
     try {
