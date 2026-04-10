@@ -35,17 +35,25 @@ function icsEscape(text) {
     .replace(/\r/g, '');     // Carriage Return entfernen
 }
 
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 // HTML-Version für X-ALT-DESC erstellen
 function createHtmlDescription(descriptionLines, feld) {
   const html = `<!DOCTYPE HTML><HTML><HEAD><META CHARSET="UTF-8"></HEAD><BODY>
-<p><strong>${descriptionLines[0]}</strong></p>
-<p>${descriptionLines[1]}</p>
-<p><strong>Spiel ${descriptionLines[2].split(' ')[1]}</strong></p>
-<p>${descriptionLines[3]}<br>${descriptionLines[4]}</p>
-${feld.bezeichnung ? `<p><strong>Halle:</strong> ${feld.bezeichnung}</p>` : ''}
-${feld.strasse && feld.ort ? `<p><strong>Adresse:</strong> ${feld.strasse}, ${feld.plz} ${feld.ort}</p>` : ''}
-<p><strong>${descriptionLines[descriptionLines.length - 2]}</strong></p>
-<p><em>${descriptionLines[descriptionLines.length - 1]}</em></p>
+<p><strong>${escapeHtml(descriptionLines[0])}</strong></p>
+<p>${escapeHtml(descriptionLines[1])}</p>
+<p><strong>Spiel ${escapeHtml(descriptionLines[2].split(' ')[1])}</strong></p>
+<p>${escapeHtml(descriptionLines[3])}<br>${escapeHtml(descriptionLines[4])}</p>
+${feld.bezeichnung ? `<p><strong>Halle:</strong> ${escapeHtml(feld.bezeichnung)}</p>` : ''}
+${feld.strasse && feld.ort ? `<p><strong>Adresse:</strong> ${escapeHtml(feld.strasse)}, ${escapeHtml(feld.plz)} ${escapeHtml(feld.ort)}</p>` : ''}
+<p><strong>${escapeHtml(descriptionLines[descriptionLines.length - 2])}</strong></p>
+<p><em>${escapeHtml(descriptionLines[descriptionLines.length - 1])}</em></p>
 </BODY></HTML>`;
   
   // Für ICS: Zeilenumbrüche entfernen und escapen
@@ -143,7 +151,7 @@ async function buildEvent(match, matchInfo, teamId, calendarType = 'all') {
   return event;
 }
 
-async function generateICS(matches, details, teamId, type = 'all') {
+async function generateICS(matches, details, teamId, type = 'all', teamName = 'Basketball Team') {
   const events = [];
   for (const match of matches) {
     const matchInfo = details[match.matchId];
@@ -152,13 +160,7 @@ async function generateICS(matches, details, teamId, type = 'all') {
   if (!events.length) return null;
 
   // Debug vor createEvents
-  events.forEach((e, i) => console.log(`Event ${i} summary: "${e.title}"`));
-
-  // Teaminfo aus teams.json holen
-  const teams = require('../teams.json');
-  const team = teams.find(t => Number(t.id) === Number(teamId));
-  
-  const teamName = team?.name || 'Basketball Team';
+  events.forEach((e, i) => console.log(`Event ${i} summary: "${e.title}"}`));
   
   const typeLabel = type === 'home' ? ' - Heimspiele' : 
                     type === 'away' ? ' - Auswärtsspiele' : '';
