@@ -1,0 +1,114 @@
+== Kontextabgrenzung
+
+=== Systemkontextdiagramm
+
+Das folgende Diagramm zeigt den BBB ICS Generator im Kontext seiner Kommunikationspartner:
+
+....
+                           +----------------------------------+
+                           |                                  |
+                           |    Basketball-Bund REST-API      |
+                           |  https://www.basketball-bund.net |
+                           |             /rest                |
+                           |                                  |
+                           +----------------------------------+
+                                           |
+                              HTTP GET     |
+                              (axios)      |
+                                           v
++-------------------+      +--------------+-----------------+      +----------------------+
+|                   |      |                                |      |                      |
+|   GitHub          |      |       BBB ICS GENERATOR        |      |   GitHub Pages       |
+|   Actions         +----->+                                +----->+   (Static Hosting)   |
+|   (CI/CD)         |      |   src/cronUpdate.js            |      |                      |
+|   Cron: */6h      |      |   src/apiClient.js             |      |   generated/*.ics    |
+|   Push: main      |      |   src/icsGenerator.js          |      |   generated/         |
+|   manuell         |      |   src/storage.js               |      |     index.html       |
+|                   |      |   src/generateHTML.js          |      |                      |
++-------------------+      |                                |      +----------+-----------+
+                           |   config.json (clubId: 4468)   |                 |
+                           |   generated/ (ICS + HTML)      |                 |
+                           |                                |          webcal:// / HTTPS
+                           +--------------------------------+                 |
+                                                                              |
+                               +------------------+      +-------------------+--+
+                               |                  |      |                      |
+                               |   iOS Calendar   |      |   Google Calendar /  |
+                               |   Apple Mail     |      |   Android            |
+                               |                  |      |                      |
+                               +------------------+      +----------------------+
+                               |                  |      |                      |
+                               |   MS Outlook     |      |   Mozilla            |
+                               |   (Windows/Mac)  |      |   Thunderbird        |
+                               |                  |      |                      |
+                               +------------------+      +----------------------+
+....
+
+=== Fachlicher Kontext
+
+[cols="2,2,5", options="header"]
+|===
+| Kommunikationspartner | Richtung | Beschreibung der Schnittstelle
+
+| *Basketball-Bund REST-API*
+| BBB ICS Generator ← API (HTTP GET)
+| Das System ruft drei Endpunkte ab: (1) Club-Teams über `/rest/club/id/{clubId}/actualmatches`, (2) Team-Spielplan über `/rest/team/id/{teamId}/matches`, (3) Match-Details über `/rest/match/id/{matchId}/matchInfo`. Alle Endpunkte liefern JSON. Keine Authentifizierung erforderlich.
+
+| *GitHub Actions*
+| GitHub Actions → BBB ICS Generator (triggert Build)
+| Führt den Node.js-Prozess (`npm run update` und `npm run generate-html`) in einer Ubuntu-Runner-Umgebung aus. Trigger: Cron alle 6 Stunden, Push auf `main`, manueller `workflow_dispatch`.
+
+| *GitHub Pages*
+| BBB ICS Generator → GitHub Pages (HTTP Upload via Actions)
+| Das `generated/`-Verzeichnis wird als Pages-Artefakt hochgeladen und über `https://olieder.github.io/bbb-ics-generator/` bereitgestellt.
+
+| *Kalender-Clients (Abonnenten)*
+| GitHub Pages → Kalender-Clients (HTTP GET / webcal)
+| Endnutzer abonnieren ICS-Feeds via `webcal://`-Protokoll (iOS/macOS) oder `https://`-URLs (Google Calendar, Outlook, Thunderbird). Der Client fragt die URL periodisch ab und synchronisiert Änderungen.
+|===
+
+=== Technischer Kontext
+
+[cols="2,3,3", options="header"]
+|===
+| Schnittstelle | Protokoll / Format | Technische Details
+
+| Basketball-Bund API → apiClient.js
+| HTTPS / JSON
+| `axios` HTTP-Client; GET-Anfragen ohne Body; Antwortstruktur `{ data: { matches: [...] } }`; Timeout und Retry nicht explizit konfiguriert; Fehlerbehandlung per try/catch mit Rückgabe von `[]` oder `null`
+
+| cronUpdate.js → generated/
+| Dateisystem (Node.js `fs`)
+| Schreibt `{teamId}_{type}.ics` und `metadata.json` via `fs.writeFileSync`; Verzeichnis `generated/` wird bei Bedarf angelegt
+
+| generateHTML.js → generated/index.html
+| Dateisystem (Node.js `fs`)
+| Liest `generated/metadata.json`; schreibt `generated/index.html` mit hartcodierten Links zur GitHub-Pages-URL `https://olieder.github.io/bbb-ics-generator/`
+
+| GitHub Actions → GitHub Pages
+| GitHub Actions API / HTTP Upload
+| Artefakt-Upload via `actions/upload-pages-artifact@v3`; Deployment via `actions/deploy-pages@v4`; Concurrency-Gruppe `pages` verhindert parallele Deployments
+
+| GitHub Pages → Kalender-Clients
+| HTTPS (TLS 1.2+) / text/calendar
+| Statische Datei-Auslieferung; kein Content-Negotiation; `Content-Type: text/calendar` für `.ics`-Dateien
+|===
+
+=== Externe API-Endpunkte im Detail
+
+[cols="3,2,4", options="header"]
+|===
+| Endpunkt | Methode | Beschreibung
+
+| `/rest/club/id/{clubId}/actualmatches?justHome=false&rangeDays=150`
+| GET
+| Liefert alle Spiele des Vereins in den nächsten 150 Tagen. Wird zum Ermitteln aller aktiven Teams (teamPermanentId) des Vereins verwendet. Antwort enthält `homeTeam` und `guestTeam` mit Teammetadaten.
+
+| `/rest/team/id/{teamId}/matches`
+| GET
+| Liefert alle Spiele eines Teams (Vergangenheit und Zukunft). Enthält Basisdaten: `matchId`, `kickoffDate`, `kickoffTime`, `homeTeam`, `guestTeam`, `ligaData`.
+
+| `/rest/match/id/{matchId}/matchInfo`
+| GET
+| Liefert Detailinfos zu einem einzelnen Spiel: vollständige Teamnamen, Spielfeld (`spielfeld`) mit Hallen-Bezeichnung, Straße, PLZ, Ort, und erweiterte Liga-Metadaten.
+|===

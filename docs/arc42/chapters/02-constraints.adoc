@@ -1,0 +1,63 @@
+== Randbedingungen
+
+=== Technische Randbedingungen
+
+[cols="2,4,3", options="header"]
+|===
+| Randbedingung | Beschreibung | Konsequenz
+
+| *Node.js 18*
+| Die GitHub Actions-Pipeline verwendet explizit `node-version: '18'`. Alle verwendeten npm-Pakete müssen mit Node.js 18 kompatibel sein.
+| Kein Einsatz von Node.js-21+-only-Features; Abhängigkeiten müssen LTS-kompatibel sein.
+
+| *RFC 5545 (iCalendar)*
+| Die erzeugten Dateien müssen dem iCalendar-Standard RFC 5545 entsprechen. Pflichtfelder (`DTSTART`, `DTEND`, `UID`, `DTSTAMP`) müssen vorhanden sein. Sonderzeichen müssen nach ICS-Escape-Regeln kodiert werden. Zeilen dürfen maximal 75 Oktetts lang sein (Line-Folding).
+| Das Bibliothek-Paket `ics` (v3) übernimmt das grundlegende Rendering; manuelle Nachbearbeitung ist für X-Properties und VCALENDAR-Header erforderlich.
+
+| *Statisches Hosting (GitHub Pages)*
+| Alle öffentlich zugänglichen Dateien müssen statisch sein. Kein serverseitiges Rendering, keine Datenbanken, keine laufenden Prozesse auf GitHub Pages.
+| Alle ICS-Dateien und die HTML-Übersichtsseite werden im `generated/`-Verzeichnis vorgebaut und als Artefakt deployed.
+
+| *Keine Infrastrukturkosten*
+| Das gesamte System muss im kostenlosen Tier von GitHub betrieben werden können (GitHub Actions Free Tier: 2.000 Minuten/Monat für öffentliche Repos; GitHub Pages: kostenlos für öffentliche Repos).
+| Alle 6 Stunden läuft ein Build von ca. 1–2 Minuten = ca. 240 Builds/Monat * 2 min = 480 min/Monat — gut im Rahmen.
+
+| *Öffentliche API ohne Authentifizierung*
+| Die Basketball-Bund REST-API unter `https://www.basketball-bund.net/rest` ist öffentlich zugänglich und erfordert keine API-Keys oder OAuth.
+| Kein Secret-Management erforderlich. Kein Rate-Limiting durch Authentifizierungsebene — Risiko von IP-basiertem Rate-Limiting bleibt.
+
+| *Abhängigkeit von npm-Paketen*
+| Verwendete Pakete: `axios` (HTTP-Client), `ics` (ICS-Rendering), `express` (lokaler Dev-Server), `node-cron` (lokaler Cron-Trigger).
+| Sicherheitsrelevante Updates müssen durch Ausführen von `npm install` im CI-Lauf aufgenommen werden. Kein Lockfile-Enforcement in der Pipeline.
+
+| *Kein persistenter Speicher in GitHub Actions*
+| GitHub Actions-Runner sind ephemer. Der `teams-cache.json` wird bei jedem Lauf neu erzeugt, da das `generated/`-Verzeichnis nicht zwischen Runs persistiert wird.
+| Der 30-Tage-TTL-Cache für Teams hat effektiv keine Wirkung in der GitHub-Actions-Umgebung; er ist nur für lokale Entwicklung relevant. Bei jedem CI-Lauf wird die Club-API erneut aufgerufen.
+|===
+
+=== Organisatorische Randbedingungen
+
+[cols="2,4,3", options="header"]
+|===
+| Randbedingung | Beschreibung | Konsequenz
+
+| *Einzelpersonen-Projekt*
+| Das Projekt wird von einer einzelnen Person (Oliver-Marcus Eder) entwickelt und betrieben. Kein formales Review-Prozess, kein Team.
+| Keine formalen PR-Reviews, kein Pair-Programming. Pragmatische Entscheidungen haben Vorrang vor Vollständigkeit.
+
+| *Open-Source auf GitHub*
+| Der Quellcode ist öffentlich auf GitHub verfügbar. Die `clubId` (4468) ist im Repository sichtbar.
+| Keine sensiblen Daten im Repository (keine API-Keys, keine persönlichen Daten). Die `clubId` ist keine vertrauliche Information.
+
+| *Keine automatisierten Tests*
+| Zum Zeitpunkt der Dokumentation existieren keine Unit- oder Integrationstests.
+| Qualitätssicherung erfolgt durch manuelle Verifikation der ICS-Ausgabe und implizit durch den CI-Lauf (Fehler im Prozess brechen den Build).
+
+| *Basketball-Bund API als externer Dienst*
+| Der Betreiber der Basketball-Bund-API ist nicht der Betreiber dieses Systems. API-Änderungen, Downtimes oder strukturelle Anpassungen liegen außerhalb des Einflussbereichs.
+| Das System muss resilient gegenüber vorübergehenden API-Ausfällen sein. Strukturelle API-Änderungen erfordern manuelle Anpassungen im Code.
+
+| *Datenschutz*
+| Die verarbeiteten Daten (Spieltermine, Teamnamen, Hallenadressen) sind öffentlich zugängliche Spielplandaten. Es werden keine personenbezogenen Daten gespeichert oder verarbeitet.
+| Kein Datenschutz-Compliance-Aufwand (DSGVO) erforderlich.
+|===

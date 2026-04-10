@@ -1,0 +1,95 @@
+== Laufzeitsicht
+
+=== Szenario 1: Update-Zyklus mit Cache-HIT (Normalfall)
+
+Dieser Ablauf tritt ein, wenn der Team-Cache jünger als 30 Tage ist. Dies ist der reguläre Ablauf für die meisten der täglich vier Ausführungen.
+
+....
+GitHub Actions         cronUpdate.js          storage.js          apiClient.js        icsGenerator.js
+      |                      |                     |                    |                    |
+      |-- npm run update --->|                     |                    |                    |
+      |                      |                     |                    |                    |
+      |                      |-- loadTeamsCache()-->|                   |                    |
+      |                      |                     |-- liest            |                    |
+      |                      |                     |   teams-cache.json |                    |
+      |                      |<-- {teams, stale:false}                  |                    |
+      |                      |   (Cache-HIT)        |                   |                    |
+      |                      |                      |                   |                    |
+      |              [für jedes Team im Cache]       |                   |                    |
+      |                      |                      |                   |                    |
+      |                      |-- fetchTeamMatches(teamId) ------------->|                    |
+      |                      |<-- Array<Match> -------------------------|                    |
+      |                      |                      |                   |                    |
+      |              [für jedes Match des Teams]     |                   |                    |
+      |                      |                      |                   |                    |
+      |                      |-- fetchMatchInfo(matchId) -------------->|                    |
+      |                      |<-- MatchInfo ----------------------------|                    |
+      |                      |                      |                   |                    |
+      |              [für jeden Typ: all/home/away]  |                   |                    |
+      |                      |                      |                   |                    |
+      |                      |-- generateICS(matches, details, teamId, type) ------------->|
+      |                      |                      |                   |   icsEscape()      |
+      |                      |                      |                   |   buildEvent()     |
+      |                      |                      |                   |   createEvents()   |
+      |                      |                      |                   |   VCALENDAR-Post-  |
+      |                      |                      |                   |   Processing       |
+      |                      |<-- ICS-String ----------------------------+--------------------|
+      |                      |                      |                   |                    |
+      |                      |-- saveICS(teamId, type, ics)-->|         |                    |
+      |                      |                      |-- schreibt        |                    |
+      |                      |                      |   {teamId}_{type}.ics                  |
+      |                      |<-- filepath ---------|                   |                    |
+      |                      |                      |                   |                    |
+      |              [nach allen Teams]              |                   |                    |
+      |                      |                      |                   |                    |
+      |                      |-- schreibt metadata.json (fs.writeFileSync)                   |
+      |                      |                      |                   |                    |
+      |<-- Prozess beendet --|                       |                   |                    |
+....
+
+==== Ablauf als nummerierte Schritte
+
+. GitHub Actions startet den Runner und führt `node src/cronUpdate.js` aus.
+. `cronUpdate.js` ruft `loadTeamsCache()` auf.
+. `storage.js` liest `generated/teams-cache.json`. Das `cachedAt`-Datum ist weniger als 30 Tage alt.
+. `loadTeamsCache()` gibt `{ teams: [...], stale: false }` zurück.
+. `cronUpdate.js` nutzt die gecachten Teams direkt (kein API-Aufruf für Club-Teams).
+. Für jedes Team: `fetchTeamMatches(teamId)` liefert alle Spiele des Teams als Array.
+. Für jedes Match: `fetchMatchInfo(matchId)` liefert Detailinfos (Hallenname, Adresse, vollständige Teamnamen).
+. Die Matches werden in drei Gruppen aufgeteilt: alle (`all`), nur Heimspiele (`home`), nur Auswärtsspiele (`away`).
+. Für jede Gruppe: `generateICS(...)` erzeugt einen vollständigen ICS-String.
+. In `buildEvent()` werden Zeiten berechnet: dtstart = Kickoff − 60 min, dtend = Kickoff + 150 min.
+. Der Alarm wird gesetzt: 30 min vor dtstart bei Heimspiel, 60 min bei Auswärtsspiel.
+. `createEvents()` der ics-Bibliothek erzeugt RFC-5545-konforme VEVENT-Blöcke.
+. Post-Processing: VCALENDAR-Header wird mit X-WR-CALNAME, X-WR-TIMEZONE etc. angereichert.
+. `saveICS(teamId, type, ics)` schreibt die Datei nach `generated/{teamId}_{type}.ics`.
+. Nach allen Teams: `metadata.json` wird mit Update-Zeitstempel und Spielzahlen geschrieben.
+. GitHub Actions führt danach `npm run generate-html` aus, das `index.html` aus `metadata.json` erzeugt.
+. Das `generated/`-Verzeichnis wird als GitHub Pages Artefakt hochgeladen und deployed.
+
+=== Szenario 2: Update-Zyklus mit Cache-MISS (erster Start oder Cache abgelaufen)
+
+Dieser Ablauf tritt beim ersten Start oder wenn der Cache älter als 30 Tage ist.
+
+==== Ablauf als nummerierte Schritte
+
+. GitHub Actions startet den Runner und führt `node src/cronUpdate.js` aus.
+. `cronUpdate.js` ruft `loadTeamsCache()` auf.
+. `storage.js` findet entweder keine `teams-cache.json` oder das `cachedAt`-Datum ist älter als 30 Tage.
+. `loadTeamsCache()` gibt `{ teams: null, stale: false }` (kein Cache) oder `{ teams: [...], stale: true }` (abgelaufen) zurück.
+. `cronUpdate.js` erkennt den Cache-MISS (`!cached || stale`) und ruft `fetchClubTeams(clubId)` auf.
+. `apiClient.js` sendet GET-Anfrage an `https://www.basketball-bund.net/rest/club/id/4468/actualmatches?justHome=false&rangeDays=150`.
+. Die API antwortet mit einer Liste aller Spiele des Vereins in den nächsten 150 Tagen.
+. `fetchClubTeams` extrahiert unique Teams (per `teamPermanentId`): iteriert über `homeTeam` und `guestTeam` jedes Spiels, filtert nach `clubId`, dedupliziert via Set.
+. Das Ergebnis ist ein Array von `{ id, name, ageGroup }` Objekten.
+. `saveTeamsCache(teams)` schreibt `{ cachedAt: <jetzt>, teams: [...] }` nach `generated/teams-cache.json`.
+. Ab hier identisch mit Szenario 1, Schritt 6 ff.
+
+==== Fehlerfall: Club-API nicht erreichbar
+
+Wenn Schritt 6 fehlschlägt (HTTP-Fehler oder Netzwerkfehler):
+
+. `fetchClubTeams` gibt `null` zurück.
+. `cronUpdate.js` prüft: `fresh === null` → prüft ob `cached` (abgelaufener Cache) vorhanden.
+. Falls abgelaufener Cache vorhanden: Warnung wird geloggt, abgelaufene Teams werden als Fallback verwendet.
+. Falls kein Cache vorhanden: Fehlermeldung wird geloggt, `[]` wird zurückgegeben — kein ICS-Update in diesem Lauf.

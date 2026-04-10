@@ -1,0 +1,186 @@
+== Architekturentscheidungen
+
+=== ADR-001: ICS (RFC 5545) statt CalDAV als Ausgabeformat
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2024
+
+| *Kontext*
+| Spieltermine der Fibalon Baskets Neumarkt sollen für Fans und Vereinsmitglieder in deren persönliche Kalender-Apps abrufbar sein. Dabei sollen verschiedene Plattformen (iOS, Android, Windows, macOS) unterstützt werden, ohne dass Nutzer eine App installieren müssen.
+
+| *Entscheidung*
+| Verwendung von statischen ICS-Dateien nach RFC 5545 als abonnierbare Kalender-Feeds. Keine CalDAV-Server-Implementation.
+
+| *Begründung*
+a|
+* ICS wird nativ von iOS Calendar, Google Calendar, Outlook, Thunderbird und praktisch allen anderen Kalenderanwendungen unterstützt.
+* CalDAV erfordert einen dauerhaft laufenden Server mit Authentifizierung, Session-Management und Datenbank.
+* Statische ICS-Dateien können auf GitHub Pages gehostet werden — kostenlos und wartungsfrei.
+* ICS ist ein Pull-Protokoll: der Client fragt die URL periodisch ab. Server-seitige Push-Logik ist nicht erforderlich.
+* Ein Ausfall des Generators hat keine sofortige Auswirkung auf Abonnenten (bestehende Daten bleiben abrufbar).
+
+| *Konsequenzen*
+a|
+* Positive: Keine Infrastrukturkosten, universelle Kompatibilität, kein laufender Server.
+* Negative: Keine Echtzeit-Updates (Client bestimmt die Sync-Frequenz, typischerweise stündlich). Keine bidirektionale Synchronisation möglich (Nutzer können keine Events bearbeiten).
+|===
+
+=== ADR-002: Eine clubId als einzige Konfiguration
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2024
+
+| *Kontext*
+| Das System soll für einen bestimmten Verein (Fibalon Baskets Neumarkt, clubId: 4468) betrieben werden. Es muss entschieden werden, wie Teams konfiguriert werden.
+
+| *Entscheidung*
+| Die gesamte Konfiguration besteht aus `config.json` mit einer einzigen Variable: `{ "clubId": "4468" }`. Teams werden dynamisch über die Club-API ermittelt.
+
+| *Begründung*
+a|
+* Die Basketball-Bund-API bietet einen Endpunkt, der alle Teams eines Vereins liefert — manuelle Pflege ist nicht nötig.
+* Neue Teams (z. B. neue Altersklassen) werden automatisch beim nächsten Cache-Ablauf erkannt.
+* Einfachheit hat Priorität: ein Parameter statt einer gepflegten Teamliste.
+* Die `clubId` ist eine stabile, unveränderliche Kennung des Vereins im DBB-System.
+
+| *Konsequenzen*
+a|
+* Positive: Zero-Maintenance bei Teamänderungen, eine einzige Konfigurationsdatei, einfaches Onboarding für neue Vereine.
+* Negative: Bei strukturellen Änderungen der Club-API müssen die Felder neu gemappt werden. Teams, die in den nächsten 150 Tagen keine Spiele haben, erscheinen nicht im Feed.
+|===
+
+=== ADR-003: 30-Tage-Cache für Team-Metadaten
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2024
+
+| *Kontext*
+| Die Club-Teams werden bei jedem der täglich vier Update-Zyklen benötigt. Die Team-Zusammensetzung eines Vereins ändert sich selten (typischerweise einmal pro Saison).
+
+| *Entscheidung*
+| Team-Metadaten werden in `generated/teams-cache.json` mit einer TTL von 30 Tagen zwischengespeichert.
+
+| *Begründung*
+a|
+* Ohne Cache: ~120 zusätzliche API-Aufrufe pro Monat an `/actualmatches` nur für Team-Ermittlung.
+* 30 Tage ist lang genug um Saison-Wechsel abzudecken, kurz genug um bei echten Änderungen aktuell zu bleiben.
+* Bei API-Fehler kann der abgelaufene Cache als Notfall-Fallback dienen.
+
+| *Konsequenzen*
+a|
+* Positive: Reduzierte API-Last, Ausfalltoleranz bei temporären API-Problemen, schnellere Ausführung.
+* Negative: In GitHub Actions ist der Cache wirkungslos (ephemerer Runner). Wenn ein Team hinzukommt, erscheint es erst nach Cache-Ablauf (maximal 30 Tage verzögert). Dies ist als technische Schuld dokumentiert.
+|===
+
+=== ADR-004: Differenzierte Alarm-Zeiten (Heim 30 min / Auswärts 60 min)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2024
+
+| *Kontext*
+| Kalender-Events sollen einen Alarm (VALARM) enthalten, der Abonnenten rechtzeitig an das Spiel erinnert. Bei Heimspielen ist die Sporthalle in der Nähe; bei Auswärtsspielen muss mehr Anreisezeit eingeplant werden.
+
+| *Entscheidung*
+| VALARM-Trigger: 30 Minuten vor `DTSTART` bei Heimspielen, 60 Minuten bei Auswärtsspielen. `DTSTART` liegt bereits 60 Minuten vor dem eigentlichen Kickoff.
+
+| *Begründung*
+a|
+* Heimspielfans/-besucher sind oft in der Nähe der Halle — 30 min Vorlauf zur Erinnerung ausreichend.
+* Auswärtsspiele erfordern Anreise — 60 min Vorlauf gibt mehr Puffer.
+* Die Unterscheidung Heim/Auswärts ist bereits per `teamPermanentId`-Vergleich bekannt.
+* Da `DTSTART` 60 min vor Kickoff liegt, entspricht ein Alarm 30 min vor `DTSTART` dem tatsächlichen Zeitraum von 90 min vor Kickoff bei Heimspielen, bzw. 120 min vor Kickoff bei Auswärtsspielen.
+
+| *Konsequenzen*
+a|
+* Positive: Individuell sinnvolle Erinnerungszeiten je nach Spieltyp.
+* Negative: Nur ein Alarm pro Event (keine mehrstufigen Erinnerungen). Abonnenten können den Alarm in ihrer Kalender-App manuell anpassen.
+|===
+
+=== ADR-005: Event-Zeitfenster (DTSTART = Kickoff −1h, DTEND = Kickoff +2,5h)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2024
+
+| *Kontext*
+| Ein Basketballspiel dauert offiziell 40 Minuten (4 × 10 Min.) plus Pausen. Der Termin im Kalender soll den realen Aufwand eines Spielbesuchs abbilden: Anreise + Anpfiff + Spiel + Nachspielzeit.
+
+| *Entscheidung*
+| `DTSTART` = Kickoff − 60 Minuten (Anreise-/Aufwärmpuffer), `DTEND` = Kickoff + 150 Minuten (2,5 Stunden für Spielzeit inkl. Pausen und Nachspielzeit).
+
+| *Begründung*
+a|
+* 60 Minuten Vorlauf: Typische Anreisezeit plus Einlass plus Aufwärmen der Teams.
+* 150 Minuten Gesamtspieldauer: 40 Min. Spielzeit + 15 Min. Halbzeit + Verlängerungen + Auslaufen = ca. 90–120 Min. aktive Spielzeit, plus Puffer.
+* Dieses Zeitfenster blockiert den Kalender realistisch und vermeidet Überschneidungen mit anderen Terminen.
+
+| *Konsequenzen*
+a|
+* Positive: Realistisches Zeitfenster im Kalender, sinnvolle Alarm-Berechnung.
+* Negative: Das Zeitfenster ist für alle Spiele gleich — Überstunden (Verlängerung, Overtime) werden nicht dynamisch erfasst. Die Kickoff-Zeit stammt aus der API; Zeitplanänderungen kurzfristig vor dem Spiel werden erst beim nächsten Update-Zyklus reflektiert.
+|===
+
+=== ADR-006: X-ALT-DESC für HTML-Beschreibungen (aktuell deaktiviert)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Deferred (vorläufig deaktiviert, Code vorhanden)
+
+| *Datum*
+| 2024
+
+| *Kontext*
+| ICS `DESCRIPTION` unterstützt nur Plain-Text. Microsoft Outlook und einige andere Clients unterstützen die nicht-standardisierte X-Property `X-ALT-DESC;FMTTYPE=text/html`, die eine HTML-Version der Beschreibung enthält und eine reichere Darstellung ermöglicht.
+
+| *Entscheidung*
+| Die Infrastruktur für `X-ALT-DESC` ist vollständig implementiert (`createHtmlDescription()`, Post-Processing-Logik in `generateICS()`), aber in der Event-Erzeugung temporär auskommentiert (`// htmlDescription`).
+
+| *Begründung*
+a|
+* `X-ALT-DESC` ist keine RFC-5545-Property — manche Clients ignorieren sie, andere verarbeiten sie fehlerhaft.
+* Debugging-Schwierigkeiten: HTML in ICS-Strings ist schwer zu verifizieren.
+* Implementierung ist fertig, Aktivierung erfordert Verifikation auf allen Zielclients.
+* Die Deaktivierung ist ein bewusstes temporäres Trade-off — Plain-Text DESCRIPTION ist universell kompatibel.
+
+| *Konsequenzen*
+a|
+* Aktuelle Konsequenz: Alle Clients zeigen Plain-Text-Beschreibungen. Funktionalität vollständig erhalten.
+* Zukünftige Aktivierung: Muss `buildEvent()` `htmlDescription` wieder befüllen und `createHtmlDescription()` testen. Besondere Sorgfalt bei Line-Folding (75-Zeichen-Limit) und HTML-in-ICS-Escaping erforderlich.
+|===

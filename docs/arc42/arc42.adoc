@@ -1,0 +1,36 @@
+= BBB ICS Generator — Architekturdokumentation
+:doctype: book
+:toc: left
+:toc-title: Inhalt
+:toclevels: 3
+:sectnums:
+:icons: font
+:source-highlighter: highlight.js
+:lang: de
+:author: Oliver-Marcus Eder
+:revdate: 2026-04-10
+:revnumber: 1.0
+
+include::chapters/01-introduction.adoc[]
+
+include::chapters/02-constraints.adoc[]
+
+include::chapters/03-context.adoc[]
+
+include::chapters/04-solution-strategy.adoc[]
+
+include::chapters/05-building-blocks.adoc[]
+
+include::chapters/06-runtime.adoc[]
+
+include::chapters/07-deployment.adoc[]
+
+include::chapters/08-crosscutting.adoc[]
+
+include::chapters/09-decisions.adoc[]
+
+include::chapters/10-quality.adoc[]
+
+include::chapters/11-risks.adoc[]
+
+include::chapters/12-glossary.adoc[]

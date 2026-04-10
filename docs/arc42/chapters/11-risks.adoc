@@ -1,0 +1,91 @@
+== Risiken und technische Schulden
+
+=== Risikotabelle
+
+[cols="1,3,2,2,4", options="header"]
+|===
+| ID | Risiko | Eintrittswahrscheinlichkeit | Auswirkung | Gegenmaßnahme / Mitigierung
+
+| R-01
+| *Basketball-Bund API-Downtime*: Die externe API unter `basketball-bund.net` ist temporär oder dauerhaft nicht erreichbar.
+| Mittel (externe Abhängigkeit, keine SLA)
+| Mittel (keine frischen Daten, aber bestehende ICS-Dateien gültig)
+| Fail-Graceful-Strategie: Bestehende ICS-Dateien werden nicht überschrieben. Abgelaufener Teams-Cache wird als Fallback verwendet. Bei dauerhaftem Ausfall: manueller Eingriff oder Migration zu einer alternativen Datenquelle.
+
+| R-02
+| *GitHub Pages Downtime*: GitHub Pages ist nicht erreichbar; Kalender-Clients können die ICS-Dateien nicht abrufen.
+| Niedrig (GitHub SLA > 99,9 %)
+| Hoch (alle Abonnenten betroffen solange Downtime anhält)
+| Keine Gegenmaßnahme sinnvoll (kostenlose Infrastruktur). Alternativlösung wäre Mirroring auf zweitem Hosting-Provider, aber overengineered für diesen Use Case.
+
+| R-03
+| *API-Strukturänderung*: Der Basketball-Bund ändert die JSON-Antwortstruktur (Felder werden umbenannt, verschoben oder entfernt).
+| Niedrig bis Mittel (öffentliche API ohne Versionierung oder Changelog)
+| Hoch (ICS-Dateien werden mit Standardwerten oder leer generiert)
+| Kein aktives Monitoring. Mitigation: Fehlerlogging in GitHub Actions wird sichtbare Warnungen erzeugen. Manuelle Anpassung des `apiClient.js` nach Analyse der neuen Struktur.
+
+| R-04
+| *ics-Bibliothek veraltet / Breaking Change*: Das npm-Paket `ics` (v3) veröffentlicht eine Breaking-Change-Version.
+| Niedrig (stabile Bibliothek, semantisches Versioning)
+| Mittel (generierte ICS-Struktur bricht, RFC-Konformität verloren)
+| `package.json` pinnt auf `^3.8.1` (Minor-Updates erlaubt, Major blockiert). Regelmäßige Abhängigkeits-Überprüfung empfohlen. Kein automatisches Dependency-Update (Dependabot nicht konfiguriert).
+
+| R-05
+| *GitHub Actions Free-Tier-Überschreitung*: Aktionen übersteigen das monatliche Kontingent (bei öffentlichen Repos: unbegrenzt).
+| Sehr niedrig (öffentliches Repository hat unlimitierte Minuten)
+| Niedrig
+| Kein unmittelbares Risiko für öffentliche Repos. Wenn das Repo auf privat gesetzt wird: ca. 480 min/Monat Verbrauch (4 Runs/Tag × 2 min × 30 Tage = 240 Runs × 2 min) — im kostenlosen Tier (2.000 min/Monat) noch komfortabel.
+
+| R-06
+| *Zeitzonenprobleme bei Sommerzeit-Wechsel*: Spieltermine, die rund um den Sommerzeit-/Winterzeit-Wechsel liegen, werden falsch gespeichert.
+| Niedrig
+| Niedrig (Kalender-Clients handeln Zeitzone meist korrekt)
+| ICS-Dateien verwenden floating times mit `X-WR-TIMEZONE:Europe/Berlin`. Korrekte Interpretation liegt beim Client. Eigentliche IANA-Zeitzonensemantik (VTIMEZONE-Komponente) ist nicht implementiert.
+|===
+
+=== Tabelle der technischen Schulden
+
+[cols="1,3,2,3", options="header"]
+|===
+| ID | Technische Schuld | Schweregrad | Empfohlene Maßnahme
+
+| TD-01
+| *Keine automatisierten Tests*: Es existieren weder Unit- noch Integrationstests für `icsGenerator.js`, `apiClient.js`, `storage.js` oder `cronUpdate.js`.
+| Hoch
+| Einführung von Unit-Tests (z. B. mit Jest oder Node's eingebautem `node:test`). Priorität: `icsGenerator.js` (RFC-5545-Validierung), `storage.js` (Path-Traversal-Schutz). Integrationstests mit gemockten API-Antworten für `cronUpdate.js`.
+
+| TD-02
+| *geocode.js nicht genutzt*: Das Modul `src/geocode.js` ist vorhanden, aber wird von keinem anderen Modul importiert oder aufgerufen (Dead Code).
+| Niedrig
+| Entweder in `icsGenerator.js` integrieren (GPS-Koordinaten in LOCATION-Property einbinden) oder aus dem Repository entfernen, um Verwirrung zu vermeiden.
+
+| TD-03
+| *Hartcodierte Base-URL in generateHTML.js*: `const BASE_URL = 'https://olieder.github.io/bbb-ics-generator/'` ist direkt im Code — nicht konfigurierbar.
+| Mittel
+| URL in `config.json` als `baseUrl`-Feld auslagern. `generateHTML.js` liest die URL aus der Konfiguration. Ermöglicht Einsatz des Systems für andere Vereine oder unter anderen GitHub-Usernamen ohne Code-Änderung.
+
+| TD-04
+| *Kein Linting / Code-Formatting*: Es existieren keine ESLint- oder Prettier-Konfigurationen. Code-Stil ist inkonsistent (z. B. `var` vs. `const`, gemischte Callback- und Promise-Stile).
+| Niedrig
+| `.eslintrc.json` und `.prettierrc` einrichten. GitHub Actions kann Linting als optionalen Pre-Deploy-Check ausführen. Wert steigt bei mehreren Contributern.
+
+| TD-05
+| *Teams-Cache ohne Wirkung in CI*: Der 30-Tage-TTL-Cache in `teams-cache.json` persistiert nicht zwischen GitHub Actions Runs (ephemerer Runner). Die Cache-Logik ist für die Produktionsumgebung faktisch wirkungslos.
+| Mittel
+| Entweder Cache über GitHub Actions Artefakte oder GitHub Releases persistent machen, oder explizit dokumentieren, dass der Cache nur für lokale Entwicklung gedacht ist. Alternativ: GitHub Actions Cache (`actions/cache`) für `generated/teams-cache.json` nutzen.
+
+| TD-06
+| *Kein Monitoring / Alerting*: Es gibt keine Benachrichtigung wenn ein Cron-Lauf fehlschlägt. GitHub Actions sendet standardmäßig keine E-Mail bei Workflow-Fehlern (außer bei aktivierter Notification-Einstellung im GitHub-Account).
+| Mittel
+| GitHub Actions Notification-Emails im Account aktivieren. Alternativ: Slack-/E-Mail-Benachrichtigung als letzten Workflow-Schritt hinzufügen, der nur bei Fehler ausgelöst wird.
+
+| TD-07
+| *X-ALT-DESC deaktiviert (ADR-006)*: Der Code für HTML-Beschreibungen (`createHtmlDescription`, Post-Processing-Logik) ist vollständig implementiert aber auskommentiert.
+| Niedrig
+| Aktivierung und Verifikation auf iOS, Google Calendar und Outlook. Line-Folding für lange HTML-Strings sicherstellen. Wenn nicht zeitnah aktiviert: Code entfernen oder in separaten Feature-Branch auslagern.
+
+| TD-08
+| *Keine Versionierung der API-Responses*: `apiClient.js` geht von einer stabilen JSON-Struktur aus. Abweichungen führen zu stillen Fehlern (z. B. `undefined` in Feldern).
+| Mittel
+| Schema-Validierung der API-Antworten (z. B. mit `zod` oder `joi`) einführen. Explizite Fehlermeldung wenn erwartete Felder fehlen. Verhindert stille Datenverluste bei API-Änderungen.
+|===

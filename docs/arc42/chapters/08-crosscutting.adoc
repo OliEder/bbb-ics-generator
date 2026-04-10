@@ -1,0 +1,156 @@
+== Querschnittliche Konzepte
+
+=== Fehlerbehandlung (Fail-Graceful-Prinzip)
+
+Das System folgt dem Prinzip der ausfalltoleranten Weiterführung: Ein Fehler bei einem einzelnen Team oder einer einzelnen API-Anfrage stoppt nicht den gesamten Update-Prozess.
+
+==== Fehlerbehandlungsstrategie pro Ebene
+
+[cols="2,3,4", options="header"]
+|===
+| Ebene | Fehlertyp | Verhalten
+
+| *Team-Ebene* (cronUpdate.js)
+| Fehler bei der Verarbeitung eines Teams (beliebige Exception)
+| `console.error` mit Stack-Trace; das Team wird übersprungen; alle anderen Teams werden normal verarbeitet. Implementiert via `try/catch` im `for...of`-Loop.
+
+| *API-Ebene* (apiClient.js)
+| HTTP-Fehler (4xx, 5xx), Netzwerkfehler (ECONNRESET, ETIMEDOUT)
+| `fetchTeamMatches` → `[]`; `fetchMatchInfo` → `null`; `fetchClubTeams` → `null`. Fehlerdetails werden via `console.error` geloggt (HTTP-Status oder Fehlermeldung).
+
+| *Cache-Ebene* (storage.js)
+| Abgelaufener Cache, kein Cache, defekte Cache-Datei (JSON-Parse-Fehler)
+| Abgelaufener Cache: wird als Fallback zurückgegeben mit `stale: true`. Kein Cache: `{ teams: null, stale: false }`. Parse-Fehler: `{ teams: null, stale: true }` — impliziter API-Aufruf.
+
+| *Club-Teams-API-Fehler* (cronUpdate.js)
+| `fetchClubTeams` gibt `null` zurück, aber abgelaufener Cache vorhanden
+| `[WARN]` Meldung; abgelaufene Cache-Daten werden als Fallback verwendet — letzter bekannter Zustand bleibt aktiv.
+
+| *Club-Teams-API-Fehler* (cronUpdate.js)
+| `fetchClubTeams` gibt `null` zurück, kein Cache vorhanden
+| `[ERROR]` Meldung; leeres Array — kein ICS-Update in diesem Lauf. Bestehende ICS-Dateien bleiben unverändert.
+
+| *ICS-Generierung* (icsGenerator.js)
+| `matches` ist leer oder `null`
+| `generateICS` gibt `null` zurück; `cronUpdate.js` prüft auf `null` vor `saveICS` und loggt `[WARN]`.
+|===
+
+==== Konsequenz für bestehende ICS-Abonnenten
+
+Bei einem komplett fehlgeschlagenen Update-Lauf (z. B. API dauerhaft nicht erreichbar) werden bestehende ICS-Dateien auf GitHub Pages *nicht überschrieben*. Abonnenten sehen weiterhin die zuletzt erfolgreich generierten Daten. Erst bei einem erfolgreichen nächsten Lauf (alle 6 Stunden) werden die Dateien aktualisiert.
+
+=== Caching-Strategie (Zwei-Layer-Cache)
+
+Das System verwendet konzeptionell zwei Cache-Schichten:
+
+==== Layer 1: Team-Metadaten-Cache (30-Tage-TTL)
+
+* *Datei:* `generated/teams-cache.json`
+* *Inhalt:* `{ cachedAt: ISO-8601-String, teams: [{ id, name, ageGroup }, ...] }`
+* *TTL:* 30 Tage (2.592.000.000 Millisekunden)
+* *Invalidierung:* Ausschließlich zeitbasiert (TTL-Ablauf)
+* *Fallback:* Abgelaufener Cache wird bei API-Fehler weiterverwendet
+* *Wirksamkeit:* In GitHub Actions nicht wirksam (ephemerer Runner); primär für lokale Entwicklung
+
+==== Layer 2: ICS-Dateien auf GitHub Pages (kein explizites Expiry)
+
+* *Dateien:* `generated/{teamId}_{type}.ics`
+* *Lebensdauer:* Bis zum nächsten erfolgreichen Update-Lauf
+* *Cache-Control:* Wird von GitHub Pages gesetzt (typischerweise kurze TTL für statische Assets)
+* *Funktion:* Abonnenten erhalten bei temporärer GitHub-Pages-Nichterreichbarkeit die zuletzt gecachten Daten durch ihren Kalender-Client
+
+=== Sicherheit
+
+==== Input-Validierung in storage.js
+
+Alle externen Eingaben, die als Teil von Dateipfaden verwendet werden, werden validiert:
+
+[source,javascript]
+----
+const VALID_TYPES = new Set(['all', 'home', 'away']);
+
+function saveICS(teamId, type, data) {
+  if (!VALID_TYPES.has(type)) throw new Error(`Ungültiger ICS-Typ: ${type}`);
+  if (!/^\d+$/.test(String(teamId))) throw new Error(`Ungültige teamId: ${teamId}`);
+  const filepath = path.join(ICS_DIR, `${teamId}_${type}.ics`);
+  // ...
+}
+----
+
+* `type` wird gegen eine Whitelist geprüft (`Set`-Lookup in O(1)) — verhindert beliebige Pfadsegmente
+* `teamId` wird gegen `/^\d+$/` geprüft — erlaubt ausschließlich Ziffern, verhindert `../` und andere Path-Traversal-Muster
+
+==== HTML-Escaping in generateHTML.js
+
+Alle aus der API stammenden Strings, die in HTML-Output eingebettet werden, durchlaufen `escapeHtml()`:
+
+[source,javascript]
+----
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+----
+
+* Verhindert XSS-Angriffe in der generierten HTML-Seite
+* Betrifft: Teamnamen, Altersgruppen-Bezeichnungen, Dateinamen in Link-Attributen
+
+==== ICS-Escaping in icsGenerator.js
+
+Alle Freitext-Felder in ICS-Properties werden durch `icsEscape()` normiert:
+
+[source,javascript]
+----
+function icsEscape(text) {
+  if (!text) return '';
+  return text
+    .replace(/\\/g, '\\\\')  // Backslash → \\
+    .replace(/;/g, '\\;')    // Semikolon → \;
+    .replace(/,/g, '\\,')    // Komma → \,
+    .replace(/\n/g, '\\n')   // Newline → \n (literal)
+    .replace(/\r/g, '');     // Carriage Return entfernen
+}
+----
+
+* Verhindert, dass Sonderzeichen die ICS-Struktur brechen (Property-Injection)
+* Betrifft: Kalendernamen (X-WR-CALNAME), HTML-Beschreibungen (X-ALT-DESC)
+* Für DESCRIPTION übernimmt die `ics`-Bibliothek das Escaping
+
+==== Kein Secret-Management erforderlich
+
+Die Basketball-Bund-API erfordert keine Authentifizierung. Es werden keine API-Keys, Tokens oder Passwörter verwendet. Das Repository enthält keine sensiblen Daten — lediglich die öffentlich bekannte `clubId: 4468`.
+
+=== Logging
+
+Das System verwendet ausschließlich `console.log`, `console.warn` und `console.error`. In GitHub Actions erscheinen diese Ausgaben im Actions-Log.
+
+[cols="2,3,3", options="header"]
+|===
+| Level | Verwendung | Beispiel
+
+| `console.log` / `[DEBUG]`
+| Normale Prozessschritte: Team-Lade-Ergebnis, ICS-Länge, Datei-Speicherung
+| `[DEBUG] Teams aus Cache geladen (3 Teams)`
+
+| `console.warn` / `[WARN]`
+| Unerwartete aber nicht kritische Zustände: leere Match-Liste, API-Fallback auf alten Cache
+| `[WARN] Club-API fehlgeschlagen, verwende abgelaufenen Cache`
+
+| `console.error` / `[ERROR]`
+| Fehler, die einen Team-Update verhindern: Exception bei Team-Verarbeitung, keine Teams verfügbar
+| `[ERROR] Keine Teams verfügbar — weder API noch Cache`
+|===
+
+Ein strukturiertes Logging-Framework (Winston, Pino) ist nicht vorhanden. Bei Bedarf wäre die Einführung eines solchen Frameworks eine sinnvolle Verbesserung, da GitHub Actions-Logs per se keine Log-Level-Filterung unterstützen.
+
+=== Zeitzonenbehandlung
+
+Alle Spieltermine werden in der deutschen Lokalzeit (Europe/Berlin) gespeichert. Die ICS-Dateien verwenden `DTSTART` und `DTEND` ohne UTC-Konvertierung, kombiniert mit:
+
+* `startInputType: 'local'` und `startOutputType: 'local'` in der ics-Bibliothek
+* `X-WR-TIMEZONE:Europe/Berlin` im VCALENDAR-Header
+
+Dies bedeutet, dass die generierten Zeiten "floating" sind — sie werden von Kalender-Clients in der lokalen Zeitzone des Abonnenten interpretiert, nicht als UTC. Für Abonnenten in Deutschland (Europe/Berlin) ist das korrekt. Abonnenten in anderen Zeitzonen würden falsche Zeiten angezeigt bekommen — dies ist ein bekanntes Trade-off zugunsten der Einfachheit.

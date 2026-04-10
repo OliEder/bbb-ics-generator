@@ -1,0 +1,83 @@
+== Lösungsstrategie
+
+=== Überblick der grundlegenden Entscheidungen
+
+Die Architektur des BBB ICS Generators basiert auf vier zentralen strategischen Entscheidungen, die gemeinsam ein einfaches, robustes und wartungsarmes System ergeben.
+
+=== Warum ICS statt CalDAV?
+
+ICS (RFC 5545) ist ein Pull-basiertes, dateibasiertes Format. Der Client ruft die Datei periodisch ab und synchronisiert lokal. CalDAV ist ein serverbasiertes Protokoll, das eine aktive Serverinstanz mit persistentem Speicher, Authentifizierung und Synchronisationslogik erfordert.
+
+*Entscheidung:* ICS-Dateien als statische Ressourcen.
+
+*Begründung:*
+
+* Statische Dateien können auf GitHub Pages gehostet werden — kostenlos, wartungsfrei, hochverfügbar.
+* Alle gängigen Kalenderanwendungen (iOS, Google, Outlook, Thunderbird) unterstützen ICS-Subscriptions nativ.
+* Kein Server, keine Datenbank, keine Laufzeitumgebung erforderlich.
+* Ausfälle des Generators beeinträchtigen bestehende Subscriptions nicht — der Client zeigt schlimmstenfalls veraltete Daten, aber keine Fehler.
+
+=== Warum GitHub Pages als Hosting?
+
+GitHub Pages ist das natürliche Hosting-Pendant zu GitHub Actions für statische Inhalte.
+
+*Entscheidung:* GitHub Pages als alleinige Hosting-Plattform.
+
+*Begründung:*
+
+* Kostenlos für öffentliche Repositories ohne Bandbreitenbeschränkung für typische Kalender-Payloads.
+* Nahtlose Integration mit GitHub Actions über `actions/upload-pages-artifact` und `actions/deploy-pages`.
+* HTTPS ist out-of-the-box vorhanden — Voraussetzung für `webcal://`-Subscriptions auf modernen iOS-Versionen.
+* Keine separate Infrastruktur, kein separates Deployment-System.
+* Verfügbarkeit von GitHub Pages liegt typischerweise bei über 99,9 % — ausreichend für einen Kalender-Feed.
+
+=== Warum ein 30-Tage-Cache für Teams?
+
+Die Team-Metadaten (welche Teams gehören zum Verein?) ändern sich selten — typischerweise einmal pro Saison, wenn neue Altersklassen-Teams dazukommen oder wegfallen.
+
+*Entscheidung:* `teams-cache.json` mit 30-Tage-TTL.
+
+*Begründung:*
+
+* Jeder API-Aufruf an `/rest/club/id/{clubId}/actualmatches` kostet Latenz und belastet die externe API.
+* Bei 4 Läufen pro Tag und ~8 Teams wären das ohne Cache zusätzliche ~120 API-Aufrufe pro Monat allein für Teamdaten.
+* 30 Tage deckt den gesamten Zeitraum ab, in dem sich Teamzusammensetzungen nicht ändern.
+* Bei Cache-Ablauf wird die API erneut aufgerufen; bei API-Fehler wird der abgelaufene Cache als Fallback verwendet.
+
+*Hinweis:* In der GitHub-Actions-Umgebung ist das `generated/`-Verzeichnis nicht persistent zwischen Runs. Der Cache wirkt dort de facto nicht — er ist primär für lokale Entwicklungsumgebungen relevant. Dieser Sachverhalt ist als technische Schuld dokumentiert (siehe Kapitel 11).
+
+=== Warum eine einzige clubId als Konfiguration?
+
+Das System ist als Single-Verein-Lösung konzipiert. Die gesamte Konfiguration besteht aus einer einzigen Datei mit einer einzigen Variablen.
+
+*Entscheidung:* `config.json` mit nur `{ "clubId": "4468" }`.
+
+*Begründung:*
+
+* Einfachheit hat Priorität. Der Betreiber ist Mitglied des Vereins und hat ein klar definiertes Einsatzszenario.
+* Alle Teams des Vereins werden automatisch über die Club-API ermittelt — keine manuelle Pflege einer Teamliste.
+* Ein neues Team wird automatisch beim nächsten Cache-Ablauf erkannt.
+* Für andere Vereine kann eine separate Instanz des Systems mit einer anderen `clubId` betrieben werden.
+
+=== Zusammenfassung der strategischen Entscheidungen
+
+[cols="3,3,3", options="header"]
+|===
+| Strategie | Alternative | Ausschlaggebendes Kriterium
+
+| ICS (RFC 5545) als Ausgabeformat
+| CalDAV, proprietäre APIs
+| Universelle Kompatibilität, kein Server nötig
+
+| GitHub Pages als Hosting
+| Eigener Server, Netlify, Vercel, S3
+| Keine Kosten, nahtlose GitHub-Integration
+
+| 30-Tage-Cache für Teamdaten
+| Kein Cache (immer API-Aufruf), kein TTL
+| API-Effizienz, Ausfalltoleranz
+
+| Eine clubId als einzige Konfiguration
+| Multi-Club-Konfiguration, Datenbank
+| Einfachheit, Self-Service durch Club-API
+|===

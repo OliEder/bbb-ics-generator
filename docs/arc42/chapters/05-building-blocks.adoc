@@ -1,0 +1,294 @@
+== Bausteinsicht
+
+=== Whitebox-Gesamtsystem
+
+Das System besteht aus sechs aktiven Modulen und einem ungenutzten Modul. Die Module sind lose gekoppelt und kommunizieren ausschließlich über Funktionsaufrufe (CommonJS `require`).
+
+....
++-----------------------------------------------------------+
+|                   BBB ICS Generator                       |
+|                                                           |
+|  +------------------+       +------------------------+   |
+|  | cronUpdate.js    |-----> | apiClient.js           |   |
+|  | (Orchestrator)   |       | (API-Facade)           |   |
+|  |                  |       +------------------------+   |
+|  |                  |                                    |
+|  |                  |       +------------------------+   |
+|  |                  |-----> | icsGenerator.js        |   |
+|  |                  |       | (RFC 5545 Renderer)    |   |
+|  |                  |       +------------------------+   |
+|  |                  |                                    |
+|  |                  |       +------------------------+   |
+|  |                  |-----> | storage.js             |   |
+|  +------------------+       | (Persistenz)           |   |
+|                             +------------------------+   |
+|                                                           |
+|  +------------------+       +------------------------+   |
+|  | generateHTML.js  |-----> | storage.js (lesen)     |   |
+|  | (HTML-Generator) |       +------------------------+   |
+|  +------------------+                                    |
+|                                                           |
+|  +------------------+                                    |
+|  | server.js        |   (nur lokale Entwicklung)         |
+|  | (Dev-Server)     |                                    |
+|  +------------------+                                    |
+|                                                           |
+|  +------------------+                                    |
+|  | geocode.js       |   (aktuell nicht verwendet)        |
+|  | (OSM Geocoding)  |                                    |
+|  +------------------+                                    |
++-----------------------------------------------------------+
+....
+
+=== Modul: cronUpdate.js (Orchestrator)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *Verantwortlichkeit*
+| Einstiegspunkt des Update-Prozesses. Orchestriert den kompletten Daten-Refresh: Teams ermitteln, Spielpläne abrufen, ICS generieren, Dateien speichern, Metadaten schreiben.
+
+| *Schnittstellen (eingehend)*
+| Keine. Wird direkt via `node src/cronUpdate.js` gestartet (durch GitHub Actions oder manuell).
+
+| *Schnittstellen (ausgehend)*
+| `apiClient.js`: `fetchTeamMatches(teamId)`, `fetchMatchInfo(matchId)`, `fetchClubTeams(clubId)` +
+`icsGenerator.js`: `generateICS(matches, details, teamId, kind, teamName)` +
+`storage.js`: `saveICS(teamId, type, data)`, `saveTeamsCache(teams)`, `loadTeamsCache()` +
+`config.json`: `clubId`
+
+| *Wichtige Logik*
+| Zweistufige Strategie für Team-Ermittlung: (1) Cache-HIT → sofortige Nutzung, (2) Cache-MISS → API-Aufruf + Cache-Befüllung, (3) API-Fehler + abgelaufener Cache → Fallback auf alten Cache. Pro Team werden drei ICS-Varianten erzeugt: `all`, `home`, `away`.
+
+| *Fehlerbehandlung*
+| Fehler pro Team werden geloggt, aber der Gesamtprozess wird für die verbleibenden Teams fortgesetzt (Fail-Graceful per Team-Isolation in try/catch).
+
+| *Abhängigkeiten*
+| `./apiClient`, `./icsGenerator`, `./storage`, `../config.json`, `fs`, `path`
+|===
+
+=== Modul: apiClient.js (API-Facade)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *Verantwortlichkeit*
+| Kapselt alle HTTP-Aufrufe an die Basketball-Bund REST-API. Abstrahiert die API-Struktur und gibt normalisierte Daten zurück. Fehlerbehandlung auf Transport-Ebene.
+
+| *Exportierte Funktionen*
+a|
+* `fetchTeamMatches(teamId)` → `Array<Match>` (leer bei Fehler)
+* `fetchMatchInfo(matchId)` → `MatchInfo \| null` (null bei Fehler)
+* `fetchClubTeams(clubId)` → `Array<Team> \| null` (null bei Fehler, leer wenn keine Matches)
+
+| *Schnittstellen (ausgehend)*
+| Basketball-Bund REST-API via `axios` HTTP-Client. Basis-URL: `https://www.basketball-bund.net/rest`.
+
+| *Wichtige Logik*
+| `fetchClubTeams` dedupliziert Teams per `teamPermanentId` (Set-basiertes Seen-Tracking). Nur Teams, deren `clubId` mit der übergebenen `clubId` übereinstimmt, werden zurückgegeben.
+
+| *Fehlerbehandlung*
+| Alle Funktionen fangen HTTP-Fehler und Netzwerkfehler via try/catch. Bei Fehler: `fetchTeamMatches` → `[]`, `fetchMatchInfo` → `null`, `fetchClubTeams` → `null`.
+
+| *Abhängigkeiten*
+| `axios`
+|===
+
+=== Modul: icsGenerator.js (RFC 5545 Renderer)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *Verantwortlichkeit*
+| Transformiert rohe Spielplan-Daten in valide ICS-Kalender-Dateien nach RFC 5545. Handhabt Zeitberechnung, Beschreibungsformatierung, ICS-Escaping und VCALENDAR-Header-Injection.
+
+| *Exportierte Funktionen*
+a|
+* `generateICS(matches, details, teamId, type, teamName)` → `Promise<string \| null>`
+
+| *Interne Funktionen*
+a|
+* `buildEvent(match, matchInfo, teamId, calendarType)` → `Promise<EventObject>`
+* `icsEscape(text)` → escaping nach RFC 5545 (Backslash, Semikolon, Komma, Newline)
+* `escapeHtml(str)` → HTML-Escaping für X-ALT-DESC
+* `createHtmlDescription(lines, feld)` → HTML-Snippet für X-ALT-DESC
+* `dateToArr(d)` → Date-Objekt zu `[year, month, day, hour, minute]` Array
+* `formatKickoff(dateStr, timeStr)` → Deutsche Datumsformatierung für Beschreibungstext
+
+| *Zeitberechnung*
+a|
+* `dtstart` = Kickoff − 60 Minuten (Anreisepuffer)
+* `dtend` = Kickoff + 150 Minuten (2,5 Stunden Spielzeit inkl. Puffer)
+* Alarm: 30 Minuten vor `dtstart` bei Heimspielen, 60 Minuten bei Auswärtsspielen
+
+| *Wichtige Logik*
+| Die `ics`-Bibliothek erzeugt RFC-konforme VEVENT-Blöcke. Der Generator führt danach eine zeilenbasierte Post-Processing-Pipeline aus: VCALENDAR-Header-Ersetzung mit X-WR-*-Properties, X-ALT-DESC-Injektion nach DESCRIPTION unter Berücksichtigung von Line-Folding, Entfernung automatisch generierter Duplikat-Header.
+
+| *ICS-Escaping*
+| `icsEscape` kodiert die vier RFC-5545-Sonderzeichen: `\` → `\\`, `;` → `\;`, `,` → `\,`, `\n` → `\n` (literal), `\r` wird entfernt. HTML-Beschreibungen werden zusätzlich von echten Newlines bereinigt.
+
+| *Abhängigkeiten*
+| `ics` (npm-Paket v3)
+|===
+
+=== Modul: storage.js (Persistenz)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *Verantwortlichkeit*
+| Kapselt alle Lese- und Schreibzugriffe auf das Dateisystem. Stellt sicher, dass keine Path-Traversal-Angriffe möglich sind. Verwaltet den Team-Cache mit TTL.
+
+| *Exportierte Funktionen*
+a|
+* `saveICS(teamId, type, data)` → `string` (Dateipfad)
+* `readICS(teamId, type)` → `string \| null`
+* `saveTeamsCache(teams)` → schreibt `teams-cache.json`
+* `loadTeamsCache()` → `{ teams: Array \| null, stale: boolean }`
+
+| *Sicherheitsmechanismen*
+a|
+* *Whitelist-Validierung für `type`*: Nur `'all'`, `'home'`, `'away'` erlaubt (via `Set`-Lookup).
+* *Regex-Validierung für `teamId`*: Nur reine Zahlenketten erlaubt (`/^\d+$/`).
+* Beide Prüfungen verhindern Path-Traversal (z. B. `../../etc/passwd`).
+
+| *Cache-Logik*
+| `teams-cache.json` enthält `{ cachedAt: ISO-8601-String, teams: [...] }`. TTL = 30 Tage. `loadTeamsCache` gibt `stale: true` zurück wenn `Date.now() - cachedAt >= 30 * 24 * 60 * 60 * 1000`. Bei Parse-Fehler wird `{ teams: null, stale: true }` zurückgegeben.
+
+| *Ausgabeverzeichnis*
+| `generated/` (relativ zum Projektroot). Wird bei Start automatisch angelegt wenn nicht vorhanden.
+
+| *Abhängigkeiten*
+| `fs`, `path` (Node.js Stdlib)
+|===
+
+=== Modul: generateHTML.js (HTML-Generator)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *Verantwortlichkeit*
+| Erzeugt die statische HTML-Übersichtsseite `generated/index.html` mit Subscription-Links für alle Teams.
+
+| *Eingang*
+| `generated/metadata.json` (erzeugt von `cronUpdate.js`) mit Teamname, Altersgruppe, Spielanzahlen und Timestamp.
+
+| *Ausgang*
+| `generated/index.html` mit drei Link-Gruppen pro Team: webcal:// (iOS/macOS), Google Calendar Render-URL (Android), direkte HTTPS-URL (Download).
+
+| *Wichtige Logik*
+| HTML-Escaping aller aus `metadata.json` gelesenen Strings via `escapeHtml()`. Hartcodierte Base-URL `https://olieder.github.io/bbb-ics-generator/` (bekannte technische Schuld, siehe Kapitel 11).
+
+| *Abhängigkeiten*
+| `fs`, `path` (Node.js Stdlib)
+|===
+
+=== Modul: server.js (Lokaler Entwicklungsserver)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *Verantwortlichkeit*
+| Stellt die generierten Dateien lokal unter `http://localhost:3000` bereit, damit Entwickler die Ausgabe ohne GitHub Pages testen können.
+
+| *Verwendung*
+| Ausschließlich für lokale Entwicklung. Wird in GitHub Actions nicht aufgerufen.
+
+| *Abhängigkeiten*
+| `express`
+|===
+
+=== Modul: geocode.js (OSM Geocoding — aktuell nicht genutzt)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *Verantwortlichkeit*
+| War als Integration für OpenStreetMap Nominatim Geocoding vorgesehen, um Hallenadressen in GPS-Koordinaten umzuwandeln.
+
+| *Status*
+| Das Modul ist im Repository vorhanden, wird aber von keinem anderen Modul importiert oder aufgerufen. Es ist aktuell funktionslos (Dead Code).
+
+| *Geplante Verwendung*
+| Zukünftige Integration: LOCATION-Eigenschaft in VEVENT-Events mit GPS-Koordinaten anreichern, damit Kalender-Apps direkt zur Sporthalle navigieren können.
+
+| *Abhängigkeiten*
+| Unbekannt (nicht in Verwendung); vermutlich `axios` für HTTP-Anfragen an Nominatim.
+|===
+
+=== Abhängigkeitsmatrix
+
+[cols="2,1,1,1,1,1,1,1", options="header"]
+|===
+| Modul | cronUpdate | apiClient | icsGenerator | storage | generateHTML | server | geocode
+
+| *cronUpdate.js*
+| —
+| nutzt
+| nutzt
+| nutzt
+| —
+| —
+| —
+
+| *apiClient.js*
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+
+| *icsGenerator.js*
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+
+| *storage.js*
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+
+| *generateHTML.js*
+| —
+| —
+| —
+| liest FS direkt
+| —
+| —
+| —
+
+| *server.js*
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+
+| *geocode.js*
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+|===

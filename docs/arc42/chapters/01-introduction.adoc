@@ -1,0 +1,69 @@
+== Einführung und Ziele
+
+=== Aufgabenstellung
+
+Der *BBB ICS Generator* ist ein automatisierter Kalender-Feed-Dienst für die *Fibalon Baskets Neumarkt*.
+Er ruft Spieltermine für alle Teams des Vereins über die öffentliche REST-API des Deutschen Basketball-Bundes (DBB) ab und stellt diese als abonnierbare ICS-Feeds bereit.
+
+Die Feeds können von Fans, Spielern und Betreuern direkt in ihre Kalenderanwendungen (iOS Calendar, Google Calendar, Outlook, Thunderbird u. a.) abonniert werden.
+Nach einmaliger Einrichtung erhalten Abonnenten automatisch alle neuen und geänderten Spieltermine, ohne manuelles Eingreifen.
+
+Die Kernfunktionalität umfasst:
+
+* Automatischer Abruf aller aktiven Teams des Vereins über die `clubId`
+* Abruf der Spielplandaten (Gegner, Datum, Uhrzeit, Liga, Spielfeld) pro Team
+* Erzeugung valider ICS-Dateien nach RFC 5545 in drei Varianten: alle Spiele, nur Heimspiele, nur Auswärtsspiele
+* Bereitstellung als statische Dateien über GitHub Pages mit webcal://, HTTPS- und Google-Calendar-Links
+* Automatische Aktualisierung alle sechs Stunden über GitHub Actions
+
+=== Qualitätsziele
+
+Die folgende Tabelle listet die drei wichtigsten Qualitätsziele in absteigender Priorität:
+
+[cols="1,2,4", options="header"]
+|===
+| Priorität | Qualitätsziel | Beschreibung und Messbarkeit
+
+| 1
+| *Kompatibilität*
+| Die erzeugten ICS-Dateien müssen von allen verbreiteten Kalenderanwendungen fehlerfrei importiert und abonniert werden können — insbesondere iOS Calendar, Google Calendar, Microsoft Outlook und Mozilla Thunderbird. Grundlage ist die strikte Einhaltung von RFC 5545 inklusive Line-Folding und korrekt escapeter Sonderzeichen.
+
+| 2
+| *Zuverlässigkeit*
+| Der tägliche Aktualisierungsprozess muss auch bei temporärer Nichtverfügbarkeit der Basketball-Bund-API stabil laufen. Bereits generierte ICS-Dateien bleiben unverändert erhalten; der nächste erfolgreiche Lauf überschreibt sie. Ein 30-Tage-Cache für die Team-Metadaten verhindert unnötige API-Aufrufe und schützt vor Ausfällen der Club-Teams-API.
+
+| 3
+| *Wartbarkeit*
+| Neue Teams werden automatisch über die `clubId` erkannt — keine manuelle Pflege einer Teamliste. Die gesamte Konfiguration beschränkt sich auf eine einzige Datei (`config.json`) mit einer einzigen Variable (`clubId`). Das Hinzufügen weiterer Vereine erfordert lediglich eine weitere Instanz des Systems.
+|===
+
+=== Stakeholder
+
+[cols="2,2,4", options="header"]
+|===
+| Rolle | Beschreibung | Interesse / Erwartung
+
+| Fans und Zuschauer
+| Interessierte Personen, die Spieltermine verfolgen möchten
+| Zuverlässiger, immer aktueller Kalender-Feed ohne manuelle Pflege; einfache Subscription über webcal- oder Google-Calendar-Link
+
+| Spielerinnen und Spieler
+| Aktive Mitglieder der Teams des Vereins
+| Terminbenachrichtigungen rechtzeitig vor dem Spielbeginn; korrekte Heimspiel-/Auswärtsspiel-Unterscheidung mit angepassten Alarm-Zeiten
+
+| Trainer und Betreuer
+| Verantwortliche für die Organisation der Teams
+| Übersicht aller Spiele eines Teams; korrekte Spielfeldinformationen (Halle, Adresse)
+
+| Vereinsverantwortliche (Fibalon Baskets Neumarkt)
+| Administration des Vereins (clubId: 4468)
+| Automatischer Betrieb ohne manuelle Pflege; keine laufenden Kosten
+
+| Systemadministrator / Maintainer
+| Person, die das GitHub-Repository betreut
+| Einfache Konfiguration; verständlicher Code; klare Fehlermeldungen im Actions-Log
+
+| GitHub Actions / GitHub Pages
+| Technische Infrastruktur
+| Keine dauerhaften Prozesse; reine Build-und-Deploy-Pipeline; Einhaltung der GitHub-Pages-Größenbeschränkungen
+|===

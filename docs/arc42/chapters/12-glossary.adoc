@@ -1,0 +1,69 @@
+== Glossar
+
+[cols="2,5", options="header"]
+|===
+| Begriff | Erklärung
+
+| *RFC 5545*
+| "Internet Calendaring and Scheduling Core Object Specification". Der Internet-Standard (Request for Comments Nr. 5545 der IETF, veröffentlicht 2009), der das iCalendar-Datenformat definiert. Legt Syntax, Pflichtfelder und Escape-Regeln für Kalender-Dateien fest. Ablösung von RFC 2445. Wichtigste Einschränkung: Textzeilen dürfen maximal 75 Oktetts lang sein (Line-Folding erforderlich).
+
+| *ICS*
+| Dateiendung und umgangssprachliche Bezeichnung für iCalendar-Dateien nach RFC 5545. Der MIME-Type ist `text/calendar`. ICS-Dateien können einzelne oder mehrere Kalender-Ereignisse (VEVENT) enthalten und von allen gängigen Kalenderanwendungen importiert oder abonniert werden.
+
+| *VCALENDAR*
+| Das äußere Container-Objekt einer ICS-Datei, begrenzt durch `BEGIN:VCALENDAR` und `END:VCALENDAR`. Enthält Calendar-Properties wie `PRODID`, `VERSION`, `CALSCALE`, `METHOD` und X-Properties wie `X-WR-CALNAME`, sowie alle enthaltenen VEVENT-Objekte.
+
+| *VEVENT*
+| Ein einzelnes Kalenderereignis innerhalb einer ICS-Datei, begrenzt durch `BEGIN:VEVENT` und `END:VEVENT`. Pflichtfelder nach RFC 5545: `DTSTART` (Startzeit), `UID` (eindeutige ID), `DTSTAMP` (Zeitstempel der Erzeugung). Im BBB ICS Generator enthält jedes VEVENT auch `DTEND`, `SUMMARY`, `DESCRIPTION`, `LOCATION`, `BUSYSTATUS` und ein `VALARM`.
+
+| *VALARM*
+| Eine Unterkomponente eines VEVENT, die eine Erinnerung (Alarm) definiert, begrenzt durch `BEGIN:VALARM` und `END:VALARM`. Felder: `ACTION` (z. B. `DISPLAY`), `DESCRIPTION` (Alarmtext), `TRIGGER` (relativer Zeitversatz, z. B. `-PT30M` für 30 Minuten vor DTSTART).
+
+| *UID*
+| "Unique Identifier". Pflichtfeld in VEVENT nach RFC 5545. Muss global eindeutig sein und über alle Versionen eines Events konstant bleiben, damit Kalender-Clients Updates (nicht Duplikate) erkennen. Im BBB ICS Generator: `{matchId}@basketball-bund.net`.
+
+| *webcal://*
+| Ein URI-Schema (kein eigenes Protokoll), das HTTPS für Kalender-Subscriptions signalisiert. `webcal://` ist funktional identisch mit `https://`, wird aber von iOS Calendar, macOS Calendar und Outlook als Trigger für die Subscription-Logik erkannt. Der Browser öffnet beim Klick automatisch die Kalender-App.
+
+| *teamPermanentId*
+| Die dauerhafte, unveränderliche ID eines Teams im Basketball-Bund-System. Im Gegensatz zu `teamId` bleibt die `teamPermanentId` über Saisons hinweg stabil. Im BBB ICS Generator als `teamId` verwendet und als Dateinamen-Bestandteil (`{teamPermanentId}_{type}.ics`).
+
+| *clubId*
+| Die eindeutige ID eines Basketballvereins im DBB-System. Im BBB ICS Generator die einzige Konfigurationsvariable (`config.json`). Für die Fibalon Baskets Neumarkt: `4468`. Alle Teams, ICS-Feeds und Links werden von dieser einen ID abgeleitet.
+
+| *spielfeld*
+| Feldname im Basketball-Bund API-Response (`matchInfo.matchInfo.spielfeld`). Enthält Informationen zur Spielhalle: `bezeichnung` (Name der Halle), `strasse` (Straße), `plz` (Postleitzahl), `ort` (Stadt). Wird in der `LOCATION`-Property des VEVENT und in der DESCRIPTION verwendet.
+
+| *Line-Folding*
+| Pflicht-Mechanismus nach RFC 5545: ICS-Textzeilen dürfen maximal 75 Oktetts lang sein. Längere Zeilen müssen mit einem CRLF gefolgt von einem einzelnen Leerzeichen oder Tab umgebrochen werden. Die `ics`-Bibliothek übernimmt Line-Folding für Standard-Properties. Bei manuell eingefügten X-Properties (z. B. `X-ALT-DESC`) muss Line-Folding manuell berücksichtigt werden.
+
+| *X-Property*
+| Eine proprietäre, nicht-standardisierte Property in einer ICS-Datei, erkennbar am `X-`-Präfix. Erlaubt durch RFC 5545 als Erweiterungsmechanismus. Beispiele im BBB ICS Generator: `X-WR-CALNAME` (Kalenderanzeigename), `X-WR-TIMEZONE` (bevorzugte Zeitzone), `X-WR-CALDESC` (Kalenderbeschreibung). Werden von Kalender-Clients unterschiedlich stark unterstützt.
+
+| *X-ALT-DESC*
+| Eine spezifische X-Property mit dem Wert `FMTTYPE=text/html`, die eine HTML-Version der DESCRIPTION enthält. Wird von Microsoft Outlook und einigen anderen Clients für eine reichere Darstellung verwendet. Nicht im RFC 5545 definiert. Im BBB ICS Generator implementiert aber vorläufig deaktiviert (ADR-006).
+
+| *ICS-Escape*
+| Die Zeichenmaskierung, die innerhalb von ICS-Property-Werten erforderlich ist, um Syntaxkonflikte zu vermeiden. Nach RFC 5545 müssen folgende Zeichen in Textwerten escapt werden: Backslash (`\`) → `\\`, Semikolon (`;`) → `\;`, Komma (`,`) → `\,`, Newline (`\n`) → `\n` (literal zwei Zeichen). Implementiert in `icsGenerator.js::icsEscape()`.
+
+| *PRODID*
+| "Product Identifier". Pflichtfeld im VCALENDAR-Container nach RFC 5545. Identifiziert das Programm, das die ICS-Datei erzeugt hat. Im BBB ICS Generator: `-//bbb-ics-generator//DE`. Format: `-//Organisation//Produkt//Sprache`.
+
+| *CALSCALE*
+| "Calendar Scale". VCALENDAR-Property, die den verwendeten Kalender-Standard angibt. Standardwert: `GREGORIAN` (Gregorianischer Kalender). Im BBB ICS Generator explizit auf `GREGORIAN` gesetzt.
+
+| *METHOD*
+| VCALENDAR-Property, die den Verwendungszweck der ICS-Datei beschreibt. Wert `PUBLISH` bedeutet: der Kalender wird veröffentlicht (kein iTIP-Workflow). Alternative: `REQUEST` für Meeting-Einladungen. Im BBB ICS Generator: `METHOD:PUBLISH`.
+
+| *DTSTART / DTEND*
+| "Date-Time Start / End". Pflicht- bzw. Optionalfelder im VEVENT. Definieren Beginn und Ende eines Kalendereintrags. Können als lokale Zeit (floating), UTC-Zeit (mit `Z`-Suffix) oder mit expliziter Zeitzone (`TZID`-Parameter) angegeben werden. Im BBB ICS Generator: floating times mit `startInputType/startOutputType: 'local'`.
+
+| *DTSTAMP*
+| "Date-Time Stamp". Pflichtfeld im VEVENT nach RFC 5545. Enthält den UTC-Zeitpunkt, zu dem das Event-Objekt erzeugt wurde. Wird von der `ics`-Bibliothek automatisch gesetzt.
+
+| *Kickoff*
+| Fachbegriff für den Anpfiff-Zeitpunkt eines Basketballspiels, wie er aus der Basketball-Bund-API als `kickoffDate` (Datum) und `kickoffTime` (Uhrzeit, Format `HH:MM`) geliefert wird. `DTSTART` im generierten Event liegt 60 Minuten vor dem Kickoff.
+
+| *teamname / teamnameSmall*
+| Felder im Basketball-Bund API-Response. `teamname` ist der vollständige Teamname (z. B. "Fibalon Baskets Neumarkt"). `teamnameSmall` ist die Kurzform (z. B. "Baskets Neumarkt"), die im VEVENT-`SUMMARY` verwendet wird. Wenn `teamnameSmall` nicht verfügbar ist, wird `teamname` als Fallback verwendet.
+|===

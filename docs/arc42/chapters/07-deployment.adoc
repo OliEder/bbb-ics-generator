@@ -1,0 +1,153 @@
+== Verteilungssicht
+
+=== Übersicht der Deployment-Umgebungen
+
+Das System kennt zwei Umgebungen: die lokale Entwicklungsumgebung und die Produktionsumgebung auf GitHub.
+
+....
++---------------------------+        +-------------------------------------------+
+|  Lokale Entwicklung       |        |  Produktionsumgebung (GitHub)             |
+|                           |        |                                           |
+|  Developer-Maschine       |        |  +---------------------+                 |
+|                           |        |  | GitHub Actions      |                 |
+|  node src/cronUpdate.js   |        |  | ubuntu-latest Runner|                 |
+|  node src/generateHTML.js |        |  |                     |                 |
+|  node src/server.js       |        |  | node-version: 18    |                 |
+|  (Port 3000)              |        |  | npm install         |                 |
+|                           |        |  | npm run update      |                 |
+|  generated/               |        |  | npm run generate-html                |
+|    *.ics                  |        |  +----------+----------+                 |
+|    index.html             |        |             |                            |
+|    teams-cache.json       |        |             | upload artifact            |
+|    metadata.json          |        |             v                            |
+|                           |        |  +---------------------+                 |
++---------------------------+        |  | GitHub Pages        |                 |
+                                     |  | (Static Hosting)    |                 |
+                                     |  |                     |                 |
+                                     |  | *.ics Dateien       |                 |
+                                     |  | index.html          |                 |
+                                     |  |                     |                 |
+                                     |  | URL: https://       |                 |
+                                     |  | olieder.github.io/  |                 |
+                                     |  | bbb-ics-generator/  |                 |
+                                     |  +---------------------+                 |
+                                     +-------------------------------------------+
+....
+
+=== GitHub Actions Workflow
+
+Der einzige CI/CD-Workflow ist in `.github/workflows/deploy.yml` definiert.
+
+==== Trigger
+
+[cols="2,4", options="header"]
+|===
+| Trigger | Beschreibung
+
+| `schedule: cron: '0 */6 * * *'`
+| Automatischer Start alle 6 Stunden (0:00, 6:00, 12:00, 18:00 UTC). Stellt sicher, dass Spielplanänderungen zeitnah übernommen werden.
+
+| `push: branches: [main]`
+| Automatischer Start bei jedem Push auf den `main`-Branch. Sinnvoll nach Code-Änderungen und Konfigurationsanpassungen.
+
+| `workflow_dispatch`
+| Manueller Start über die GitHub Actions Web-UI. Für sofortige Aktualisierungen oder Debugging.
+|===
+
+==== Berechtigungen
+
+Der Workflow benötigt drei spezifische Permissions:
+
+[cols="2,3", options="header"]
+|===
+| Permission | Zweck
+
+| `contents: read`
+| Checkout des Repository-Inhalts
+
+| `pages: write`
+| Upload und Deployment auf GitHub Pages
+
+| `id-token: write`
+| OIDC-Token für die pages-Deployment-Action
+|===
+
+==== Workflow-Schritte im Detail
+
+. *Checkout* (`actions/checkout@v4`): Klont den `main`-Branch in das Runner-Arbeitsverzeichnis. Enthält `src/`, `config.json`, `package.json`.
+
+. *Setup Node.js* (`actions/setup-node@v4`, `node-version: '18'`): Installiert Node.js 18 LTS auf dem Ubuntu-Runner.
+
+. *Install dependencies* (`npm install`): Installiert alle npm-Abhängigkeiten aus `package.json` (`axios`, `ics`, `express`, `node-cron`). Kein `--ci`-Flag, kein Lockfile-Enforcement.
+
+. *Generate ICS files* (`npm run update` → `node src/cronUpdate.js`): Hauptschritt. Ruft die Basketball-Bund-API ab, erzeugt alle ICS-Dateien und schreibt `metadata.json` in `generated/`.
+
+. *Generate HTML* (`npm run generate-html` → `node src/generateHTML.js`): Erzeugt `generated/index.html` aus `metadata.json`.
+
+. *List generated files (debug)* (`ls -la generated/`, `find generated/ -name "*.ics" -ls`): Diagnostik-Schritt, listet alle erzeugten Dateien im Actions-Log.
+
+. *Setup Pages* (`actions/configure-pages@v4`): Konfiguriert GitHub Pages für den aktuellen Repository-Kontext.
+
+. *Upload artifact* (`actions/upload-pages-artifact@v3`, `path: ./generated`): Packt das `generated/`-Verzeichnis als Pages-Artefakt.
+
+. *Deploy to GitHub Pages* (`actions/deploy-pages@v4`): Deployed das Artefakt auf GitHub Pages. Gibt die öffentliche URL als Output `page_url` zurück.
+
+==== Concurrency-Steuerung
+
+[source,yaml]
+----
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+----
+
+Verhindert parallele Deployments: Ein laufendes Deployment wird nicht abgebrochen, wenn ein neues getriggert wird. Das neue Deployment wartet, bis das aktuelle abgeschlossen ist.
+
+=== Verzeichnisstruktur nach erfolgreichem Build
+
+....
+generated/
+├── {teamId}_all.ics       # Alle Spiele eines Teams
+├── {teamId}_home.ics      # Nur Heimspiele
+├── {teamId}_away.ics      # Nur Auswärtsspiele
+├── ... (3 Dateien pro Team)
+├── metadata.json          # Update-Metadaten für HTML-Generator
+├── teams-cache.json       # Team-Cache (effektiv nur lokal relevant)
+└── index.html             # Übersichtsseite mit Subscription-Links
+....
+
+=== Nutzer-Subscription
+
+Endnutzer können die ICS-Feeds auf drei Arten abonnieren:
+
+[cols="2,3,4", options="header"]
+|===
+| Methode | URL-Schema | Zielplattformen
+
+| *webcal://*
+| `webcal://olieder.github.io/bbb-ics-generator/{teamId}_{type}.ics`
+| iOS Calendar (iPhone/iPad), macOS Calendar, Outlook 2016+
+
+| *Google Calendar Render-URL*
+| `https://www.google.com/calendar/render?cid=webcal%3A%2F%2Folieder.github.io%2F...`
+| Google Calendar (Web), Android (Kalender-App)
+
+| *Direkte HTTPS-URL*
+| `https://olieder.github.io/bbb-ics-generator/{teamId}_{type}.ics`
+| Thunderbird, manuelle ICS-Downloads, Outlook (Web-Abo)
+|===
+
+==== Subscription-Prozess unter iOS
+
+. Nutzer öffnet `https://olieder.github.io/bbb-ics-generator/` im Browser.
+. Klickt auf den gewünschten "iOS/Mac: ..." Link.
+. iOS fragt: "Kalender abonnieren?" — Bestätigung durch Nutzer.
+. iOS Calendar synchronisiert den Feed initial und danach automatisch alle paar Stunden.
+. Spieltermine erscheinen im persönlichen Kalender mit Alarm 30/60 Minuten vor dem Event.
+
+==== Subscription-Prozess unter Android (Google Calendar)
+
+. Nutzer öffnet die Übersichtsseite und klickt auf "Android: ..." Link.
+. Browser öffnet `google.com/calendar/render?cid=...`
+. Google Calendar fragt nach Bestätigung zum Hinzufügen des Kalenders.
+. Synchronisierung erfolgt durch Google-Server (nicht durch das Gerät direkt).
