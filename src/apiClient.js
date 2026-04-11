@@ -144,6 +144,37 @@ async function fetchTournamentRounds(ligaId) {
       const roundName = nameMap[matches.length] || `Runde ${day}`;
       rounds.push({ roundName, matches: matches.map(mapMatch) });
     }
+
+    // Fill in missing future rounds with known winners (or TBD) as placeholders
+    const roundSizes = [8, 4, 2, 1];
+    const lastRound = rounds[rounds.length - 1];
+    let prevMatches = lastRound ? lastRound.matches : [];
+    let prevSize = prevMatches.length;
+    let nextSize = prevSize / 2;
+    while (nextSize >= 1) {
+      // Derive participants: winners from previous round, TBD where no result yet
+      const participants = [];
+      for (const m of prevMatches) {
+        if (m.homeWon === true)  participants.push(m.home);
+        else if (m.homeWon === false) participants.push(m.guest);
+        else { participants.push('TBD'); participants.push('TBD'); break; }
+      }
+      // Pair up participants into matches
+      const placeholderMatches = [];
+      for (let i = 0; i < nextSize; i++) {
+        placeholderMatches.push({
+          home: participants[i * 2]     || 'TBD',
+          guest: participants[i * 2 + 1] || 'TBD',
+          result: null, homeWon: null, homeBye: false, guestBye: false,
+        });
+      }
+      const roundName = nameMap[nextSize] || `Runde (${nextSize} Spiele)`;
+      rounds.push({ roundName, matches: placeholderMatches });
+      prevMatches = placeholderMatches;
+      prevSize = nextSize;
+      nextSize = Math.floor(nextSize / 2);
+    }
+
     return rounds.length > 0 ? rounds : null;
   } catch (err) {
     console.error('API error fetchTournamentRounds spielplan', ligaId, err.response ? err.response.status : err.message);

@@ -301,17 +301,37 @@ function buildStandingsTable(comp) {
     `</div>`;
 }
 
-function buildBracket(comp) {
+function buildBracket(comp, ownTeamName) {
   if (!comp.bracket) {
     return `<p class="comp-unavailable">Bracket noch nicht verfügbar.</p>`;
   }
+  const isOwn = name => ownTeamName && name && name.toLowerCase().includes(ownTeamName.toLowerCase().split(' ')[0].toLowerCase());
   const rounds = comp.bracket.map(round => {
     const matches = (round.matches || []).map(m => {
-      const homeClass = m.homeWon === true ? ' bracket-winner' : (m.homeBye ? ' bracket-bye' : '');
-      const guestClass = m.homeWon === false ? ' bracket-winner' : (m.guestBye ? ' bracket-bye' : '');
+      const isTbd = name => name === 'TBD';
+      const homeWinner = m.homeWon === true;
+      const guestWinner = m.homeWon === false;
+      const homeClass = [
+        'bracket-team',
+        homeWinner ? ' bracket-winner' : '',
+        m.homeBye ? ' bracket-bye' : '',
+        isOwn(m.home) ? ' bracket-own' : '',
+        isTbd(m.home) ? ' bracket-tbd' : '',
+      ].join('');
+      const guestClass = [
+        'bracket-team',
+        guestWinner ? ' bracket-winner' : '',
+        m.guestBye ? ' bracket-bye' : '',
+        isOwn(m.guest) ? ' bracket-own' : '',
+        isTbd(m.guest) ? ' bracket-tbd' : '',
+      ].join('');
+      const resultHtml = m.result
+        ? `<div class="bracket-result">${escapeHtml(m.result)}</div>`
+        : '';
       return `<div class="bracket-match">` +
-        `<div class="bracket-team${homeClass}">${escapeHtml(m.home)}</div>` +
-        `<div class="bracket-team${guestClass}">${escapeHtml(m.guest)}</div>` +
+        `<div class="${homeClass}">${escapeHtml(m.home)}</div>` +
+        `<div class="${guestClass}">${escapeHtml(m.guest)}</div>` +
+        resultHtml +
         `</div>`;
     }).join('');
     return `<div class="bracket-round">` +
@@ -431,6 +451,9 @@ function buildSharedStyles(primary, accent, cupColor) {
     .bracket-team:last-child { border-bottom: none; }
     .bracket-winner { background: var(--color-badge-home-bg); font-weight: 600; }
     .bracket-bye { opacity: 0.45; }
+    .bracket-own { outline: 2px solid var(--color-primary); outline-offset: -2px; font-weight: 700; }
+    .bracket-tbd { color: var(--color-text); opacity: 0.4; font-style: italic; }
+    .bracket-result { padding: 2px 8px; font-size: 0.75rem; text-align: center; background: var(--color-surface); color: var(--color-text); opacity: 0.6; border-top: 1px solid var(--color-border); }
     /* Schedule (reused from existing) */
     .schedule-section { margin-bottom: 16px; }
     .team-card { border-radius: 10px; border: 1px solid var(--color-border); overflow: hidden; margin-bottom: 12px; }
@@ -553,7 +576,7 @@ function buildTeamPage(team, allTeams, theme) {
     const headingClass = isLiga(comp.liganame) ? 'comp-heading' : 'comp-heading comp-heading--cup';
     const body = isLiga(comp.liganame)
       ? buildStandingsTable(comp)
-      : buildBracket(comp);
+      : buildBracket(comp, team.teamName);
     return `<section class="comp-section">
   <h2 class="${headingClass}">${escapeHtml(comp.liganame)}</h2>
   ${body}
