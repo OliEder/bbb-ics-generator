@@ -6,7 +6,7 @@
 
 **Architecture:** Logo URLs are constructed from `teamPermanentId` using the pattern `https://www.basketball-bund.net/media/team/{teamPermanentId}/logo` — no extra API call needed. The `teamId` in `metadata.json` is already the `teamPermanentId`. Each team card gets tabs implemented as accessible `role="tablist"` with keyboard arrow-key navigation in JavaScript. `fetchClubInfo()` in `apiClient.js` is removed since it returned null anyway (club endpoint has no logo field). The logo URL is added to each team entry in `metadata.json`.
 
-**Tech Stack:** Node.js, vanilla HTML/CSS/JS (no frameworks), node:test for tests, axe-core + jsdom for WCAG 2.1 AA automated testing
+**Tech Stack:** Node.js, vanilla HTML/CSS/JS (no frameworks), node:test for unit/e2e tests, Playwright + @axe-core/playwright for WCAG 2.1 AA browser tests (local + CI)
 
 ---
 
@@ -18,8 +18,10 @@
 | `src/cronUpdate.js` | Remove `fetchClubInfo` import/call; construct `logoUrl` from first team's `id`; add `logoUrl` to each team's `meta` entry |
 | `src/generateHTML.js` | Full rewrite of HTML template: tab UI per team card, logo in header + team cards, keyboard nav JS, updated CSS |
 | `tests/e2e/html-generation.test.js` | Update `sampleMetadata` with `logoUrl`; update/add tests for tabs, logo in team cards, keyboard nav attributes |
-| `tests/e2e/accessibility.test.js` | New: WCAG 2.1 AA automated tests via axe-core + jsdom |
-| `package.json` | Add `axe-core` and `jsdom` as devDependencies |
+| `tests/accessibility/wcag.spec.js` | New: WCAG 2.1 AA Playwright tests with @axe-core/playwright + structural checks |
+| `playwright.config.js` | New: Playwright config — Chromium only, HTML reporter, local static server |
+| `.github/workflows/test.yml` | New: CI workflow running node:test + Playwright, uploads HTML report as artifact, paths filter excludes calendar-only commits |
+| `package.json` | Add `@playwright/test`, `@axe-core/playwright` as devDependencies; add `test:a11y` script |
 
 ---
 
@@ -716,82 +718,97 @@ git commit -m "test: clarify club-logo header test after team-card logo addition
 
 ---
 
-## Task 6: WCAG 2.1 AA automated accessibility tests
+## Task 6: WCAG 2.1 AA Playwright accessibility tests (local + CI)
 
 **Files:**
-- Create: `tests/e2e/accessibility.test.js`
+- Create: `tests/accessibility/wcag.spec.js`
+- Create: `playwright.config.js`
 - Modify: `package.json`
 
-**Background:** `axe-core` is an automated accessibility testing engine that maps directly to WCAG 2.1 success criteria. Running it via `jsdom` (a DOM implementation for Node) lets us test the generated HTML without a real browser. Note: automated tools cover ~30-40% of WCAG criteria — the rest requires manual review. This test suite covers the verifiable subset.
+**Background:** Playwright runs a real Chromium browser — this catches issues that jsdom misses (CSS contrast ratios, rendered layout, actual JS execution). `@axe-core/playwright` integrates axe directly into Playwright tests. The HTML reporter generates a browsable test report locally and as a CI artifact.
 
-**WCAG 2.1 AA criteria covered by these tests:**
-- 1.1.1 Non-text Content — `alt` attributes on images
-- 1.3.1 Info and Relationships — correct ARIA roles (tablist/tab/tabpanel), landmark regions
-- 2.1.1 Keyboard — focusable elements (structural check)
-- 2.4.1 Bypass Blocks — landmark `<main>` and `<header>`
-- 2.4.2 Page Titled — `<title>` element present
-- 2.4.6 Headings and Labels — `<h1>` present, tab buttons have visible labels
-- 3.1.1 Language of Page — `lang` attribute on `<html>`
-- 4.1.2 Name, Role, Value — ARIA roles and aria-selected/aria-controls/aria-labelledby correct
+**WCAG 2.1 AA criteria covered (automated):**
+- 1.1.1 Non-text Content — `alt` on images
+- 1.3.1 Info and Relationships — ARIA roles (tablist/tab/tabpanel), landmark regions
+- 1.4.3 Contrast (Minimum) — color contrast of text (only possible in real browser)
+- 2.1.1 Keyboard — focusable elements, tab stops
+- 2.4.1 Bypass Blocks — `<main>` and `<header>` landmarks
+- 2.4.2 Page Titled — `<title>` element
+- 2.4.6 Headings and Labels — `<h1>`, tab button labels
+- 3.1.1 Language of Page — `lang` on `<html>`
+- 4.1.2 Name, Role, Value — ARIA attributes correct
 
-**Note on `window.eval()`:** axe-core must run inside the jsdom window context. We inject it via `dom.window.eval(axeSource)` where `axeSource` is the content of the axe-core library file — not user input. This is the standard pattern for running axe in jsdom.
+**How local serving works:** The test generates `index.html` into a temp dir, then Playwright serves it via `page.goto('file://' + path)`. No HTTP server needed.
 
 - [ ] **Step 1: Install dependencies**
 
 ```bash
-npm install --save-dev axe-core jsdom
+npm install --save-dev @playwright/test @axe-core/playwright
+npx playwright install chromium
 ```
 
-Verify `package.json` now lists both under `devDependencies`.
+Verify `package.json` devDependencies now includes `@playwright/test` and `@axe-core/playwright`.
 
-- [ ] **Step 2: Write the failing test file**
-
-Create `tests/e2e/accessibility.test.js` with this content:
+- [ ] **Step 2: Create `playwright.config.js`**
 
 ```javascript
-'use strict';
+// @ts-check
+const { defineConfig, devices } = require('@playwright/test');
 
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const { mkdtempSync, rmSync, writeFileSync, readFileSync } = require('node:fs');
+module.exports = defineConfig({
+  testDir: './tests/accessibility',
+  reporter: [
+    ['list'],
+    ['html', { outputFolder: 'playwright-report', open: 'never' }],
+  ],
+  use: {
+    ...devices['Desktop Chrome'],
+  },
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+  ],
+});
+```
+
+- [ ] **Step 3: Add scripts to `package.json`**
+
+Add to the `scripts` section:
+
+```json
+"test:a11y": "playwright test",
+"test:a11y:report": "playwright show-report"
+```
+
+- [ ] **Step 4: Add `playwright-report/` and `test-results/` to `.gitignore`**
+
+Open `.gitignore` and add:
+
+```
+playwright-report/
+test-results/
+```
+
+- [ ] **Step 5: Write the failing test file**
+
+Create `tests/accessibility/wcag.spec.js`:
+
+```javascript
+// @ts-check
+const { test, expect } = require('@playwright/test');
+const AxeBuilder = require('@axe-core/playwright').default;
+const { mkdtempSync, rmSync, writeFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
-const { join } = require('node:path');
-const { JSDOM } = require('jsdom');
-const axeSource = readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
+const { join, resolve } = require('node:path');
 
-// Helper: generate HTML and return it as a string
-function generateHtml(theme, metadata) {
+function generateIndexHtml(theme, metadata) {
   const dir = mkdtempSync(join(tmpdir(), 'bbb-a11y-'));
-  try {
-    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(metadata));
-    const modPath = require.resolve('../../src/generateHTML.js');
-    delete require.cache[modPath];
-    process.env.BBB_GENERATED_DIR = dir;
-    const { genHTML } = require('../../src/generateHTML.js');
-    genHTML(theme);
-    return readFileSync(join(dir, 'index.html'), 'utf8');
-  } finally {
-    rmSync(dir, { recursive: true });
-  }
-}
-
-// Run axe-core against an HTML string, return violations
-// axeSource is injected into jsdom via window.eval — this is the standard
-// approach for running axe in Node without a real browser. axeSource is a
-// static library file, not user input.
-async function runAxe(html) {
-  const dom = new JSDOM(html, { runScripts: 'dangerously' });
-  dom.window.eval(axeSource); // eslint-disable-line no-eval
-  return new Promise((resolve, reject) => {
-    dom.window.axe.run(
-      dom.window.document,
-      { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] } },
-      (err, results) => {
-        if (err) reject(err);
-        else resolve(results.violations);
-      }
-    );
-  });
+  writeFileSync(join(dir, 'metadata.json'), JSON.stringify(metadata));
+  const modPath = require.resolve('../../src/generateHTML.js');
+  delete require.cache[modPath];
+  process.env.BBB_GENERATED_DIR = dir;
+  const { genHTML } = require('../../src/generateHTML.js');
+  genHTML(theme);
+  return { dir, htmlPath: join(dir, 'index.html') };
 }
 
 const sampleMetadata = [
@@ -824,139 +841,304 @@ const WITH_LOGO_THEME = {
   logoUrl: 'https://www.basketball-bund.net/media/team/167881/logo',
 };
 
-test('WCAG 2.1 AA: keine Violations ohne Logo', async () => {
-  const html = generateHtml(DEFAULT_THEME, sampleMetadata);
-  const violations = await runAxe(html);
-  if (violations.length > 0) {
-    const report = violations.map(v =>
-      `[${v.id}] ${v.description}\n  Impact: ${v.impact}\n  Nodes: ${v.nodes.map(n => n.html).join(', ')}`
-    ).join('\n\n');
-    assert.fail(`WCAG 2.1 AA Violations gefunden:\n\n${report}`);
-  }
-});
+test.describe('WCAG 2.1 AA — axe-core vollständiger Scan', () => {
+  test('keine Violations ohne Logo', async ({ page }) => {
+    const { dir, htmlPath } = generateIndexHtml(DEFAULT_THEME, sampleMetadata);
+    try {
+      await page.goto('file://' + htmlPath);
+      const results = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa'])
+        .analyze();
+      expect(results.violations).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
 
-test('WCAG 2.1 AA: keine Violations mit Logo im Header', async () => {
-  const html = generateHtml(WITH_LOGO_THEME, sampleMetadata);
-  const violations = await runAxe(html);
-  if (violations.length > 0) {
-    const report = violations.map(v =>
-      `[${v.id}] ${v.description}\n  Impact: ${v.impact}\n  Nodes: ${v.nodes.map(n => n.html).join(', ')}`
-    ).join('\n\n');
-    assert.fail(`WCAG 2.1 AA Violations gefunden:\n\n${report}`);
-  }
-});
+  test('keine Violations mit Logo im Header', async ({ page }) => {
+    const { dir, htmlPath } = generateIndexHtml(WITH_LOGO_THEME, sampleMetadata);
+    try {
+      await page.goto('file://' + htmlPath);
+      const results = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa'])
+        .analyze();
+      expect(results.violations).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
 
-test('WCAG 2.1 AA: keine Violations mit leerer Team-Liste', async () => {
-  const html = generateHtml(DEFAULT_THEME, []);
-  const violations = await runAxe(html);
-  if (violations.length > 0) {
-    const report = violations.map(v =>
-      `[${v.id}] ${v.description}\n  Impact: ${v.impact}`
-    ).join('\n\n');
-    assert.fail(`WCAG 2.1 AA Violations gefunden:\n\n${report}`);
-  }
-});
-
-test('2.4.2 Seitentitel: <title> ist vorhanden und nicht leer', () => {
-  const html = generateHtml(DEFAULT_THEME, sampleMetadata);
-  const dom = new JSDOM(html);
-  const title = dom.window.document.querySelector('title');
-  assert.ok(title, '<title> fehlt');
-  assert.ok(title.textContent.trim().length > 0, '<title> ist leer');
-});
-
-test('3.1.1 Sprache: lang-Attribut auf <html> ist gesetzt', () => {
-  const html = generateHtml(DEFAULT_THEME, sampleMetadata);
-  const dom = new JSDOM(html);
-  const lang = dom.window.document.documentElement.getAttribute('lang');
-  assert.ok(lang && lang.trim().length > 0, 'lang-Attribut auf <html> fehlt');
-});
-
-test('2.4.1 Bypass Blocks: <main> und <header> Landmark sind vorhanden', () => {
-  const html = generateHtml(DEFAULT_THEME, sampleMetadata);
-  const dom = new JSDOM(html);
-  assert.ok(dom.window.document.querySelector('main'), '<main> Landmark fehlt');
-  assert.ok(dom.window.document.querySelector('header'), '<header> Landmark fehlt');
-});
-
-test('2.4.6 Überschriften: <h1> ist vorhanden und nicht leer', () => {
-  const html = generateHtml(DEFAULT_THEME, sampleMetadata);
-  const dom = new JSDOM(html);
-  const h1 = dom.window.document.querySelector('h1');
-  assert.ok(h1, '<h1> fehlt');
-  assert.ok(h1.textContent.trim().length > 0, '<h1> ist leer');
-});
-
-test('4.1.2 Tab-Buttons: aria-controls zeigt auf existierende Panels', () => {
-  const html = generateHtml(DEFAULT_THEME, sampleMetadata);
-  const dom = new JSDOM(html);
-  const tabs = dom.window.document.querySelectorAll('[role="tab"]');
-  assert.ok(tabs.length > 0, 'Keine Tab-Buttons gefunden');
-  tabs.forEach(tab => {
-    const controlsId = tab.getAttribute('aria-controls');
-    assert.ok(controlsId, `Tab ohne aria-controls: ${tab.textContent}`);
-    const panel = dom.window.document.getElementById(controlsId);
-    assert.ok(panel, `Panel mit id="${controlsId}" nicht gefunden`);
-    assert.equal(panel.getAttribute('role'), 'tabpanel',
-      `Panel role="tabpanel" fehlt für id="${controlsId}"`);
+  test('keine Violations mit leerer Team-Liste', async ({ page }) => {
+    const { dir, htmlPath } = generateIndexHtml(DEFAULT_THEME, []);
+    try {
+      await page.goto('file://' + htmlPath);
+      const results = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa'])
+        .analyze();
+      expect(results.violations).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
   });
 });
 
-test('4.1.2 Tablist: aria-label auf jeder tablist', () => {
-  const html = generateHtml(DEFAULT_THEME, sampleMetadata);
-  const dom = new JSDOM(html);
-  const tablists = dom.window.document.querySelectorAll('[role="tablist"]');
-  assert.ok(tablists.length > 0, 'Keine tablist gefunden');
-  tablists.forEach(tl => {
-    const label = tl.getAttribute('aria-label') || tl.getAttribute('aria-labelledby');
-    assert.ok(label, 'tablist ohne aria-label oder aria-labelledby');
+test.describe('WCAG 2.1 AA — strukturelle Prüfungen', () => {
+  test('2.4.2 Seitentitel vorhanden', async ({ page }) => {
+    const { dir, htmlPath } = generateIndexHtml(DEFAULT_THEME, sampleMetadata);
+    try {
+      await page.goto('file://' + htmlPath);
+      const title = await page.title();
+      expect(title.trim().length).toBeGreaterThan(0);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  test('3.1.1 lang-Attribut auf <html>', async ({ page }) => {
+    const { dir, htmlPath } = generateIndexHtml(DEFAULT_THEME, sampleMetadata);
+    try {
+      await page.goto('file://' + htmlPath);
+      const lang = await page.getAttribute('html', 'lang');
+      expect(lang).toBeTruthy();
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  test('2.4.1 <main> und <header> Landmarks vorhanden', async ({ page }) => {
+    const { dir, htmlPath } = generateIndexHtml(DEFAULT_THEME, sampleMetadata);
+    try {
+      await page.goto('file://' + htmlPath);
+      await expect(page.locator('main')).toBeAttached();
+      await expect(page.locator('header')).toBeAttached();
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  test('2.4.6 <h1> vorhanden und nicht leer', async ({ page }) => {
+    const { dir, htmlPath } = generateIndexHtml(DEFAULT_THEME, sampleMetadata);
+    try {
+      await page.goto('file://' + htmlPath);
+      const h1 = page.locator('h1');
+      await expect(h1).toBeAttached();
+      const text = await h1.textContent();
+      expect(text?.trim().length).toBeGreaterThan(0);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  test('4.1.2 aria-controls auf Tabs zeigt auf existierende Panels', async ({ page }) => {
+    const { dir, htmlPath } = generateIndexHtml(DEFAULT_THEME, sampleMetadata);
+    try {
+      await page.goto('file://' + htmlPath);
+      const tabs = page.locator('[role="tab"]');
+      const count = await tabs.count();
+      expect(count).toBeGreaterThan(0);
+      for (let i = 0; i < count; i++) {
+        const controlsId = await tabs.nth(i).getAttribute('aria-controls');
+        expect(controlsId).toBeTruthy();
+        const panel = page.locator(`#${controlsId}`);
+        await expect(panel).toBeAttached();
+        const role = await panel.getAttribute('role');
+        expect(role).toBe('tabpanel');
+      }
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  test('4.1.2 Tablist hat aria-label', async ({ page }) => {
+    const { dir, htmlPath } = generateIndexHtml(DEFAULT_THEME, sampleMetadata);
+    try {
+      await page.goto('file://' + htmlPath);
+      const tablists = page.locator('[role="tablist"]');
+      const count = await tablists.count();
+      expect(count).toBeGreaterThan(0);
+      for (let i = 0; i < count; i++) {
+        const label = await tablists.nth(i).getAttribute('aria-label')
+          || await tablists.nth(i).getAttribute('aria-labelledby');
+        expect(label).toBeTruthy();
+      }
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  test('2.1.1 Tastaturnavigation: ArrowRight wechselt Tab', async ({ page }) => {
+    const { dir, htmlPath } = generateIndexHtml(DEFAULT_THEME, sampleMetadata);
+    try {
+      await page.goto('file://' + htmlPath);
+      // Focus the first tab of the first team card
+      const firstTab = page.locator('[role="tab"]').first();
+      await firstTab.focus();
+      await page.keyboard.press('ArrowRight');
+      // Second tab should now be selected
+      const secondTab = page.locator('[role="tab"]').nth(1);
+      const selected = await secondTab.getAttribute('aria-selected');
+      expect(selected).toBe('true');
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  test('1.1.1 Alle <img> haben alt-Attribut', async ({ page }) => {
+    const { dir, htmlPath } = generateIndexHtml(WITH_LOGO_THEME, sampleMetadata);
+    try {
+      await page.goto('file://' + htmlPath);
+      const images = page.locator('img');
+      const count = await images.count();
+      expect(count).toBeGreaterThan(0);
+      for (let i = 0; i < count; i++) {
+        const alt = await images.nth(i).getAttribute('alt');
+        // alt="" is valid for decorative images, alt must be present
+        expect(alt).not.toBeNull();
+      }
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
   });
 });
-
-test('1.1.1 Alt-Texte: Alle <img> haben alt-Attribut', () => {
-  const html = generateHtml(WITH_LOGO_THEME, sampleMetadata);
-  const dom = new JSDOM(html);
-  const images = dom.window.document.querySelectorAll('img');
-  assert.ok(images.length > 0, 'Keine <img>-Elemente gefunden');
-  images.forEach(img => {
-    assert.ok(
-      img.hasAttribute('alt'),
-      `<img src="${img.getAttribute('src')}"> hat kein alt-Attribut`
-    );
-  });
-});
 ```
 
-- [ ] **Step 3: Run tests to verify they fail (generateHTML not yet updated)**
+- [ ] **Step 6: Run tests to verify they fail before Task 3**
 
 ```bash
-node --test tests/e2e/accessibility.test.js
+npx playwright test
 ```
 
-Expected: Tests fail — axe violations present or ARIA attributes missing in old HTML. This confirms the tests actually test something.
+Expected: failures — ARIA attributes missing in current HTML, axe violations present. This proves the tests are meaningful.
 
-- [ ] **Step 4: After Task 3 (generateHTML rewrite) is complete, run accessibility tests again**
+- [ ] **Step 7: After Task 3 (generateHTML rewrite), run again**
 
 ```bash
-node --test tests/e2e/accessibility.test.js
+npx playwright test
 ```
 
-Expected: all 10 tests pass.
-
-- [ ] **Step 5: Run full test suite**
+Expected: all tests pass. Report at `playwright-report/index.html` — open with:
 
 ```bash
-node --test
+npm run test:a11y:report
 ```
 
-Expected: all tests pass.
-
-- [ ] **Step 6: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add tests/e2e/accessibility.test.js package.json package-lock.json
-git commit -m "test: add WCAG 2.1 AA automated accessibility tests via axe-core"
+git add tests/accessibility/wcag.spec.js playwright.config.js package.json package-lock.json .gitignore
+git commit -m "test: add WCAG 2.1 AA Playwright accessibility tests"
 ```
+
+---
+
+## Task 7: CI workflow — run tests on code changes only
+
+**Files:**
+- Create: `.github/workflows/test.yml`
+
+**Key design decisions:**
+- `paths` filter: only runs when `src/**`, `tests/**`, `playwright.config.js`, `package.json`, or `package-lock.json` change — not on calendar-update commits (which only touch `generated/` and have `[skip ci]`)
+- Uploads `playwright-report/` as a GitHub Actions artifact (retained 30 days) — viewable under Actions → Run → Artifacts
+- Runs `node --test` (unit/e2e) first, then Playwright separately so failures are distinguishable
+- Uses `--reporter=github` for node:test to get inline annotations on PRs
+
+- [ ] **Step 1: Create `.github/workflows/test.yml`**
+
+```yaml
+name: Run Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'playwright.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/test.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'playwright.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-and-e2e:
+    name: Unit & E2E Tests (node:test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit and e2e tests
+        run: node --test 'tests/e2e/*.test.js'
+
+  accessibility:
+    name: Accessibility Tests (Playwright + axe)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Generate test HTML
+        run: |
+          mkdir -p generated
+          echo '[]' > generated/metadata.json
+          node src/generateHTML.js
+
+      - name: Run Playwright accessibility tests
+        run: npx playwright test
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
+```
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add .github/workflows/test.yml
+git commit -m "ci: add test workflow with paths filter and Playwright report artifact"
+```
+
+- [ ] **Step 3: Push and verify on GitHub**
+
+```bash
+git push
+```
+
+Go to `https://github.com/OliEder/bbb-ics-generator/actions` and verify:
+- Workflow "Run Tests" appears
+- Calendar update commits (only touching `generated/`) do NOT trigger this workflow
+- After a run: Artifacts section shows `playwright-report` — click to download and open `index.html`
 
 ---
 
