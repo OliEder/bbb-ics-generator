@@ -55,17 +55,14 @@ function buildScheduleRow(match, cupColor) {
   const compStyle = cup ? ` style="color:${escapeHtml(cupColor)};font-weight:600"` : '';
   const compText  = escapeHtml(match.competition);
 
-  const resultText = match.result ? escapeHtml(match.result) : '–';
-
-  let resultClass = 'schedule-result';
+  // Format result: bold own score, normal opponent score
+  let resultText = match.result ? escapeHtml(match.result) : '–';
   if (match.result) {
     const parts = match.result.split(':');
     if (parts.length === 2) {
-      const own = parseInt(parts[match.isHome ? 0 : 1], 10);
-      const opp = parseInt(parts[match.isHome ? 1 : 0], 10);
-      if (!isNaN(own) && !isNaN(opp)) {
-        resultClass += own > opp ? ' schedule-result--win' : ' schedule-result--loss';
-      }
+      const ownIdx = match.isHome ? 0 : 1;
+      const oppIdx = match.isHome ? 1 : 0;
+      resultText = `<strong>${escapeHtml(parts[ownIdx].trim())}</strong>:${escapeHtml(parts[oppIdx].trim())}`;
     }
   }
 
@@ -85,7 +82,7 @@ function buildScheduleRow(match, cupColor) {
     `<span class="${badgeClass}">${badgeLabel}</span>` +
     `<span class="schedule-opponent">${dateLabel} · ${escapeHtml(match.opponent)}${nextLabel}</span>` +
     `<span class="schedule-competition"${compStyle}>${compText}</span>` +
-    `<span class="${resultClass}">${resultText}</span>` +
+    `<span class="schedule-result">${resultText || '–'}</span>` +
     `</div>`;
 }
 
@@ -184,25 +181,29 @@ function buildTeaserCard(team) {
 
   // Streak: count consecutive wins or losses from most recent played match
   const played = allMatches.filter(m => m.result);
-  let streakHtml = '';
+
+  // Streak as subtle info text (e.g. "3 Siege in Folge" / "2 Niederlagen in Folge")
+  let streakText = '';
   if (played.length > 0) {
-    const isWin = m => {
+    const ownScore = m => {
       const p = (m.result || '').split(':');
       if (p.length !== 2) return null;
       const own = parseInt(p[m.isHome ? 0 : 1], 10);
       const opp = parseInt(p[m.isHome ? 1 : 0], 10);
       return (!isNaN(own) && !isNaN(opp)) ? own > opp : null;
     };
-    const lastResult = isWin(played[played.length - 1]);
-    if (lastResult !== null) {
+    const last = ownScore(played[played.length - 1]);
+    if (last !== null) {
       let count = 0;
       for (let i = played.length - 1; i >= 0; i--) {
-        if (isWin(played[i]) === lastResult) count++;
+        if (ownScore(played[i]) === last) count++;
         else break;
       }
-      const label = lastResult ? `${count}S` : `${count}N`;
-      const cls = lastResult ? 'teaser-streak teaser-streak--win' : 'teaser-streak teaser-streak--loss';
-      streakHtml = `<span class="${cls}">${label}</span>`;
+      if (count > 1) {
+        streakText = last
+          ? `${count} Siege in Folge`
+          : `${count} Niederlagen in Folge`;
+      }
     }
   }
 
@@ -211,19 +212,17 @@ function buildTeaserCard(team) {
       ? (m.isHome ? 'badge badge--home' : 'badge badge--away')
       : 'badge badge--cup';
     const badgeLabel = m.isHome ? 'H' : 'A';
-    let scoreClass = 'teaser-score';
     const parts = (m.result || '').split(':');
+    let scoreHtml = escapeHtml(m.result);
     if (parts.length === 2) {
-      const own = parseInt(parts[m.isHome ? 0 : 1], 10);
-      const opp = parseInt(parts[m.isHome ? 1 : 0], 10);
-      if (!isNaN(own) && !isNaN(opp)) {
-        scoreClass += own > opp ? ' schedule-result--win' : ' schedule-result--loss';
-      }
+      const ownIdx = m.isHome ? 0 : 1;
+      const oppIdx = m.isHome ? 1 : 0;
+      scoreHtml = `<strong>${escapeHtml(parts[ownIdx].trim())}</strong>:${escapeHtml(parts[oppIdx].trim())}`;
     }
     return `<div class="teaser-result">` +
       `<span class="${badgeClass}">${badgeLabel}</span>` +
       `<span class="teaser-opponent">${escapeHtml(m.opponent)}</span>` +
-      `<span class="${scoreClass}">${escapeHtml(m.result)}</span>` +
+      `<span class="teaser-score">${scoreHtml}</span>` +
       `</div>`;
   }).join('');
 
@@ -235,8 +234,8 @@ function buildTeaserCard(team) {
   <div class="teaser-header">
     ${logoHtml}
     <span class="teaser-team-name">${team.ageGroup ? escapeHtml(team.ageGroup) : escapeHtml(team.teamName)}${genderSpan(team.gender) ? ` ${genderSpan(team.gender)}` : ''}${team.ageGroup ? `<small> ${escapeHtml(team.teamName)}</small>` : ''}</span>
-    ${streakHtml}
   </div>
+  ${streakText ? `<div class="teaser-streak-info">${escapeHtml(streakText)}</div>` : ''}
   <div class="teaser-results">${resultRows}</div>
   ${nextHtml}
   <a class="teaser-link" href="teams/${escapeHtml(team.teamId)}.html">Zum Team →</a>
@@ -353,13 +352,7 @@ function buildSharedStyles(primary, accent, cupColor) {
     .teaser-header { background: var(--color-primary); color: var(--color-on-primary); padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
     .teaser-team-name { font-weight: 700; font-size: 0.92rem; flex: 1; }
     .gender-sym { font-size: 0.8em; opacity: 0.75; }
-    .teaser-streak { font-size: 0.75rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
-    .teaser-streak--win { background: #1a7f3c; color: #fff; }
-    .teaser-streak--loss { background: #b91c1c; color: #fff; }
-    @media (prefers-color-scheme: dark) {
-      .teaser-streak--win { background: #166534; color: #d1fae5; }
-      .teaser-streak--loss { background: #991b1b; color: #fee2e2; }
-    }
+    .teaser-streak-info { font-size: 0.72rem; color: var(--color-text); opacity: 0.6; padding: 4px 14px 0; }
     .teaser-results { flex: 1; padding: 8px 14px; }
     .teaser-result { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--color-border); font-size: 0.82rem; }
     .teaser-score { font-weight: 600; }
@@ -416,12 +409,6 @@ function buildSharedStyles(primary, accent, cupColor) {
     .schedule-next-label { font-size: 0.75rem; font-weight: 600; color: var(--color-primary); margin-left: 4px; }
     .schedule-competition { font-size: 0.75rem; color: var(--color-text); white-space: nowrap; }
     .schedule-result { font-size: 0.88rem; font-weight: 600; white-space: nowrap; min-width: 44px; text-align: right; color: var(--color-text); }
-    .schedule-result--win  { color: #1a7f3c; }
-    .schedule-result--loss { color: #b91c1c; }
-    @media (prefers-color-scheme: dark) {
-      .schedule-result--win  { color: #4ade80; }
-      .schedule-result--loss { color: #f87171; }
-    }
     .btn-group { display: flex; flex-direction: column; gap: 8px; }
     .btn { display: inline-flex; align-items: center; gap: 8px; background: var(--color-surface); color: var(--color-primary); border: 1.5px solid var(--color-border); padding: 9px 14px; border-radius: 7px; font-size: 0.82rem; font-weight: 600; text-decoration: none; transition: background 0.15s, border-color 0.15s; }
     .btn:hover { background: var(--color-primary-light); border-color: var(--color-primary); }

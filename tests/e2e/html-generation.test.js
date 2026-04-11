@@ -435,7 +435,7 @@ test('Spielplan-Sektion erscheint wenn matches vorhanden', () => {
     const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
     assert.ok(html.includes('SPIELPLAN'), 'Spielplan-Überschrift fehlt');
     assert.ok(html.includes('TSV Musterstadt'), 'Gegnerteam fehlt');
-    assert.ok(html.includes('62:58'), 'Ergebnis fehlt');
+    assert.ok(html.includes('62') && html.includes('58'), 'Ergebnis fehlt');
   } finally {
     rmSync(dir, { recursive: true });
   }
@@ -554,9 +554,9 @@ test('buildTeaserCard: shows last 3 results, next match, and team link', () => {
     ],
   };
   const html = buildTeaserCard(team);
-  assert.ok(html.includes('72:68'), 'first result missing');
-  assert.ok(html.includes('55:61'), 'second result missing');
-  assert.ok(html.includes('80:74'), 'third result missing');
+  assert.ok(html.includes('>72<') && html.includes(':68'), 'first result missing');
+  assert.ok(html.includes('>61<') && html.includes(':55'), 'second result missing');
+  assert.ok(html.includes('>80<') && html.includes(':74'), 'third result missing');
   assert.ok(html.includes('Freising'), 'next match missing');
   assert.ok(html.includes('teaser-next'), 'next highlight class missing');
   assert.ok(html.includes('teams/100.html'), 'team page link missing');
@@ -617,7 +617,7 @@ test('buildTeaserCard: fewer than 3 results — no empty rows', () => {
     ],
   };
   const html = buildTeaserCard(team);
-  assert.ok(html.includes('24:18'), 'result missing');
+  assert.ok(html.includes('>24<') && html.includes(':18'), 'result missing');
   assert.ok(!html.includes('teaser-result-empty'), 'no empty row class expected');
 });
 
