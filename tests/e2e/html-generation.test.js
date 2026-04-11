@@ -35,12 +35,14 @@ const sampleMetadata = [
   },
 ];
 
+const DEFAULT_THEME = { primary: '#004174', accent: '#009ef3', logoUrl: null };
+
 test('index.html wird erstellt', () => {
   const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
   try {
     writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
     const { genHTML } = requireGenHTML(dir);
-    genHTML();
+    genHTML(DEFAULT_THEME);
     assert.ok(existsSync(join(dir, 'index.html')), 'index.html wurde nicht erstellt');
   } finally {
     rmSync(dir, { recursive: true });
@@ -52,7 +54,7 @@ test('index.html enthält webcal:// Links', () => {
   try {
     writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
     const { genHTML } = requireGenHTML(dir);
-    genHTML();
+    genHTML(DEFAULT_THEME);
     const html = readFileSync(join(dir, 'index.html'), 'utf8');
     assert.ok(html.includes('webcal://'), 'webcal:// Link fehlt');
   } finally {
@@ -65,7 +67,7 @@ test('index.html enthält google.com/calendar/render Links', () => {
   try {
     writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
     const { genHTML } = requireGenHTML(dir);
-    genHTML();
+    genHTML(DEFAULT_THEME);
     const html = readFileSync(join(dir, 'index.html'), 'utf8');
     assert.ok(html.includes('google.com/calendar/render'), 'Google Calendar Link fehlt');
   } finally {
@@ -78,7 +80,7 @@ test('index.html enthält https://olieder.github.io Links', () => {
   try {
     writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
     const { genHTML } = requireGenHTML(dir);
-    genHTML();
+    genHTML(DEFAULT_THEME);
     const html = readFileSync(join(dir, 'index.html'), 'utf8');
     assert.ok(html.includes('https://olieder.github.io'), 'GitHub Pages Link fehlt');
   } finally {
@@ -91,7 +93,7 @@ test('Teamname ist escaped (kein raw <, >, &)', () => {
   try {
     writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
     const { genHTML } = requireGenHTML(dir);
-    genHTML();
+    genHTML(DEFAULT_THEME);
     const html = readFileSync(join(dir, 'index.html'), 'utf8');
     // The raw unescaped name should not appear
     assert.ok(!html.includes('<script>'), 'Unescaped <script> gefunden');
@@ -107,10 +109,77 @@ test('Anzahl .team Divs = Anzahl Teams in metadata', () => {
   try {
     writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
     const { genHTML } = requireGenHTML(dir);
-    genHTML();
+    genHTML(DEFAULT_THEME);
     const html = readFileSync(join(dir, 'index.html'), 'utf8');
     const matches = html.match(/class="team-card"/g) || [];
     assert.equal(matches.length, sampleMetadata.length);
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('CSS-Variablen für primary und accent sind im HTML', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML({ primary: '#ff0000', accent: '#00ff00', logoUrl: null });
+    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    assert.ok(html.includes('--color-primary: #ff0000'), 'primary CSS-Variable fehlt');
+    assert.ok(html.includes('--color-accent:  #00ff00'), 'accent CSS-Variable fehlt');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('Dark Mode media query ist vorhanden', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML({ primary: '#004174', accent: '#009ef3', logoUrl: null });
+    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    assert.ok(html.includes('prefers-color-scheme: dark'), 'Dark Mode media query fehlt');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('Logo-URL wird als img-Tag eingebettet wenn vorhanden', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML({ primary: '#004174', accent: '#009ef3', logoUrl: 'https://example.com/logo.png' });
+    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    assert.ok(html.includes('https://example.com/logo.png'), 'Logo-URL fehlt im HTML');
+    assert.ok(html.includes('club-logo'), 'club-logo Klasse fehlt');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('Kein club-logo img wenn logoUrl null', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML({ primary: '#004174', accent: '#009ef3', logoUrl: null });
+    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    assert.ok(!html.includes('class="club-logo"'), 'club-logo img-Klasse sollte nicht vorhanden sein wenn kein Logo');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('color-mix() wird für abgeleitete Farben verwendet', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML({ primary: '#004174', accent: '#009ef3', logoUrl: null });
+    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    assert.ok(html.includes('color-mix('), 'color-mix() fehlt im CSS');
   } finally {
     rmSync(dir, { recursive: true });
   }
