@@ -4,7 +4,31 @@
 
 Dieser Ablauf tritt ein, wenn der Team-Cache jünger als 30 Tage ist. Dies ist der reguläre Ablauf für die meisten der täglich vier Ausführungen.
 
-image::https://mermaid.ink/svg/c2VxdWVuY2VEaWFncmFtCiAgICBwYXJ0aWNpcGFudCBHSEEgYXMgR2l0SHViIEFjdGlvbnMKICAgIHBhcnRpY2lwYW50IENVIGFzIGNyb25VcGRhdGUuanMKICAgIHBhcnRpY2lwYW50IFNUIGFzIHN0b3JhZ2UuanMKICAgIHBhcnRpY2lwYW50IEFDIGFzIGFwaUNsaWVudC5qcwogICAgcGFydGljaXBhbnQgSUcgYXMgaWNzR2VuZXJhdG9yLmpzCiAgICBHSEEtPj5DVTogbnBtIHJ1biB1cGRhdGUKICAgIENVLT4-U1Q6IGxvYWRUZWFtc0NhY2hlKCkKICAgIFNULS0-PkNVOiB7dGVhbXMsIHN0YWxlOmZhbHNlfQogICAgbG9vcCBmdWVyIGplZGVzIFRlYW0KICAgICAgICBDVS0-PkFDOiBmZXRjaFRlYW1NYXRjaGVzKHRlYW1JZCkKICAgICAgICBBQy0tPj5DVTogQXJyYXk8TWF0Y2g-CiAgICAgICAgbG9vcCBmdWVyIGplZGVzIE1hdGNoCiAgICAgICAgICAgIENVLT4-QUM6IGZldGNoTWF0Y2hJbmZvKG1hdGNoSWQpCiAgICAgICAgICAgIEFDLS0-PkNVOiBNYXRjaEluZm8KICAgICAgICBlbmQKICAgICAgICBDVS0-PklHOiBnZW5lcmF0ZUlDUyhtYXRjaGVzLCBkZXRhaWxzLCB0ZWFtSWQsIHR5cGUpCiAgICAgICAgSUctLT4-Q1U6IElDUy1TdHJpbmcKICAgICAgICBDVS0-PlNUOiBzYXZlSUNTKHRlYW1JZCwgdHlwZSwgaWNzKQogICAgZW5kCiAgICBDVS0-PkNVOiBzY2hyZWlidCBtZXRhZGF0YS5qc29uCiAgICBDVS0-PkNVOiBnZW5IVE1MKHRoZW1lKQ[Update-Zyklus Sequenzdiagramm,link="https://mermaid.ink/svg/c2VxdWVuY2VEaWFncmFtCiAgICBwYXJ0aWNpcGFudCBHSEEgYXMgR2l0SHViIEFjdGlvbnMKICAgIHBhcnRpY2lwYW50IENVIGFzIGNyb25VcGRhdGUuanMKICAgIHBhcnRpY2lwYW50IFNUIGFzIHN0b3JhZ2UuanMKICAgIHBhcnRpY2lwYW50IEFDIGFzIGFwaUNsaWVudC5qcwogICAgcGFydGljaXBhbnQgSUcgYXMgaWNzR2VuZXJhdG9yLmpzCiAgICBHSEEtPj5DVTogbnBtIHJ1biB1cGRhdGUKICAgIENVLT4-U1Q6IGxvYWRUZWFtc0NhY2hlKCkKICAgIFNULS0-PkNVOiB7dGVhbXMsIHN0YWxlOmZhbHNlfQogICAgbG9vcCBmdWVyIGplZGVzIFRlYW0KICAgICAgICBDVS0-PkFDOiBmZXRjaFRlYW1NYXRjaGVzKHRlYW1JZCkKICAgICAgICBBQy0tPj5DVTogQXJyYXk8TWF0Y2g-CiAgICAgICAgbG9vcCBmdWVyIGplZGVzIE1hdGNoCiAgICAgICAgICAgIENVLT4-QUM6IGZldGNoTWF0Y2hJbmZvKG1hdGNoSWQpCiAgICAgICAgICAgIEFDLS0-PkNVOiBNYXRjaEluZm8KICAgICAgICBlbmQKICAgICAgICBDVS0-PklHOiBnZW5lcmF0ZUlDUyhtYXRjaGVzLCBkZXRhaWxzLCB0ZWFtSWQsIHR5cGUpCiAgICAgICAgSUctLT4-Q1U6IElDUy1TdHJpbmcKICAgICAgICBDVS0-PlNUOiBzYXZlSUNTKHRlYW1JZCwgdHlwZSwgaWNzKQogICAgZW5kCiAgICBDVS0-PkNVOiBzY2hyZWlidCBtZXRhZGF0YS5qc29uCiAgICBDVS0-PkNVOiBnZW5IVE1MKHRoZW1lKQ"]
+[source,mermaid]
+----
+sequenceDiagram
+    participant GHA as GitHub Actions
+    participant CU as cronUpdate.js
+    participant ST as storage.js
+    participant AC as apiClient.js
+    participant IG as icsGenerator.js
+    GHA->>CU: npm run update
+    CU->>ST: loadTeamsCache()
+    ST-->>CU: {teams, stale:false}
+    loop fuer jedes Team
+        CU->>AC: fetchTeamMatches(teamId)
+        AC-->>CU: Array<Match>
+        loop fuer jedes Match
+            CU->>AC: fetchMatchInfo(matchId)
+            AC-->>CU: MatchInfo
+        end
+        CU->>IG: generateICS(matches, details, teamId, type)
+        IG-->>CU: ICS-String
+        CU->>ST: saveICS(teamId, type, ics)
+    end
+    CU->>CU: schreibt metadata.json
+    CU->>CU: genHTML(theme)
+----
 
 ==== Ablauf als nummerierte Schritte
 

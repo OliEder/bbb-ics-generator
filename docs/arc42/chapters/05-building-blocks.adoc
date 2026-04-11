@@ -4,7 +4,17 @@
 
 Das System besteht aus sechs aktiven Modulen und einem ungenutzten Modul. Die Module sind lose gekoppelt und kommunizieren ausschließlich über Funktionsaufrufe (CommonJS `require`).
 
-image::https://mermaid.ink/svg/Z3JhcGggTFIKICAgIENVWyJjcm9uVXBkYXRlLmpzCk9yY2hlc3RyYXRvciJdIC0tPiBBQ1siYXBpQ2xpZW50LmpzCkFQSS1GYWNhZGUiXQogICAgQ1UgLS0-IElHWyJpY3NHZW5lcmF0b3IuanMKUkZDIDU1NDUgUmVuZGVyZXIiXQogICAgQ1UgLS0-IFNUWyJzdG9yYWdlLmpzClBlcnNpc3RlbnoiXQogICAgQ1UgLS0-IEdIWyJnZW5lcmF0ZUhUTUwuanMKSFRNTC1HZW5lcmF0b3IiXQogICAgR0ggLS0-IFNUCiAgICBTVlsic2VydmVyLmpzCkRldi1TZXJ2ZXIiXSAtLi0-fG51ciBsb2thbHwgU1QKICAgIEdFT1siZ2VvY29kZS5qcwpuaWNodCBnZW51dHp0Il0[BBB ICS Generator Bausteinsicht,link="https://mermaid.ink/svg/Z3JhcGggTFIKICAgIENVWyJjcm9uVXBkYXRlLmpzCk9yY2hlc3RyYXRvciJdIC0tPiBBQ1siYXBpQ2xpZW50LmpzCkFQSS1GYWNhZGUiXQogICAgQ1UgLS0-IElHWyJpY3NHZW5lcmF0b3IuanMKUkZDIDU1NDUgUmVuZGVyZXIiXQogICAgQ1UgLS0-IFNUWyJzdG9yYWdlLmpzClBlcnNpc3RlbnoiXQogICAgQ1UgLS0-IEdIWyJnZW5lcmF0ZUhUTUwuanMKSFRNTC1HZW5lcmF0b3IiXQogICAgR0ggLS0-IFNUCiAgICBTVlsic2VydmVyLmpzCkRldi1TZXJ2ZXIiXSAtLi0-fG51ciBsb2thbHwgU1QKICAgIEdFT1siZ2VvY29kZS5qcwpuaWNodCBnZW51dHp0Il0"]
+[source,mermaid]
+----
+graph LR
+    CU["cronUpdate.js\nOrchestrator"] --> AC["apiClient.js\nAPI-Facade"]
+    CU --> IG["icsGenerator.js\nRFC 5545 Renderer"]
+    CU --> ST["storage.js\nPersistenz"]
+    CU --> GH["generateHTML.js\nHTML-Generator"]
+    GH --> ST
+    SV["server.js\nDev-Server"] -.->|nur lokal| ST
+    GEO["geocode.js\nnicht genutzt"]
+----
 
 === Modul: cronUpdate.js (Orchestrator)
 
