@@ -176,7 +176,7 @@ function genHTML(theme = {}) {
       border-bottom: 1px solid var(--color-info-border);
       padding: 5px 20px;
       font-size: 0.72rem;
-      color: var(--color-text-muted);
+      color: var(--color-text);
     }
     main { max-width: 760px; margin: 0 auto; padding: 20px 16px; }
     .team-card {
@@ -231,7 +231,7 @@ function genHTML(theme = {}) {
       background: transparent;
       font-size: 0.78rem;
       font-weight: 600;
-      color: var(--color-text-muted);
+      color: var(--color-text);
       cursor: pointer;
       border-bottom: 2px solid transparent;
       transition: color 0.15s, border-color 0.15s, background 0.15s;
