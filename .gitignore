@@ -19,6 +19,11 @@ Thumbs.db
 # Claude Code
 .claude/
 docs/superpowers/
+.superpowers/
+
+# Playwright
+playwright-report/
+test-results/
 
 # Runtime data
 pids
