@@ -51,39 +51,39 @@ test('index.html wird erstellt', () => {
   }
 });
 
-test('index.html enthält webcal:// Links', () => {
+test('team page enthält webcal:// Links', () => {
   const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
   try {
     writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
     const { genHTML } = requireGenHTML(dir);
     genHTML(DEFAULT_THEME);
-    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
     assert.ok(html.includes('webcal://'), 'webcal:// Link fehlt');
   } finally {
     rmSync(dir, { recursive: true });
   }
 });
 
-test('index.html enthält google.com/calendar/render Links', () => {
+test('team page enthält google.com/calendar/render Links', () => {
   const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
   try {
     writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
     const { genHTML } = requireGenHTML(dir);
     genHTML(DEFAULT_THEME);
-    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
     assert.ok(html.includes('google.com/calendar/render'), 'Google Calendar Link fehlt');
   } finally {
     rmSync(dir, { recursive: true });
   }
 });
 
-test('index.html enthält https://olieder.github.io Links', () => {
+test('team page enthält https://olieder.github.io Links', () => {
   const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
   try {
     writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
     const { genHTML } = requireGenHTML(dir);
     genHTML(DEFAULT_THEME);
-    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
     assert.ok(html.includes('https://olieder.github.io'), 'GitHub Pages Link fehlt');
   } finally {
     rmSync(dir, { recursive: true });
@@ -106,15 +106,16 @@ test('Teamname ist escaped (kein raw <, >, &)', () => {
   }
 });
 
-test('Anzahl .team Divs = Anzahl Teams in metadata', () => {
+test('Anzahl team pages = Anzahl Teams in metadata', () => {
   const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
   try {
     writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
     const { genHTML } = requireGenHTML(dir);
     genHTML(DEFAULT_THEME);
-    const html = readFileSync(join(dir, 'index.html'), 'utf8');
-    const matches = html.match(/class="team-card"/g) || [];
-    assert.equal(matches.length, sampleMetadata.length);
+    // Each team gets its own page under teams/
+    for (const team of sampleMetadata) {
+      assert.ok(existsSync(join(dir, 'teams', `${team.teamId}.html`)), `teams/${team.teamId}.html fehlt`);
+    }
   } finally {
     rmSync(dir, { recursive: true });
   }
@@ -215,13 +216,13 @@ test('Logo-URL aus teamId ist in Team-Card', () => {
   }
 });
 
-test('Tab-Struktur mit role="tablist" ist vorhanden', () => {
+test('Tab-Struktur mit role="tablist" ist vorhanden (team page)', () => {
   const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
   try {
     writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
     const { genHTML } = requireGenHTML(dir);
     genHTML(DEFAULT_THEME);
-    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
     assert.ok(html.includes('role="tablist"'), 'tablist role fehlt');
     assert.ok(html.includes('role="tab"'), 'tab role fehlt');
     assert.ok(html.includes('role="tabpanel"'), 'tabpanel role fehlt');
@@ -230,27 +231,27 @@ test('Tab-Struktur mit role="tablist" ist vorhanden', () => {
   }
 });
 
-test('Jede Team-Card hat drei Tab-Panels (all, home, away)', () => {
+test('Team page hat drei Tab-Panels (all, home, away)', () => {
   const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
   try {
     writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
     const { genHTML } = requireGenHTML(dir);
     genHTML(DEFAULT_THEME);
-    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
     const panels = html.match(/role="tabpanel"/g) || [];
-    assert.equal(panels.length, sampleMetadata.length * 3, 'Falsche Anzahl tab panels');
+    assert.equal(panels.length, 3, 'Falsche Anzahl tab panels');
   } finally {
     rmSync(dir, { recursive: true });
   }
 });
 
-test('Keyboard-Navigation JS ist eingebettet', () => {
+test('Keyboard-Navigation JS ist in team page eingebettet', () => {
   const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
   try {
     writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
     const { genHTML } = requireGenHTML(dir);
     genHTML(DEFAULT_THEME);
-    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
     assert.ok(html.includes('ArrowRight') || html.includes('arrowright'), 'Keyboard-Navigation JS fehlt');
   } finally {
     rmSync(dir, { recursive: true });
@@ -336,7 +337,7 @@ test('Heim-Tab enthält nur Heimspiele', () => {
     writeFileSync(join(dir, 'metadata.json'), JSON.stringify(metaHomeAway));
     const { genHTML } = requireGenHTML(dir);
     genHTML(DEFAULT_THEME);
-    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
     // panel-167881-home must contain Heimgegner but NOT Auswärtsgegner
     const homePanel = html.match(/id="panel-167881-home"[\s\S]*?(?=id="panel-167881-away")/)?.[0] || '';
     assert.ok(homePanel.includes('Heimgegner'),     'Heimgegner fehlt im Heim-Panel');
@@ -366,8 +367,8 @@ test('Auswärts-Tab enthält nur Auswärtsspiele', () => {
     writeFileSync(join(dir, 'metadata.json'), JSON.stringify(metaHomeAway));
     const { genHTML } = requireGenHTML(dir);
     genHTML(DEFAULT_THEME);
-    const html = readFileSync(join(dir, 'index.html'), 'utf8');
-    const awayPanel = html.match(/id="panel-167881-away"[\s\S]*?(?=<\/div>\s*<\/div>\s*(?:<div class="schedule-legend|<\/main>|<script))/)?.[0] || '';
+    const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
+    const awayPanel = html.match(/id="panel-167881-away"[\s\S]*?(?=(?:<div class="schedule-legend|<\/section>|<\/main>|<script))/)?.[0] || '';
     assert.ok(awayPanel.includes('Auswärtsgegner'), 'Auswärtsgegner fehlt im Auswärts-Panel');
     assert.ok(!awayPanel.includes('Heimgegner'),    'Heimgegner darf nicht im Auswärts-Panel sein');
   } finally {
@@ -431,7 +432,7 @@ test('Spielplan-Sektion erscheint wenn matches vorhanden', () => {
     writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadataWithMatches));
     const { genHTML } = requireGenHTML(dir);
     genHTML(DEFAULT_THEME);
-    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
     assert.ok(html.includes('SPIELPLAN'), 'Spielplan-Überschrift fehlt');
     assert.ok(html.includes('TSV Musterstadt'), 'Gegnerteam fehlt');
     assert.ok(html.includes('62:58'), 'Ergebnis fehlt');
@@ -503,7 +504,7 @@ test('buildNavigation: active page has aria-current, all teams linked', () => {
   assert.ok(html.includes('teams/200.html'), 'U16 link missing');
 });
 
-test('buildNavigation: contains inline script for toggle', () => {
+test('buildNavigation: does not contain inline script (script moved to buildNavScript)', () => {
   const modPath = require.resolve('../../src/generateHTML.js');
   delete require.cache[modPath];
   const { _testExports } = require('../../src/generateHTML.js');
@@ -513,7 +514,20 @@ test('buildNavigation: contains inline script for toggle', () => {
     { teamId: '100', teamName: 'Herren', ageGroup: '' },
   ];
   const html = buildNavigation(teams, 'index');
-  assert.ok(html.includes('<script>'), 'inline script tag missing');
+  assert.ok(!html.includes('<script>'), 'inline script tag should not be in buildNavigation');
+  assert.ok(html.includes('nav-toggle'), 'nav-toggle button should still be present');
+  assert.ok(html.includes('nav-drawer'), 'nav-drawer should still be present');
+  assert.ok(html.includes('aria-expanded'), 'aria-expanded attribute should still be present');
+});
+
+test('buildNavScript: returns script that references nav-toggle, nav-drawer, aria-expanded', () => {
+  const modPath = require.resolve('../../src/generateHTML.js');
+  delete require.cache[modPath];
+  const { _testExports } = require('../../src/generateHTML.js');
+  const { buildNavScript } = _testExports;
+
+  const html = buildNavScript();
+  assert.ok(html.includes('<script>'), 'script tag missing');
   assert.ok(html.includes('nav-toggle'), 'script should reference nav-toggle');
   assert.ok(html.includes('nav-drawer'), 'script should reference nav-drawer');
   assert.ok(html.includes('aria-expanded'), 'script should toggle aria-expanded');
@@ -685,4 +699,97 @@ test('buildBracket: null bracket renders unavailable note', () => {
 
   const html = buildBracket({ liganame: 'Pokal', bracket: null });
   assert.ok(html.includes('nicht verfügbar'), 'missing unavailable note');
+});
+
+// --- genHTML multi-page integration ---
+const sampleTeams = [
+  {
+    teamId: '100', teamName: 'Herren', ageGroup: '',
+    lastUpdate: new Date().toISOString(),
+    matchCount: 3, homeMatchCount: 2, awayMatchCount: 1,
+    logoUrl: 'https://example.com/logo.png',
+    matches: [
+      { date: '2025-03-01', opponent: 'Regensburg', result: '72:68', isHome: true,  isNext: false, competition: 'Bayernliga' },
+      { date: '2025-04-17', opponent: 'Freising',   result: null,    isHome: true,  isNext: true,  competition: 'Bayernliga' },
+    ],
+    competitions: [
+      { ligaId: '47653', liganame: 'Bayernliga', isLiga: true,
+        table: [
+          { rank: 1, teamName: 'Regensburg', played: 16, won: 14, lost: 2, points: '28:4', isOwn: false },
+          { rank: 3, teamName: 'Herren',     played: 16, won: 10, lost: 6, points: '20:12', isOwn: true },
+        ],
+        bracket: null },
+    ],
+  },
+  {
+    teamId: '200', teamName: 'U16', ageGroup: 'U16',
+    lastUpdate: new Date().toISOString(),
+    matchCount: 2, homeMatchCount: 1, awayMatchCount: 1,
+    logoUrl: null,
+    matches: [],
+    competitions: [
+      { ligaId: '51935', liganame: 'Bezirksoberliga U16', isLiga: true,
+        table: null, bracket: null },
+    ],
+  },
+];
+
+const DEFAULT_THEME_MULTI = { primary: '#004174', accent: '#009ef3', logoUrl: null, cupColor: '#7c3aed' };
+
+test('genHTML creates index.html and teams/ subpages', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-multi-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleTeams));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME_MULTI);
+    assert.ok(existsSync(join(dir, 'index.html')), 'index.html missing');
+    assert.ok(existsSync(join(dir, 'teams', '100.html')), 'teams/100.html missing');
+    assert.ok(existsSync(join(dir, 'teams', '200.html')), 'teams/200.html missing');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('index.html contains teaser cards with links to team pages', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-multi-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleTeams));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME_MULTI);
+    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    assert.ok(html.includes('teams/100.html'), 'link to Herren page missing');
+    assert.ok(html.includes('teams/200.html'), 'link to U16 page missing');
+    assert.ok(html.includes('teaser-card'), 'teaser-card class missing');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('team page contains standings table and schedule tabs', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-multi-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleTeams));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME_MULTI);
+    const html = readFileSync(join(dir, 'teams', '100.html'), 'utf8');
+    assert.ok(html.includes('standings-table'), 'standings table missing');
+    assert.ok(html.includes('Bayernliga'), 'competition heading missing');
+    assert.ok(html.includes('tab-bar'), 'schedule tabs missing');
+    assert.ok(html.includes('btn-group'), 'calendar buttons missing');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('team page with null table shows unavailable note', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-multi-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleTeams));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME_MULTI);
+    const html = readFileSync(join(dir, 'teams', '200.html'), 'utf8');
+    assert.ok(html.includes('nicht verfügbar'), 'unavailable note missing');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
 });
