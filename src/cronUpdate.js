@@ -32,13 +32,15 @@ async function updateAll() {
   const teams = await getTeams();
 
   const BBB_MEDIA_BASE = 'https://www.basketball-bund.net/media/team';
+  // All teamPermanentIds for this club share the same club logo at this endpoint.
+  // Using teams[0] is safe; any team ID resolves to the club crest.
   const firstTeamLogoUrl = teams.length > 0
     ? `${BBB_MEDIA_BASE}/${teams[0].id}/logo`
     : null;
 
   const theme = {
     primary: config.theme?.primary || '#004174',
-    accent:  config.theme?.accent  || '#009ef3',
+    accent: config.theme?.accent || '#009ef3',
     logoUrl: config.theme?.logoUrl || firstTeamLogoUrl,
   };
 
