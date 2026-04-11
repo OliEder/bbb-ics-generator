@@ -6,7 +6,7 @@
 
 **Architecture:** Logo URLs are constructed from `teamPermanentId` using the pattern `https://www.basketball-bund.net/media/team/{teamPermanentId}/logo` — no extra API call needed. The `teamId` in `metadata.json` is already the `teamPermanentId`. Each team card gets tabs implemented as accessible `role="tablist"` with keyboard arrow-key navigation in JavaScript. `fetchClubInfo()` in `apiClient.js` is removed since it returned null anyway (club endpoint has no logo field). The logo URL is added to each team entry in `metadata.json`.
 
-**Tech Stack:** Node.js, vanilla HTML/CSS/JS (no frameworks), node:test for tests
+**Tech Stack:** Node.js, vanilla HTML/CSS/JS (no frameworks), node:test for tests, axe-core + jsdom for WCAG 2.1 AA automated testing
 
 ---
 
@@ -18,6 +18,8 @@
 | `src/cronUpdate.js` | Remove `fetchClubInfo` import/call; construct `logoUrl` from first team's `id`; add `logoUrl` to each team's `meta` entry |
 | `src/generateHTML.js` | Full rewrite of HTML template: tab UI per team card, logo in header + team cards, keyboard nav JS, updated CSS |
 | `tests/e2e/html-generation.test.js` | Update `sampleMetadata` with `logoUrl`; update/add tests for tabs, logo in team cards, keyboard nav attributes |
+| `tests/e2e/accessibility.test.js` | New: WCAG 2.1 AA automated tests via axe-core + jsdom |
+| `package.json` | Add `axe-core` and `jsdom` as devDependencies |
 
 ---
 
@@ -710,6 +712,250 @@ Expected: all tests pass
 ```bash
 git add tests/e2e/html-generation.test.js
 git commit -m "test: clarify club-logo header test after team-card logo addition"
+```
+
+---
+
+## Task 6: WCAG 2.1 AA automated accessibility tests
+
+**Files:**
+- Create: `tests/e2e/accessibility.test.js`
+- Modify: `package.json`
+
+**Background:** `axe-core` is an automated accessibility testing engine that maps directly to WCAG 2.1 success criteria. Running it via `jsdom` (a DOM implementation for Node) lets us test the generated HTML without a real browser. Note: automated tools cover ~30-40% of WCAG criteria — the rest requires manual review. This test suite covers the verifiable subset.
+
+**WCAG 2.1 AA criteria covered by these tests:**
+- 1.1.1 Non-text Content — `alt` attributes on images
+- 1.3.1 Info and Relationships — correct ARIA roles (tablist/tab/tabpanel), landmark regions
+- 2.1.1 Keyboard — focusable elements (structural check)
+- 2.4.1 Bypass Blocks — landmark `<main>` and `<header>`
+- 2.4.2 Page Titled — `<title>` element present
+- 2.4.6 Headings and Labels — `<h1>` present, tab buttons have visible labels
+- 3.1.1 Language of Page — `lang` attribute on `<html>`
+- 4.1.2 Name, Role, Value — ARIA roles and aria-selected/aria-controls/aria-labelledby correct
+
+**Note on `window.eval()`:** axe-core must run inside the jsdom window context. We inject it via `dom.window.eval(axeSource)` where `axeSource` is the content of the axe-core library file — not user input. This is the standard pattern for running axe in jsdom.
+
+- [ ] **Step 1: Install dependencies**
+
+```bash
+npm install --save-dev axe-core jsdom
+```
+
+Verify `package.json` now lists both under `devDependencies`.
+
+- [ ] **Step 2: Write the failing test file**
+
+Create `tests/e2e/accessibility.test.js` with this content:
+
+```javascript
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { mkdtempSync, rmSync, writeFileSync, readFileSync } = require('node:fs');
+const { tmpdir } = require('node:os');
+const { join } = require('node:path');
+const { JSDOM } = require('jsdom');
+const axeSource = readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
+
+// Helper: generate HTML and return it as a string
+function generateHtml(theme, metadata) {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-a11y-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(metadata));
+    const modPath = require.resolve('../../src/generateHTML.js');
+    delete require.cache[modPath];
+    process.env.BBB_GENERATED_DIR = dir;
+    const { genHTML } = require('../../src/generateHTML.js');
+    genHTML(theme);
+    return readFileSync(join(dir, 'index.html'), 'utf8');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+}
+
+// Run axe-core against an HTML string, return violations
+// axeSource is injected into jsdom via window.eval — this is the standard
+// approach for running axe in Node without a real browser. axeSource is a
+// static library file, not user input.
+async function runAxe(html) {
+  const dom = new JSDOM(html, { runScripts: 'dangerously' });
+  dom.window.eval(axeSource); // eslint-disable-line no-eval
+  return new Promise((resolve, reject) => {
+    dom.window.axe.run(
+      dom.window.document,
+      { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] } },
+      (err, results) => {
+        if (err) reject(err);
+        else resolve(results.violations);
+      }
+    );
+  });
+}
+
+const sampleMetadata = [
+  {
+    teamId: '167881',
+    teamName: 'Fibalon Baskets U10',
+    ageGroup: 'U10',
+    lastUpdate: new Date().toISOString(),
+    matchCount: 2,
+    homeMatchCount: 1,
+    awayMatchCount: 1,
+    logoUrl: 'https://www.basketball-bund.net/media/team/167881/logo',
+  },
+  {
+    teamId: '167882',
+    teamName: 'Test Team',
+    ageGroup: 'U12',
+    lastUpdate: new Date().toISOString(),
+    matchCount: 1,
+    homeMatchCount: 1,
+    awayMatchCount: 0,
+    logoUrl: 'https://www.basketball-bund.net/media/team/167882/logo',
+  },
+];
+
+const DEFAULT_THEME = { primary: '#004174', accent: '#009ef3', logoUrl: null };
+const WITH_LOGO_THEME = {
+  primary: '#004174',
+  accent: '#009ef3',
+  logoUrl: 'https://www.basketball-bund.net/media/team/167881/logo',
+};
+
+test('WCAG 2.1 AA: keine Violations ohne Logo', async () => {
+  const html = generateHtml(DEFAULT_THEME, sampleMetadata);
+  const violations = await runAxe(html);
+  if (violations.length > 0) {
+    const report = violations.map(v =>
+      `[${v.id}] ${v.description}\n  Impact: ${v.impact}\n  Nodes: ${v.nodes.map(n => n.html).join(', ')}`
+    ).join('\n\n');
+    assert.fail(`WCAG 2.1 AA Violations gefunden:\n\n${report}`);
+  }
+});
+
+test('WCAG 2.1 AA: keine Violations mit Logo im Header', async () => {
+  const html = generateHtml(WITH_LOGO_THEME, sampleMetadata);
+  const violations = await runAxe(html);
+  if (violations.length > 0) {
+    const report = violations.map(v =>
+      `[${v.id}] ${v.description}\n  Impact: ${v.impact}\n  Nodes: ${v.nodes.map(n => n.html).join(', ')}`
+    ).join('\n\n');
+    assert.fail(`WCAG 2.1 AA Violations gefunden:\n\n${report}`);
+  }
+});
+
+test('WCAG 2.1 AA: keine Violations mit leerer Team-Liste', async () => {
+  const html = generateHtml(DEFAULT_THEME, []);
+  const violations = await runAxe(html);
+  if (violations.length > 0) {
+    const report = violations.map(v =>
+      `[${v.id}] ${v.description}\n  Impact: ${v.impact}`
+    ).join('\n\n');
+    assert.fail(`WCAG 2.1 AA Violations gefunden:\n\n${report}`);
+  }
+});
+
+test('2.4.2 Seitentitel: <title> ist vorhanden und nicht leer', () => {
+  const html = generateHtml(DEFAULT_THEME, sampleMetadata);
+  const dom = new JSDOM(html);
+  const title = dom.window.document.querySelector('title');
+  assert.ok(title, '<title> fehlt');
+  assert.ok(title.textContent.trim().length > 0, '<title> ist leer');
+});
+
+test('3.1.1 Sprache: lang-Attribut auf <html> ist gesetzt', () => {
+  const html = generateHtml(DEFAULT_THEME, sampleMetadata);
+  const dom = new JSDOM(html);
+  const lang = dom.window.document.documentElement.getAttribute('lang');
+  assert.ok(lang && lang.trim().length > 0, 'lang-Attribut auf <html> fehlt');
+});
+
+test('2.4.1 Bypass Blocks: <main> und <header> Landmark sind vorhanden', () => {
+  const html = generateHtml(DEFAULT_THEME, sampleMetadata);
+  const dom = new JSDOM(html);
+  assert.ok(dom.window.document.querySelector('main'), '<main> Landmark fehlt');
+  assert.ok(dom.window.document.querySelector('header'), '<header> Landmark fehlt');
+});
+
+test('2.4.6 Überschriften: <h1> ist vorhanden und nicht leer', () => {
+  const html = generateHtml(DEFAULT_THEME, sampleMetadata);
+  const dom = new JSDOM(html);
+  const h1 = dom.window.document.querySelector('h1');
+  assert.ok(h1, '<h1> fehlt');
+  assert.ok(h1.textContent.trim().length > 0, '<h1> ist leer');
+});
+
+test('4.1.2 Tab-Buttons: aria-controls zeigt auf existierende Panels', () => {
+  const html = generateHtml(DEFAULT_THEME, sampleMetadata);
+  const dom = new JSDOM(html);
+  const tabs = dom.window.document.querySelectorAll('[role="tab"]');
+  assert.ok(tabs.length > 0, 'Keine Tab-Buttons gefunden');
+  tabs.forEach(tab => {
+    const controlsId = tab.getAttribute('aria-controls');
+    assert.ok(controlsId, `Tab ohne aria-controls: ${tab.textContent}`);
+    const panel = dom.window.document.getElementById(controlsId);
+    assert.ok(panel, `Panel mit id="${controlsId}" nicht gefunden`);
+    assert.equal(panel.getAttribute('role'), 'tabpanel',
+      `Panel role="tabpanel" fehlt für id="${controlsId}"`);
+  });
+});
+
+test('4.1.2 Tablist: aria-label auf jeder tablist', () => {
+  const html = generateHtml(DEFAULT_THEME, sampleMetadata);
+  const dom = new JSDOM(html);
+  const tablists = dom.window.document.querySelectorAll('[role="tablist"]');
+  assert.ok(tablists.length > 0, 'Keine tablist gefunden');
+  tablists.forEach(tl => {
+    const label = tl.getAttribute('aria-label') || tl.getAttribute('aria-labelledby');
+    assert.ok(label, 'tablist ohne aria-label oder aria-labelledby');
+  });
+});
+
+test('1.1.1 Alt-Texte: Alle <img> haben alt-Attribut', () => {
+  const html = generateHtml(WITH_LOGO_THEME, sampleMetadata);
+  const dom = new JSDOM(html);
+  const images = dom.window.document.querySelectorAll('img');
+  assert.ok(images.length > 0, 'Keine <img>-Elemente gefunden');
+  images.forEach(img => {
+    assert.ok(
+      img.hasAttribute('alt'),
+      `<img src="${img.getAttribute('src')}"> hat kein alt-Attribut`
+    );
+  });
+});
+```
+
+- [ ] **Step 3: Run tests to verify they fail (generateHTML not yet updated)**
+
+```bash
+node --test tests/e2e/accessibility.test.js
+```
+
+Expected: Tests fail — axe violations present or ARIA attributes missing in old HTML. This confirms the tests actually test something.
+
+- [ ] **Step 4: After Task 3 (generateHTML rewrite) is complete, run accessibility tests again**
+
+```bash
+node --test tests/e2e/accessibility.test.js
+```
+
+Expected: all 10 tests pass.
+
+- [ ] **Step 5: Run full test suite**
+
+```bash
+node --test
+```
+
+Expected: all tests pass.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add tests/e2e/accessibility.test.js package.json package-lock.json
+git commit -m "test: add WCAG 2.1 AA automated accessibility tests via axe-core"
 ```
 
 ---
