@@ -1,4 +1,4 @@
-const { fetchTeamMatches, fetchMatchInfo, fetchClubTeams, fetchClubInfo } = require('./apiClient');
+const { fetchTeamMatches, fetchMatchInfo, fetchClubTeams } = require('./apiClient');
 const { generateICS } = require('./icsGenerator');
 const { saveICS, saveTeamsCache, loadTeamsCache } = require('./storage');
 const { genHTML } = require('./generateHTML');
@@ -31,17 +31,15 @@ async function updateAll() {
   const meta = [];
   const teams = await getTeams();
 
-  // Build theme from API + config overrides
-  let apiInfo = { logoUrl: null };
-  try {
-    apiInfo = await fetchClubInfo(config.clubId);
-  } catch (e) {
-    console.warn('[WARN] fetchClubInfo fehlgeschlagen, nutze Fallback-Logo:', e.message);
-  }
+  const BBB_MEDIA_BASE = 'https://www.basketball-bund.net/media/team';
+  const firstTeamLogoUrl = teams.length > 0
+    ? `${BBB_MEDIA_BASE}/${teams[0].id}/logo`
+    : null;
+
   const theme = {
     primary: config.theme?.primary || '#004174',
-    accent: config.theme?.accent || '#009ef3',
-    logoUrl: config.theme?.logoUrl || apiInfo?.logoUrl || 'https://www.fibalon-baskets.de/wp-content/uploads/2015/09/cropped-Fibalon_Baskets_Logo_Fin-1.png',
+    accent:  config.theme?.accent  || '#009ef3',
+    logoUrl: config.theme?.logoUrl || firstTeamLogoUrl,
   };
 
   for (const t of teams) {
@@ -95,6 +93,7 @@ async function updateAll() {
         matchCount: matches.length,
         homeMatchCount: homeMatches.length,
         awayMatchCount: awayMatches.length,
+        logoUrl: `${BBB_MEDIA_BASE}/${t.id}/logo`,
       });
     } catch (e) {
       console.error(`Fehler beim Update Team ${t.id}:`, e.stack || e);

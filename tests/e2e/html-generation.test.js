@@ -23,6 +23,7 @@ const sampleMetadata = [
     matchCount: 2,
     homeMatchCount: 1,
     awayMatchCount: 1,
+    logoUrl: 'https://www.basketball-bund.net/media/team/167881/logo',
   },
   {
     teamId: '167882',
@@ -32,6 +33,7 @@ const sampleMetadata = [
     matchCount: 1,
     homeMatchCount: 1,
     awayMatchCount: 0,
+    logoUrl: 'https://www.basketball-bund.net/media/team/167882/logo',
   },
 ];
 
@@ -180,6 +182,20 @@ test('color-mix() wird für abgeleitete Farben verwendet', () => {
     genHTML({ primary: '#004174', accent: '#009ef3', logoUrl: null });
     const html = readFileSync(join(dir, 'index.html'), 'utf8');
     assert.ok(html.includes('color-mix('), 'color-mix() fehlt im CSS');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('Logo-URL aus teamId ist in Team-Card', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML({ primary: '#004174', accent: '#009ef3', logoUrl: 'https://www.basketball-bund.net/media/team/167881/logo' });
+    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    assert.ok(html.includes('media/team/167881/logo'), 'Team-Logo-URL fehlt im HTML');
+    assert.ok(html.includes('media/team/167882/logo'), 'Team-Logo-URL für zweites Team fehlt');
   } finally {
     rmSync(dir, { recursive: true });
   }
