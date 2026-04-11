@@ -6,6 +6,8 @@ const config = require('../config.json');
 const fs = require('fs');
 const path = require('path');
 
+const CURRENT_SEASON = 2025; // Saison 2025/26
+
 async function getTeams() {
   const { teams: cached, stale } = loadTeamsCache();
   if (cached && !stale) {
@@ -88,8 +90,6 @@ async function updateAll() {
         }
       }
 
-      // Aktuelle Saison = seasonId 2025 (Saison 2025/26)
-      const CURRENT_SEASON = 2025;
       const seasonMatches = matches
         .filter(m => m.ligaData?.seasonId === CURRENT_SEASON)
         .sort((a, b) => {
