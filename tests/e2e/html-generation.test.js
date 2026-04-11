@@ -134,6 +134,20 @@ test('CSS-Variablen für primary und accent sind im HTML', () => {
   }
 });
 
+test('sanitizeCssColor blockiert CSS-Injection im theme', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML({ primary: 'red; background: url(evil)', accent: '#009ef3', logoUrl: null });
+    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    assert.ok(!html.includes('url(evil)'), 'CSS-Injection wurde nicht geblockt');
+    assert.ok(html.includes('--color-primary: #004174'), 'Fallback-Farbe fehlt nach Injection-Versuch');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
 test('Dark Mode media query ist vorhanden', () => {
   const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
   try {

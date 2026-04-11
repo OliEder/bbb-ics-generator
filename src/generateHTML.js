@@ -38,7 +38,7 @@ const ICON_ANDROID = `<svg width="14" height="17" viewBox="-147 -70 294 345" ari
 
 const ICON_DOWNLOAD = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
 
-function buildTabPanel(teamId, type, count, webcalLink, googleLink, httpsLink) {
+function buildTabPanel(teamId, type, webcalLink, googleLink, httpsLink) {
   const id = `panel-${teamId}-${type}`;
   const tabId = `tab-${teamId}-${type}`;
   const hidden = type !== 'all' ? ' hidden' : '';
@@ -70,9 +70,9 @@ function buildTeamCard(t) {
     return `<button id="tab-${t.teamId}-${type}" role="tab" aria-selected="${selected}" aria-controls="panel-${t.teamId}-${type}" tabindex="${tabindex}">${label}</button>`;
   }).join('');
 
-  const panels = variants.map(({ type, count }) =>
+  const panels = variants.map(({ type }) =>
     buildTabPanel(
-      t.teamId, type, count,
+      t.teamId, type,
       makeWebcalLink(`${t.teamId}_${type}.ics`),
       makeGoogleCalLink(`${t.teamId}_${type}.ics`),
       makeHttpsLink(`${t.teamId}_${type}.ics`),
