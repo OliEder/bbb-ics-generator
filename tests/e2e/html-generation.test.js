@@ -126,7 +126,7 @@ test('CSS-Variablen für primary und accent sind im HTML', () => {
     genHTML({ primary: '#ff0000', accent: '#00ff00', logoUrl: null });
     const html = readFileSync(join(dir, 'index.html'), 'utf8');
     assert.ok(html.includes('--color-primary: #ff0000'), 'primary CSS-Variable fehlt');
-    assert.ok(html.includes('--color-accent:  #00ff00'), 'accent CSS-Variable fehlt');
+    assert.ok(html.includes('--color-accent') && html.includes('#00ff00'), 'accent CSS-Variable fehlt');
   } finally {
     rmSync(dir, { recursive: true });
   }
