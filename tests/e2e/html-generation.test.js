@@ -256,3 +256,51 @@ test('Keyboard-Navigation JS ist eingebettet', () => {
     rmSync(dir, { recursive: true });
   }
 });
+
+const sampleMetadataWithMatches = [
+  {
+    teamId: '167881',
+    teamName: 'Fibalon Baskets Neumarkt U10',
+    ageGroup: 'U10',
+    lastUpdate: new Date().toISOString(),
+    matchCount: 2,
+    homeMatchCount: 1,
+    awayMatchCount: 1,
+    logoUrl: 'https://www.basketball-bund.net/media/team/167881/logo',
+    matches: [
+      {
+        date: '2025-10-12',
+        time: '15:00',
+        opponent: 'TSV Musterstadt',
+        isHome: true,
+        result: '62:58',
+        competition: 'Kreisliga Mittelfranken',
+        isNext: false,
+      },
+      {
+        date: '2025-10-26',
+        time: '14:00',
+        opponent: 'SV Demo',
+        isHome: true,
+        result: null,
+        competition: 'Kreisliga Mittelfranken',
+        isNext: true,
+      },
+    ],
+  },
+];
+
+test('Spielplan-Sektion erscheint wenn matches vorhanden', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadataWithMatches));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    assert.ok(html.includes('SPIELPLAN'), 'Spielplan-Überschrift fehlt');
+    assert.ok(html.includes('TSV Musterstadt'), 'Gegnerteam fehlt');
+    assert.ok(html.includes('62:58'), 'Ergebnis fehlt');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});

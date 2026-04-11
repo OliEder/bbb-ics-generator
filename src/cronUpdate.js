@@ -39,9 +39,10 @@ async function updateAll() {
     : null;
 
   const theme = {
-    primary: config.theme?.primary || '#004174',
-    accent: config.theme?.accent || '#009ef3',
-    logoUrl: config.theme?.logoUrl || firstTeamLogoUrl,
+    primary:  config.theme?.primary  || '#004174',
+    accent:   config.theme?.accent   || '#009ef3',
+    logoUrl:  config.theme?.logoUrl  || firstTeamLogoUrl,
+    cupColor: config.cupColor        || '#7c3aed',
   };
 
   for (const t of teams) {
@@ -87,15 +88,46 @@ async function updateAll() {
         }
       }
 
+      // Aktuelle Saison = seasonId 2025 (Saison 2025/26)
+      const CURRENT_SEASON = 2025;
+      const seasonMatches = matches
+        .filter(m => m.ligaData?.seasonId === CURRENT_SEASON)
+        .sort((a, b) => {
+          const da = (a.kickoffDate || '') + (a.kickoffTime || '');
+          const db = (b.kickoffDate || '') + (b.kickoffTime || '');
+          return da < db ? -1 : da > db ? 1 : 0;
+        });
+
+      // isNext: erstes Spiel ohne Ergebnis
+      let nextMarked = false;
+      const mappedMatches = seasonMatches.map(m => {
+        const isHome = Number(m.homeTeam?.teamPermanentId) === Number(t.id);
+        const opponent = isHome
+          ? (m.guestTeam?.teamname || '')
+          : (m.homeTeam?.teamname  || '');
+        const result = m.result || null;
+        const isNext = !nextMarked && !result ? (nextMarked = true, true) : false;
+        return {
+          date:        m.kickoffDate  || '',
+          time:        m.kickoffTime  || '',
+          opponent,
+          isHome,
+          result,
+          competition: m.ligaData?.liganame || '',
+          isNext,
+        };
+      });
+
       meta.push({
-        teamId: t.id,
-        teamName: t.name,
-        ageGroup: t.ageGroup,
-        lastUpdate: new Date().toISOString(),
-        matchCount: matches.length,
+        teamId:         t.id,
+        teamName:       t.name,
+        ageGroup:       t.ageGroup,
+        lastUpdate:     new Date().toISOString(),
+        matchCount:     matches.length,
         homeMatchCount: homeMatches.length,
         awayMatchCount: awayMatches.length,
-        logoUrl: `${BBB_MEDIA_BASE}/${t.id}/logo`,
+        logoUrl:        `${BBB_MEDIA_BASE}/${t.id}/logo`,
+        matches:        mappedMatches,
       });
     } catch (e) {
       console.error(`Fehler beim Update Team ${t.id}:`, e.stack || e);
