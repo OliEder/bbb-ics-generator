@@ -294,11 +294,11 @@ function buildStandingsTable(comp) {
     `</div>` +
     `<div id="${tableId}-official" class="standings-panel">` +
     `<table class="standings-table" aria-label="${escapeHtml(comp.liganame)} Tabelle">` +
-    `<thead><tr><th>#</th><th>Team</th><th>Sp</th><th>GP</th><th>S</th><th>N</th><th>+/−</th></tr></thead>` +
+    `<thead><tr><th class="standings-rank">#</th><th>Team</th><th class="standings-num">Sp</th><th class="standings-num">GP</th><th class="standings-num">S</th><th class="standings-num">N</th><th class="standings-num">+/−</th></tr></thead>` +
     `<tbody>${officialRows}</tbody></table></div>` +
     `<div id="${tableId}-gb" class="standings-panel" hidden>` +
     `<table class="standings-table" aria-label="${escapeHtml(comp.liganame)} Ranking nach GB">` +
-    `<thead><tr><th>#</th><th>Team</th><th>Sp</th><th>GP</th><th>S</th><th>N</th><th>GB</th><th>+/−</th></tr></thead>` +
+    `<thead><tr><th class="standings-rank">#</th><th>Team</th><th class="standings-num">Sp</th><th class="standings-num">GP</th><th class="standings-num">S</th><th class="standings-num">N</th><th class="standings-num">GB</th><th class="standings-num">+/−</th></tr></thead>` +
     `<tbody>${gbRows}</tbody></table></div>` +
     `</div>`;
 }
@@ -415,6 +415,8 @@ function buildSharedStyles(primary, accent, cupColor) {
     .standings-tab-btn--active { background: var(--color-primary); color: var(--color-on-primary); border-color: var(--color-primary); font-weight: 700; }
     .standings-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-bottom: 4px; }
     .standings-table th { text-align: left; color: var(--color-text); font-weight: 600; border-bottom: 1px solid var(--color-border); padding: 4px 8px; }
+    .standings-table th.standings-num { text-align: right; }
+    .standings-table th.standings-rank { text-align: center; }
     .standings-table td { padding: 4px 8px; border-bottom: 1px solid var(--color-border); }
     .standings-num { text-align: right; }
     .standings-rank { text-align: center; font-weight: 600; }
