@@ -1,7 +1,8 @@
-const { fetchTeamMatches, fetchMatchInfo, fetchClubTeams } = require('./apiClient');
+const { fetchTeamMatches, fetchMatchInfo, fetchClubTeams, fetchClubInfo } = require('./apiClient');
 const { generateICS } = require('./icsGenerator');
 const { saveICS, saveTeamsCache, loadTeamsCache } = require('./storage');
-const { clubId } = require('../config.json');
+const { genHTML } = require('./generateHTML');
+const config = require('../config.json');
 const fs = require('fs');
 const path = require('path');
 
@@ -11,8 +12,8 @@ async function getTeams() {
     console.log(`[DEBUG] Teams aus Cache geladen (${cached.length} Teams)`);
     return cached;
   }
-  console.log(`[DEBUG] Lade Teams von API für Club ${clubId}...`);
-  const fresh = await fetchClubTeams(clubId);
+  console.log(`[DEBUG] Lade Teams von API für Club ${config.clubId}...`);
+  const fresh = await fetchClubTeams(config.clubId);
   if (fresh && fresh.length > 0) {
     saveTeamsCache(fresh);
     console.log(`[DEBUG] ${fresh.length} Teams gecacht`);
@@ -29,6 +30,14 @@ async function getTeams() {
 async function updateAll() {
   const meta = [];
   const teams = await getTeams();
+
+  // Build theme from API + config overrides
+  const apiInfo = await fetchClubInfo(config.clubId);
+  const theme = {
+    primary: config.theme?.primary || '#004174',
+    accent: config.theme?.accent || '#009ef3',
+    logoUrl: config.theme?.logoUrl || apiInfo?.logoUrl || 'https://www.fibalon-baskets.de/wp-content/uploads/2015/09/cropped-Fibalon_Baskets_Logo_Fin-1.png',
+  };
 
   for (const t of teams) {
     try {
@@ -87,7 +96,9 @@ async function updateAll() {
     }
   }
 
-  fs.writeFileSync(path.resolve(__dirname, '../generated/metadata.json'), JSON.stringify(meta, null, 2));
+  const generatedDir = process.env.BBB_ICS_DIR || path.resolve(__dirname, '../generated');
+  fs.writeFileSync(path.join(generatedDir, 'metadata.json'), JSON.stringify(meta, null, 2));
+  genHTML(theme);
 }
 
 module.exports = { getTeams, updateAll };
