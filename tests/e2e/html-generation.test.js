@@ -439,3 +439,29 @@ test('Spielplan-Sektion erscheint wenn matches vorhanden', () => {
     rmSync(dir, { recursive: true });
   }
 });
+
+test('Auswärtsspiel hat badge--away im HTML', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  const metaAway = [
+    {
+      teamId: '167881',
+      teamName: 'Test Team',
+      ageGroup: 'U10',
+      lastUpdate: new Date().toISOString(),
+      matchCount: 1, homeMatchCount: 0, awayMatchCount: 1,
+      logoUrl: null,
+      matches: [
+        { date: '2025-10-19', time: '15:00', opponent: 'Auswärtsgegner', isHome: false, result: null, competition: 'Kreisliga', isNext: true },
+      ],
+    },
+  ];
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(metaAway));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    assert.ok(html.includes('badge--away'), 'badge--away Klasse fehlt für Auswärtsspiel');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
