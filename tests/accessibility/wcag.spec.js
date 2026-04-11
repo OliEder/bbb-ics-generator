@@ -16,6 +16,17 @@ function generateIndexHtml(theme, metadata) {
   return { dir, htmlPath: join(dir, 'index.html') };
 }
 
+function generateTeamHtml(theme, metadata) {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-a11y-team-'));
+  writeFileSync(join(dir, 'metadata.json'), JSON.stringify(metadata));
+  const modPath = require.resolve('../../src/generateHTML.js');
+  delete require.cache[modPath];
+  process.env.BBB_GENERATED_DIR = dir;
+  const { genHTML } = require('../../src/generateHTML.js');
+  genHTML(theme);
+  return { dir, htmlPath: join(dir, 'teams', `${metadata[0].teamId}.html`) };
+}
+
 const sampleMetadata = [
   {
     teamId: '167881',
@@ -39,7 +50,7 @@ const sampleMetadata = [
   },
 ];
 
-const DEFAULT_THEME = { primary: '#004174', accent: '#009ef3', logoUrl: null };
+const DEFAULT_THEME = { primary: '#004174', accent: '#009ef3', cupColor: '#7c3aed', logoUrl: null };
 const WITH_LOGO_THEME = {
   primary: '#004174',
   accent: '#009ef3',
@@ -79,6 +90,40 @@ test.describe('WCAG 2.1 AA — axe-core vollständiger Scan', () => {
       await page.goto('file://' + htmlPath);
       const results = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa'])
+        .analyze();
+      expect(results.violations).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  test('keine Violations auf Team-Seite', async ({ page }) => {
+    const metadata = [
+      {
+        teamId: '167881',
+        teamName: 'Fibalon Baskets U10',
+        ageGroup: 'U10',
+        lastUpdate: new Date().toISOString(),
+        matchCount: 2,
+        homeMatchCount: 1,
+        awayMatchCount: 1,
+        logoUrl: 'https://www.basketball-bund.net/media/team/167881/logo',
+        matches: [
+          { date: '2025-03-01', opponent: 'Roth', result: '24:18', isHome: true, isNext: false, competition: 'Kreisliga' },
+          { date: '2025-04-17', opponent: 'Ansbach', result: null, isHome: false, isNext: true, competition: 'Kreisliga' },
+        ],
+        competitions: [
+          { ligaId: '51961', liganame: 'Kreisliga Neumarkt', isLiga: true,
+            table: [{ rank: 1, teamName: 'Fibalon U10', played: 4, won: 3, lost: 1, points: '6:2', isOwn: true }],
+            bracket: null },
+        ],
+      },
+    ];
+    const { dir, htmlPath } = generateTeamHtml(DEFAULT_THEME, metadata);
+    try {
+      await page.goto(`file://${htmlPath}`);
+      const results = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
         .analyze();
       expect(results.violations).toEqual([]);
     } finally {

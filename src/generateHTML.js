@@ -282,7 +282,7 @@ function buildSharedStyles(primary, accent, cupColor) {
     .teaser-result { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--color-border); font-size: 0.82rem; }
     .teaser-score { font-weight: 600; }
     .teaser-next { background: var(--color-next-bg); border: 1px solid var(--color-next-border); border-radius: 6px; margin: 6px 14px; padding: 6px 10px; font-size: 0.78rem; font-weight: 600; color: var(--color-text); }
-    .teaser-link { display: block; text-align: right; padding: 8px 14px; color: var(--color-accent); font-size: 0.82rem; font-weight: 600; text-decoration: none; }
+    .teaser-link { display: block; text-align: right; padding: 8px 14px; color: var(--color-primary); font-size: 0.82rem; font-weight: 600; text-decoration: none; }
     /* Team page */
     .team-page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
     .team-page-title { font-size: 1.3rem; font-weight: 700; color: var(--color-text); }
@@ -322,7 +322,7 @@ function buildSharedStyles(primary, accent, cupColor) {
     .schedule-list { margin-bottom: 12px; }
     .schedule-header { font-size: 0.72rem; font-weight: 700; color: var(--color-text); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
     .schedule-row { display: flex; align-items: center; gap: 8px; padding: 7px 6px; border-radius: 6px; }
-    .schedule-row--past { opacity: 0.55; }
+    .schedule-row--past { color: color-mix(in srgb, var(--color-primary) 75%, white); }
     .schedule-next { background: var(--color-next-bg); border: 1px solid var(--color-next-border); padding: 8px 8px; }
     .badge { border-radius: 4px; padding: 3px 7px; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; min-width: 24px; text-align: center; }
     .badge--home { background: var(--color-badge-home-bg); color: var(--color-primary); }
