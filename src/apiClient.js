@@ -42,6 +42,7 @@ async function fetchClubTeams(clubId) {
           id,
           name: teamObj.teamname || 'Unbekannt',
           ageGroup: match.ligaData?.akName || '',
+          gender: match.ligaData?.geschlecht || '',
         });
       }
     }

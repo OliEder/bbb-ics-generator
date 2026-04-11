@@ -15,6 +15,15 @@ function makeGoogleCalLink(filename) {
   return 'https://www.google.com/calendar/render?cid=' + encodeURIComponent(makeWebcalLink(filename));
 }
 
+function genderSymbol(gender) {
+  if (!gender) return '';
+  const g = String(gender).toLowerCase().trim();
+  if (g === 'männlich' || g === 'male' || g === 'm') return '♂';
+  if (g === 'weiblich' || g === 'female' || g === 'w' || g === 'f') return '♀';
+  if (g === 'mix' || g === 'mixed') return '⚥';
+  return '';
+}
+
 function escapeHtml(str) {
   return String(str || '')
     .replace(/&/g, '&amp;')
@@ -133,11 +142,16 @@ function buildNavigation(teams, activePage) {
     const href = homeActive
       ? `teams/${escapeHtml(t.teamId)}.html`
       : `${escapeHtml(t.teamId)}.html`;
-    // Build a unique label: prefer "U16 · Neumarkt 2" over bare "U16"
-    const suffix = t.teamName ? t.teamName.replace(/^.*?Neumarkt\s*/i, '').trim() : '';
-    const label = t.ageGroup
-      ? escapeHtml(suffix ? `${t.ageGroup} · ${suffix}` : t.ageGroup)
-      : escapeHtml(t.teamName);
+    // Build a unique label: prefer "U16 · 2 ♂" over bare "U16 ♂"
+    // suffix = anything after the club name in teamName (e.g. "2" from "FBN Neumarkt 2")
+    const rawSuffix = t.teamName ? t.teamName.replace(/^.*?Neumarkt\s*/i, '').trim() : '';
+    // Only use suffix if it's a short disambiguator (not the full name unchanged)
+    const suffix = rawSuffix && rawSuffix !== t.teamName ? rawSuffix : '';
+    const sym = genderSymbol(t.gender);
+    const base = t.ageGroup
+      ? (suffix ? `${t.ageGroup} · ${suffix}` : t.ageGroup)
+      : (t.teamName || '');
+    const label = escapeHtml(sym ? `${base} ${sym}` : base);
     return `<a href="${href}"${active ? ' aria-current="page"' : ''}>${label}</a>`;
   }).join('');
 
@@ -216,7 +230,7 @@ function buildTeaserCard(team) {
   return `<div class="teaser-card">
   <div class="teaser-header">
     ${logoHtml}
-    <span class="teaser-team-name">${team.ageGroup ? escapeHtml(team.ageGroup) : escapeHtml(team.teamName)}${team.ageGroup ? `<small> ${escapeHtml(team.teamName)}</small>` : ''}</span>
+    <span class="teaser-team-name">${team.ageGroup ? escapeHtml(team.ageGroup) : escapeHtml(team.teamName)}${genderSymbol(team.gender) ? ` <span class="gender-sym" aria-hidden="true">${genderSymbol(team.gender)}</span>` : ''}${team.ageGroup ? `<small> ${escapeHtml(team.teamName)}</small>` : ''}</span>
     ${streakHtml}
   </div>
   <div class="teaser-results">${resultRows}</div>
@@ -334,6 +348,7 @@ function buildSharedStyles(primary, accent, cupColor) {
     .teaser-card { border: 1px solid var(--color-border); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
     .teaser-header { background: var(--color-primary); color: var(--color-on-primary); padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
     .teaser-team-name { font-weight: 700; font-size: 0.92rem; flex: 1; }
+    .gender-sym { font-size: 0.8em; opacity: 0.75; }
     .teaser-streak { font-size: 0.75rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
     .teaser-streak--win { background: #1a7f3c; color: #fff; }
     .teaser-streak--loss { background: #b91c1c; color: #fff; }
@@ -526,7 +541,7 @@ function buildTeamPage(team, allTeams, theme) {
     <div class="team-page-header">
       ${logoHtml}
       <div>
-        <h1 class="team-page-title">${team.ageGroup ? escapeHtml(team.ageGroup) : escapeHtml(team.teamName)}</h1>
+        <h1 class="team-page-title">${team.ageGroup ? escapeHtml(team.ageGroup) : escapeHtml(team.teamName)}${genderSymbol(team.gender) ? ` <span class="gender-sym" aria-hidden="true">${genderSymbol(team.gender)}</span>` : ''}</h1>
         ${team.ageGroup ? `<p class="team-page-club">${escapeHtml(team.teamName)}</p>` : ''}
         <p class="team-page-meta">Stand: ${lastUpdate}</p>
       </div>
