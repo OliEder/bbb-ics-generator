@@ -2,7 +2,6 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const sinon = require('sinon');
 const { mkdtempSync, rmSync, writeFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
@@ -34,7 +33,7 @@ function requireCronUpdate(dir) {
 
 // ---- Cache-HIT ----
 
-test('Cache-HIT: loadTeamsCache gibt frische Teams zurück → fetchClubTeams nicht aufgerufen', async () => {
+test('Cache-HIT: loadTeamsCache gibt frische Teams zurück → fetchClubTeams nicht aufgerufen', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'bbb-cache-'));
   try {
     // Write a fresh cache
@@ -43,16 +42,12 @@ test('Cache-HIT: loadTeamsCache gibt frische Teams zurück → fetchClubTeams ni
 
     // Stub axios so any real network call fails loudly
     const axios = require('axios');
-    const stub = sinon.stub(axios, 'get').rejects(new Error('Should not be called'));
+    const stub = t.mock.method(axios, 'get', () => Promise.reject(new Error('Should not be called')));
 
-    try {
-      const { getTeams } = requireCronUpdate(dir);
-      const result = await getTeams();
-      assert.deepEqual(result, mockTeams);
-      assert.ok(!stub.called, 'fetchClubTeams (axios.get) wurde unerwartet aufgerufen');
-    } finally {
-      stub.restore();
-    }
+    const { getTeams } = requireCronUpdate(dir);
+    const result = await getTeams();
+    assert.deepEqual(result, mockTeams);
+    assert.equal(stub.mock.calls.length, 0, 'fetchClubTeams (axios.get) wurde unerwartet aufgerufen');
   } finally {
     rmSync(dir, { recursive: true });
   }
@@ -60,7 +55,7 @@ test('Cache-HIT: loadTeamsCache gibt frische Teams zurück → fetchClubTeams ni
 
 // ---- Cache-MISS ----
 
-test('Cache-MISS: stale Cache → fetchClubTeams wird aufgerufen, Cache neu geschrieben', async () => {
+test('Cache-MISS: stale Cache → fetchClubTeams wird aufgerufen, Cache neu geschrieben', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'bbb-cache-'));
   try {
     // Write a stale cache (31 days old)
@@ -72,23 +67,17 @@ test('Cache-MISS: stale Cache → fetchClubTeams wird aufgerufen, Cache neu gesc
     );
 
     const axios = require('axios');
-    const stub = sinon.stub(axios, 'get').resolves(clubTeamsResponse);
+    t.mock.method(axios, 'get', () => Promise.resolve(clubTeamsResponse));
 
-    try {
-      const { getTeams } = requireCronUpdate(dir);
-      const result = await getTeams();
-      assert.ok(stub.called, 'fetchClubTeams (axios.get) wurde nicht aufgerufen');
-      // Should return the fresh teams parsed from clubTeamsResponse
-      assert.ok(Array.isArray(result) && result.length > 0, 'Keine Teams zurückgegeben');
-      assert.equal(result[0].id, String(clubTeamsResponse.data.data.matches[0].homeTeam.teamPermanentId));
+    const { getTeams } = requireCronUpdate(dir);
+    const result = await getTeams();
+    assert.ok(Array.isArray(result) && result.length > 0, 'Keine Teams zurückgegeben');
+    assert.equal(result[0].id, String(clubTeamsResponse.data.data.matches[0].homeTeam.teamPermanentId));
 
-      // Verify cache was written fresh
-      const { loadTeamsCache } = requireStorage(dir);
-      const { stale } = loadTeamsCache();
-      assert.equal(stale, false, 'Cache sollte nach Update nicht stale sein');
-    } finally {
-      stub.restore();
-    }
+    // Verify cache was written fresh
+    const { loadTeamsCache } = requireStorage(dir);
+    const { stale } = loadTeamsCache();
+    assert.equal(stale, false, 'Cache sollte nach Update nicht stale sein');
   } finally {
     rmSync(dir, { recursive: true });
   }
@@ -96,7 +85,7 @@ test('Cache-MISS: stale Cache → fetchClubTeams wird aufgerufen, Cache neu gesc
 
 // ---- Fallback ----
 
-test('Fallback: fetchClubTeams wirft Error + stale Cache → stale Cache zurückgegeben', async () => {
+test('Fallback: fetchClubTeams wirft Error + stale Cache → stale Cache zurückgegeben', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'bbb-cache-'));
   try {
     // Write a stale cache
@@ -108,16 +97,12 @@ test('Fallback: fetchClubTeams wirft Error + stale Cache → stale Cache zurück
     );
 
     const axios = require('axios');
-    const stub = sinon.stub(axios, 'get').rejects(new Error('Network error'));
+    t.mock.method(axios, 'get', () => Promise.reject(new Error('Network error')));
 
-    try {
-      const { getTeams } = requireCronUpdate(dir);
-      const result = await getTeams();
-      // Should fall back to stale cached teams
-      assert.deepEqual(result, mockTeams, 'Stale Cache wurde nicht als Fallback verwendet');
-    } finally {
-      stub.restore();
-    }
+    const { getTeams } = requireCronUpdate(dir);
+    const result = await getTeams();
+    // Should fall back to stale cached teams
+    assert.deepEqual(result, mockTeams, 'Stale Cache wurde nicht als Fallback verwendet');
   } finally {
     rmSync(dir, { recursive: true });
   }

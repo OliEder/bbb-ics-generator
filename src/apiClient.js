@@ -56,14 +56,14 @@ async function fetchLeagueTable(ligaId, ownTeamId) {
   const url = `${BASE_URL}/competition/table/id/${ligaId}`;
   try {
     const res = await axios.get(url);
-    const rows = res.data?.data?.table || [];
+    const rows = res.data?.data?.tabelle?.entries || [];
     return rows.map(row => ({
-      rank:     row.rank || 0,
+      rank:     row.rang || 0,
       teamName: row.team?.teamname || '',
-      played:   row.games || 0,
-      won:      row.wins  || 0,
-      lost:     row.losses || 0,
-      points:   `${row.pointsWon || 0}:${row.pointsLost || 0}`,
+      played:   row.anzspiele || 0,
+      won:      row.s  || 0,
+      lost:     row.n || 0,
+      points:   `${row.anzGewinnpunkte || 0}:${row.anzVerlustpunkte || 0}`,
       isOwn:    String(row.team?.teamPermanentId) === String(ownTeamId),
     }));
   } catch (err) {
