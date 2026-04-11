@@ -216,6 +216,38 @@ a|
 * Negative: Wenn basketball-bund.net die Media-URL-Struktur ändert, müssen alle Logo-URLs angepasst werden. Das Logo-Bild wird vom Browser beim Öffnen der Seite geladen (kann scheitern, falls URL nicht erreichbar — `<img>` zeigt dann keinen Broken-Image-Indikator da `alt=""`).
 |===
 
+=== ADR-009: Spielplan-Anzeige in Team-Cards (Saison-gefiltertes matches-Array)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-04-11
+
+| *Kontext*
+| Die Übersichtsseite soll pro Team den Spielplan der aktuellen Saison anzeigen — vergangene Spiele mit Ergebnis, kommende ohne — direkt in den Tab-Panels, oberhalb der Kalender-Abo-Buttons.
+
+| *Entscheidung*
+| `cronUpdate.js` filtert die rohen API-Matches auf `seasonId === 2025`, sortiert sie aufsteigend und speichert sie als `matches[]`-Array in `metadata.json`. `generateHTML.js` rendert dieses Array als HTML-Tabelle im jeweiligen Tab-Panel (Alle/Heim/Auswärts). Liga-Erkennung per Namens-Heuristik: enthält `liganame` das Wort "Liga" → Liga-Typ, sonst Cup/Pokal. Cup-Farbe ist konfigurierbar via `config.theme.cupColor` (Default `#7c3aed`).
+
+| *Begründung*
+a|
+* Matches sind bereits per `fetchTeamMatches()` geladen — kein zusätzlicher API-Aufruf nötig.
+* Saison-Filter (`seasonId === 2025`) ist im Daten-Layer (`cronUpdate.js`), nicht im View-Layer — `generateHTML.js` bekommt nur saubere, vorverarbeitete Daten.
+* `isNext`-Flag kennzeichnet das nächste anstehende Spiel bereits beim Schreiben der Metadaten — keine Zeitberechnungen im Template nötig.
+* Konfigurierbare Cup-Farbe (`config.theme.cupColor`) ermöglicht Anpassung ohne Code-Änderung.
+* Harte Saison-Konstante (`CURRENT_SEASON = 2025`) auf Modul-Ebene ist dokumentierter Trade-off: einfach, aber erfordert jährliche Code-Änderung.
+
+| *Konsequenzen*
+a|
+* Positive: Spielplan ohne zusätzliche API-Calls, Tab-Filterung (Alle/Heim/Auswärts) konsistent mit Kalender-Abo-Struktur, WCAG-konform (axe-core-geprüft).
+* Negative: `CURRENT_SEASON` muss jährlich aktualisiert werden. `metadata.json` wächst durch das `matches`-Array (bei typisch 14–20 Spielen pro Team vernachlässigbar). Liga-Heuristik ("liga" im Namen) kann bei ungewöhnlichen Wettbewerbsnamen fehlschlagen.
+|===
+
 === ADR-006: X-ALT-DESC für HTML-Beschreibungen (aktuell deaktiviert)
 
 [cols="2,5", options="header"]
