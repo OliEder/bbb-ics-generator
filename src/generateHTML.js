@@ -38,7 +38,7 @@ function buildScheduleRow(match, cupColor) {
   const cup = !isLiga(match.competition);
   const badgeClass = cup ? 'badge badge--cup' : (match.isHome ? 'badge badge--home' : 'badge badge--away');
   const badgeLabel = match.isHome ? 'H' : 'A';
-  const badgeStyle = cup ? ` style="background:color-mix(in srgb,${escapeHtml(cupColor)} 15%,white);color:${escapeHtml(cupColor)}"` : '';
+  const badgeStyle = '';
 
   const compStyle = cup ? ` style="color:${escapeHtml(cupColor)};font-weight:600"` : '';
   const compText  = escapeHtml(match.competition);
@@ -52,7 +52,7 @@ function buildScheduleRow(match, cupColor) {
   // Format date: 'YYYY-MM-DD' → 'DD.MM.'
   const dateParts = String(match.date || '').split('-');
   const dateLabel = dateParts.length === 3
-    ? `${dateParts[2]}.${dateParts[1]}.`
+    ? `${escapeHtml(dateParts[2])}.${escapeHtml(dateParts[1])}.`
     : escapeHtml(match.date);
 
   const nextLabel = match.isNext ? ' <span class="schedule-next-label">Nächstes →</span>' : '';
@@ -236,7 +236,7 @@ function genHTML(theme = {}) {
       font-size: 0.72rem;
       color: var(--color-text);
     }
-    .main { max-width: 760px; margin: 0 auto; padding: 20px 16px; }
+    main { max-width: 760px; margin: 0 auto; padding: 20px 16px; }
     .team-card {
       border-radius: 10px; border: 1px solid var(--color-border);
       overflow: hidden; margin-bottom: 12px;
@@ -300,6 +300,7 @@ function genHTML(theme = {}) {
     }
     .badge--home { background: var(--color-badge-home-bg); color: var(--color-primary); }
     .badge--away { background: var(--color-badge-away-bg); color: #b84a00; }
+    .badge--cup { background: color-mix(in srgb, var(--color-cup) 15%, white); color: var(--color-cup); }
     .schedule-opponent {
       flex: 1; font-size: 0.88rem; color: var(--color-text); min-width: 0;
     }
@@ -333,6 +334,7 @@ function genHTML(theme = {}) {
         border-color: var(--color-border);
       }
       .btn:hover { background: var(--color-surface-card); }
+      .badge--cup { background: color-mix(in srgb, var(--color-cup) 25%, black); color: color-mix(in srgb, var(--color-cup) 80%, white); }
     }
     /* Legend */
     .schedule-legend {
@@ -359,7 +361,7 @@ function genHTML(theme = {}) {
     <div class="schedule-legend">
       <span><span class="badge badge--home">H</span> Heimspiel (Liga)</span>
       <span><span class="badge badge--away">A</span> Auswärtsspiel (Liga)</span>
-      <span><span class="badge" style="background:color-mix(in srgb,${cupColor} 15%,white);color:${cupColor}">H/A</span> Pokal / Cup</span>
+      <span><span class="badge badge--cup">H/A</span> Pokal / Cup</span>
     </div>
   </main>
   <script>
@@ -410,6 +412,6 @@ if (require.main === module) {
     primary:  config.theme?.primary  || '#004174',
     accent:   config.theme?.accent   || '#009ef3',
     logoUrl:  config.theme?.logoUrl  || null,
-    cupColor: config.cupColor        || '#7c3aed',
+    cupColor: config.theme?.cupColor || '#7c3aed',
   });
 }
