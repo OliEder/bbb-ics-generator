@@ -1,3 +1,9 @@
 {
-  "clubId": "4468"
+  "clubId": "4468",
+  "_theme_example": {
+    "comment": "Optionale Overrides — entferne '_example' um sie zu aktivieren",
+    "primary": "#004174",
+    "accent": "#009ef3",
+    "logoUrl": "https://example.com/logo.png"
+  }
 }
