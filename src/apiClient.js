@@ -104,7 +104,9 @@ async function fetchTournamentRounds(ligaId) {
             if (result && m.homeTeam && m.guestTeam) {
               const parts = result.split(':');
               if (parts.length === 2) {
-                homeWon = parseInt(parts[0], 10) > parseInt(parts[1], 10);
+                const a = parseInt(parts[0], 10);
+                const b = parseInt(parts[1], 10);
+                if (!isNaN(a) && !isNaN(b)) homeWon = a > b;
               }
             }
             return {
