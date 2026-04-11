@@ -367,7 +367,7 @@ test('Auswärts-Tab enthält nur Auswärtsspiele', () => {
     const { genHTML } = requireGenHTML(dir);
     genHTML(DEFAULT_THEME);
     const html = readFileSync(join(dir, 'index.html'), 'utf8');
-    const awayPanel = html.match(/id="panel-167881-away"[\s\S]*?(?=<\/div>\s*<\/div>\s*<script)/)?.[0] || '';
+    const awayPanel = html.match(/id="panel-167881-away"[\s\S]*?(?=<\/div>\s*<\/div>\s*(?:<div class="schedule-legend|<\/main>|<script))/)?.[0] || '';
     assert.ok(awayPanel.includes('Auswärtsgegner'), 'Auswärtsgegner fehlt im Auswärts-Panel');
     assert.ok(!awayPanel.includes('Heimgegner'),    'Heimgegner darf nicht im Auswärts-Panel sein');
   } finally {

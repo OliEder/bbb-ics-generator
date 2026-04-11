@@ -354,14 +354,14 @@ function genHTML(theme = {}) {
   <div class="update-bar">
     Stand: ${new Date().toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })} · Automatisch alle 6h aktualisiert
   </div>
-  <div class="main">
+  <main>
+    ${teams.map(t => buildTeamCard(t, cupColor)).join('')}
     <div class="schedule-legend">
       <span><span class="badge badge--home">H</span> Heimspiel (Liga)</span>
       <span><span class="badge badge--away">A</span> Auswärtsspiel (Liga)</span>
       <span><span class="badge" style="background:color-mix(in srgb,${cupColor} 15%,white);color:${cupColor}">H/A</span> Pokal / Cup</span>
     </div>
-    ${teams.map(t => buildTeamCard(t, cupColor)).join('')}
-  </div>
+  </main>
   <script>
     document.querySelectorAll('[role="tablist"]').forEach(function(tablist) {
       var tabs = Array.from(tablist.querySelectorAll('[role="tab"]'));
