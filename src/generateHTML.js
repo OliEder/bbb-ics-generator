@@ -287,8 +287,8 @@ function buildSharedStyles(primary, accent, cupColor) {
     /* Team page */
     .team-page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
     .team-page-title { font-size: 1.3rem; font-weight: 700; color: var(--color-text); }
-    .team-page-club { font-size: 0.78rem; color: var(--color-text-muted); margin-top: 1px; }
-    .team-page-meta { font-size: 0.75rem; color: var(--color-text-muted); margin-top: 2px; }
+    .team-page-club { font-size: 0.78rem; color: var(--color-text); margin-top: 1px; }
+    .team-page-meta { font-size: 0.75rem; color: var(--color-text); margin-top: 2px; }
     .comp-section { margin-bottom: 24px; }
     .comp-heading { font-size: 0.9rem; font-weight: 700; color: var(--color-primary); border-left: 3px solid var(--color-primary); padding-left: 10px; margin-bottom: 10px; }
     .comp-heading--cup { color: var(--color-cup); border-left-color: var(--color-cup); }
