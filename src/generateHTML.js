@@ -194,7 +194,7 @@ function buildBracket(comp) {
     return `<p class="comp-unavailable">Bracket noch nicht verfügbar.</p>`;
   }
   const rounds = comp.bracket.map(round => {
-    const matches = round.matches.map(m => {
+    const matches = (round.matches || []).map(m => {
       const homeClass = m.homeWon === true ? ' bracket-winner' : (m.homeBye ? ' bracket-bye' : '');
       const guestClass = m.homeWon === false ? ' bracket-winner' : (m.guestBye ? ' bracket-bye' : '');
       return `<div class="bracket-match">` +
@@ -426,7 +426,7 @@ function buildTeamPage(team, allTeams, theme) {
     const label    = type === 'all' ? `Alle (${count})` : type === 'home' ? `Heim (${count})` : `Auswärts (${count})`;
     const selected = type === 'all' ? 'true' : 'false';
     const tabindex = type === 'all' ? '0' : '-1';
-    return `<button id="tab-${team.teamId}-${type}" role="tab" aria-selected="${selected}" aria-controls="panel-${team.teamId}-${type}" tabindex="${tabindex}">${label}</button>`;
+    return `<button id="tab-${escapeHtml(team.teamId)}-${type}" role="tab" aria-selected="${selected}" aria-controls="panel-${escapeHtml(team.teamId)}-${type}" tabindex="${tabindex}">${label}</button>`;
   }).join('');
 
   const panels = variants.map(({ type }) =>
@@ -516,48 +516,6 @@ function buildIndexPage(teams, theme) {
 </html>`;
 }
 
-function buildTeamCard(t, cupColor) {
-  const logoHtml = t.logoUrl
-    ? `<img src="${escapeHtml(t.logoUrl)}" alt="" class="team-logo" aria-hidden="true">`
-    : `<div class="team-logo-placeholder" aria-hidden="true"></div>`;
-
-  const variants = [
-    { type: 'all',  count: Number(t.matchCount) },
-    { type: 'home', count: Number(t.homeMatchCount) },
-    { type: 'away', count: Number(t.awayMatchCount) },
-  ];
-
-  const tabs = variants.map(({ type, count }) => {
-    const label    = type === 'all' ? `Alle (${count})` : type === 'home' ? `Heim (${count})` : `Auswärts (${count})`;
-    const selected = type === 'all' ? 'true' : 'false';
-    const tabindex = type === 'all' ? '0' : '-1';
-    return `<button id="tab-${t.teamId}-${type}" role="tab" aria-selected="${selected}" aria-controls="panel-${t.teamId}-${type}" tabindex="${tabindex}">${label}</button>`;
-  }).join('');
-
-  const panels = variants.map(({ type }) =>
-    buildTabPanel(
-      t.teamId, type,
-      makeWebcalLink(`${t.teamId}_${type}.ics`),
-      makeGoogleCalLink(`${t.teamId}_${type}.ics`),
-      makeHttpsLink(`${t.teamId}_${type}.ics`),
-      t.matches || [],
-      cupColor,
-    )
-  ).join('');
-
-  return `
-  <div class="team-card">
-    <div class="team-card-header">
-      ${logoHtml}
-      <span class="team-name">${escapeHtml(t.teamName)} <small>${escapeHtml(t.ageGroup)}</small></span>
-      <span class="team-badge">${Number(t.matchCount)} Sp. · ${Number(t.homeMatchCount)} H · ${Number(t.awayMatchCount)} A</span>
-    </div>
-    <div class="tab-bar" role="tablist" aria-label="Spielvariante für ${escapeHtml(t.teamName)}">
-      ${tabs}
-    </div>
-    ${panels}
-  </div>`;
-}
 
 function genHTML(theme = {}) {
   const primary  = sanitizeCssColor(theme.primary  || '#004174');
@@ -576,7 +534,7 @@ function genHTML(theme = {}) {
 
   // Write teams/{teamId}.html
   const teamsDir = path.join(generatedDir, 'teams');
-  if (!fs.existsSync(teamsDir)) fs.mkdirSync(teamsDir, { recursive: true });
+  fs.mkdirSync(teamsDir, { recursive: true });
   for (const team of teams) {
     fs.writeFileSync(
       path.join(teamsDir, `${team.teamId}.html`),
