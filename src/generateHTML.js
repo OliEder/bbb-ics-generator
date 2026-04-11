@@ -160,6 +160,30 @@ function buildTeaserCard(team) {
   const pastMatches = allMatches.filter(m => m.result).slice(-3);
   const nextMatch   = allMatches.find(m => m.isNext);
 
+  // Streak: count consecutive wins or losses from most recent played match
+  const played = allMatches.filter(m => m.result);
+  let streakHtml = '';
+  if (played.length > 0) {
+    const isWin = m => {
+      const p = (m.result || '').split(':');
+      if (p.length !== 2) return null;
+      const own = parseInt(p[m.isHome ? 0 : 1], 10);
+      const opp = parseInt(p[m.isHome ? 1 : 0], 10);
+      return (!isNaN(own) && !isNaN(opp)) ? own > opp : null;
+    };
+    const lastResult = isWin(played[played.length - 1]);
+    if (lastResult !== null) {
+      let count = 0;
+      for (let i = played.length - 1; i >= 0; i--) {
+        if (isWin(played[i]) === lastResult) count++;
+        else break;
+      }
+      const label = lastResult ? `${count}S` : `${count}N`;
+      const cls = lastResult ? 'teaser-streak teaser-streak--win' : 'teaser-streak teaser-streak--loss';
+      streakHtml = `<span class="${cls}">${label}</span>`;
+    }
+  }
+
   const resultRows = [...pastMatches].reverse().map(m => {
     const badgeClass = isLiga(m.competition)
       ? (m.isHome ? 'badge badge--home' : 'badge badge--away')
@@ -189,6 +213,7 @@ function buildTeaserCard(team) {
   <div class="teaser-header">
     ${logoHtml}
     <span class="teaser-team-name">${team.ageGroup ? escapeHtml(team.ageGroup) : escapeHtml(team.teamName)}${team.ageGroup ? `<small> ${escapeHtml(team.teamName)}</small>` : ''}</span>
+    ${streakHtml}
   </div>
   <div class="teaser-results">${resultRows}</div>
   ${nextHtml}
@@ -305,6 +330,13 @@ function buildSharedStyles(primary, accent, cupColor) {
     .teaser-card { border: 1px solid var(--color-border); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
     .teaser-header { background: var(--color-primary); color: var(--color-on-primary); padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
     .teaser-team-name { font-weight: 700; font-size: 0.92rem; flex: 1; }
+    .teaser-streak { font-size: 0.75rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+    .teaser-streak--win { background: #1a7f3c; color: #fff; }
+    .teaser-streak--loss { background: #b91c1c; color: #fff; }
+    @media (prefers-color-scheme: dark) {
+      .teaser-streak--win { background: #166534; color: #d1fae5; }
+      .teaser-streak--loss { background: #991b1b; color: #fee2e2; }
+    }
     .teaser-results { flex: 1; padding: 8px 14px; }
     .teaser-result { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--color-border); font-size: 0.82rem; }
     .teaser-score { font-weight: 600; }
