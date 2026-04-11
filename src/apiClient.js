@@ -80,52 +80,69 @@ async function fetchTournamentRounds(ligaId) {
   const spielplanUrl = `${BASE_URL}/competition/spielplan/id/${ligaId}`;
   try {
     const spielplanRes = await axios.get(spielplanUrl);
-    const spieltage = spielplanRes.data?.data?.spieltage || [];
-    if (spieltage.length === 0) return null;
+    const data = spielplanRes.data?.data || {};
+    const spieltage = data.spieltage || [];
 
-    const rounds = [];
-    for (const st of spieltage) {
-      const mdUrl = `${BASE_URL}/competition/id/${ligaId}/matchday/${st.spieltag}`;
-      try {
-        const mdRes = await axios.get(mdUrl);
-        const mdMatches = mdRes.data?.data?.matches || [];
-        if (mdMatches.length === 0) continue;
+    const isBye = t =>
+      !t.teamPermanentId ||
+      t.teamPermanentId === 0 ||
+      /freilos|\?/i.test(t.teamname || '');
 
-        // Round name by match count
-        const count = mdMatches.length;
-        const nameMap = { 1: 'Finale', 2: 'Halbfinale', 4: 'Viertelfinale', 8: 'Achtelfinale' };
-        const roundName = nameMap[count] || st.bezeichnung || `Runde ${st.spieltag}`;
-
-        rounds.push({
-          roundName,
-          matches: mdMatches.map(m => {
-            const isBye = t =>
-              !t.teamPermanentId ||
-              t.teamPermanentId === 0 ||
-              /freilos|\?/i.test(t.teamname || '');
-            const result = m.result || null;
-            let homeWon = null;
-            if (result && m.homeTeam && m.guestTeam) {
-              const parts = result.split(':');
-              if (parts.length === 2) {
-                const a = parseInt(parts[0], 10);
-                const b = parseInt(parts[1], 10);
-                if (!isNaN(a) && !isNaN(b)) homeWon = a > b;
-              }
-            }
-            return {
-              home:     m.homeTeam?.teamname  || '',
-              guest:    m.guestTeam?.teamname || '',
-              result,
-              homeWon,
-              homeBye:  isBye(m.homeTeam  || {}),
-              guestBye: isBye(m.guestTeam || {}),
-            };
-          }),
-        });
-      } catch (innerErr) {
-        console.error('API error fetchTournamentRounds matchday', ligaId, st.spieltag, innerErr.message);
+    const mapMatch = m => {
+      const result = m.result || null;
+      let homeWon = null;
+      if (result) {
+        const parts = result.split(':');
+        if (parts.length === 2) {
+          const a = parseInt(parts[0], 10);
+          const b = parseInt(parts[1], 10);
+          if (!isNaN(a) && !isNaN(b)) homeWon = a > b;
+        }
       }
+      return {
+        home:     m.homeTeam?.teamname  || '',
+        guest:    m.guestTeam?.teamname || '',
+        result,
+        homeWon,
+        homeBye:  isBye(m.homeTeam  || {}),
+        guestBye: isBye(m.guestTeam || {}),
+      };
+    };
+
+    const nameMap = { 1: 'Finale', 2: 'Halbfinale', 4: 'Viertelfinale', 8: 'Achtelfinale' };
+
+    // Path A: spieltage array available → fetch each matchday separately
+    if (spieltage.length > 0) {
+      const rounds = [];
+      for (const st of spieltage) {
+        const mdUrl = `${BASE_URL}/competition/id/${ligaId}/matchday/${st.spieltag}`;
+        try {
+          const mdRes = await axios.get(mdUrl);
+          const mdMatches = mdRes.data?.data?.matches || [];
+          if (mdMatches.length === 0) continue;
+          const roundName = nameMap[mdMatches.length] || st.bezeichnung || `Runde ${st.spieltag}`;
+          rounds.push({ roundName, matches: mdMatches.map(mapMatch) });
+        } catch (innerErr) {
+          console.error('API error fetchTournamentRounds matchday', ligaId, st.spieltag, innerErr.message);
+        }
+      }
+      return rounds.length > 0 ? rounds : null;
+    }
+
+    // Path B: no spieltage, but matches inline (e.g. Bayernpokal) → group by matchDay
+    const inlineMatches = data.matches || [];
+    if (inlineMatches.length === 0) return null;
+
+    const byRound = new Map();
+    for (const m of inlineMatches) {
+      const day = m.matchDay ?? 0;
+      if (!byRound.has(day)) byRound.set(day, []);
+      byRound.get(day).push(m);
+    }
+    const rounds = [];
+    for (const [day, matches] of [...byRound.entries()].sort((a, b) => a[0] - b[0])) {
+      const roundName = nameMap[matches.length] || `Runde ${day}`;
+      rounds.push({ roundName, matches: matches.map(mapMatch) });
     }
     return rounds.length > 0 ? rounds : null;
   } catch (err) {
