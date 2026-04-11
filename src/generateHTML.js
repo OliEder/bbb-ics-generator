@@ -127,7 +127,7 @@ function buildTabPanel(teamId, type, webcalLink, googleLink, httpsLink, matches,
 function sortTeams(teams) {
   function sortKey(t) {
     const ag = String(t.ageGroup || '').trim().toUpperCase();
-    if (!ag || ag === 'HERREN' || (t.teamName || '').toLowerCase().includes('herren')) return 0;
+    if (!ag || ag === 'HERREN' || ag === 'SENIOREN' || (t.teamName || '').toLowerCase().includes('herren')) return 0;
     const m = ag.match(/^U(\d+)$/);
     return m ? 1000 - parseInt(m[1], 10) : 2000;
   }
