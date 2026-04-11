@@ -109,7 +109,7 @@ test('Anzahl .team Divs = Anzahl Teams in metadata', () => {
     const { genHTML } = requireGenHTML(dir);
     genHTML();
     const html = readFileSync(join(dir, 'index.html'), 'utf8');
-    const matches = html.match(/class="team"/g) || [];
+    const matches = html.match(/class="team-card"/g) || [];
     assert.equal(matches.length, sampleMetadata.length);
   } finally {
     rmSync(dir, { recursive: true });

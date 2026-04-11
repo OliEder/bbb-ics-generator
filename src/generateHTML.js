@@ -31,9 +31,17 @@ const ICON_ANDROID = `<svg width="14" height="17" viewBox="-147 -70 294 345" ari
 
 const ICON_DOWNLOAD = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
 
+function sanitizeCssColor(value) {
+  // Accept only safe CSS color formats: hex, rgb(), rgba(), hsl(), hsla(), named colors
+  if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value)) return value;
+  if (/^(rgb|rgba|hsl|hsla)\([^)]*\)$/.test(value)) return value;
+  if (/^[a-zA-Z]+$/.test(value)) return value; // named colors like "red"
+  return '#004174'; // fallback to safe default
+}
+
 function genHTML(theme = {}) {
-  const primary = escapeHtml(theme.primary || '#004174');
-  const accent  = escapeHtml(theme.accent  || '#009ef3');
+  const primary = sanitizeCssColor(theme.primary || '#004174');
+  const accent  = sanitizeCssColor(theme.accent  || '#009ef3');
   const logoUrl = theme.logoUrl || null;
 
   const generatedDir = process.env.BBB_GENERATED_DIR || process.env.BBB_ICS_DIR || path.resolve(__dirname, '../generated');
@@ -202,9 +210,19 @@ function genHTML(theme = {}) {
         <span class="team-badge">${Number(t.matchCount)} Spiele · ${Number(t.homeMatchCount)} Heim · ${Number(t.awayMatchCount)} Auswärts</span>
       </div>
       <div class="btn-group">
-        <a href="${escapeHtml(makeWebcalLink(t.teamId + '_all.ics'))}" class="btn">${ICON_APPLE} iOS / Mac</a>
-        <a href="${escapeHtml(makeGoogleCalLink(t.teamId + '_all.ics'))}" class="btn">${ICON_ANDROID} Android</a>
-        <a href="${escapeHtml(makeHttpsLink(t.teamId + '_all.ics'))}" class="btn" download>${ICON_DOWNLOAD} ICS</a>
+        <a href="${escapeHtml(makeWebcalLink(t.teamId + '_all.ics'))}" class="btn">${ICON_APPLE} iOS / Mac: Alle</a>
+        <a href="${escapeHtml(makeWebcalLink(t.teamId + '_home.ics'))}" class="btn">${ICON_APPLE} iOS / Mac: Heim</a>
+        <a href="${escapeHtml(makeWebcalLink(t.teamId + '_away.ics'))}" class="btn">${ICON_APPLE} iOS / Mac: Auswärts</a>
+      </div>
+      <div class="btn-group">
+        <a href="${escapeHtml(makeGoogleCalLink(t.teamId + '_all.ics'))}" class="btn">${ICON_ANDROID} Android: Alle</a>
+        <a href="${escapeHtml(makeGoogleCalLink(t.teamId + '_home.ics'))}" class="btn">${ICON_ANDROID} Android: Heim</a>
+        <a href="${escapeHtml(makeGoogleCalLink(t.teamId + '_away.ics'))}" class="btn">${ICON_ANDROID} Android: Auswärts</a>
+      </div>
+      <div class="btn-group">
+        <a href="${escapeHtml(makeHttpsLink(t.teamId + '_all.ics'))}" class="btn" download>${ICON_DOWNLOAD} ICS: Alle</a>
+        <a href="${escapeHtml(makeHttpsLink(t.teamId + '_home.ics'))}" class="btn" download>${ICON_DOWNLOAD} ICS: Heim</a>
+        <a href="${escapeHtml(makeHttpsLink(t.teamId + '_away.ics'))}" class="btn" download>${ICON_DOWNLOAD} ICS: Auswärts</a>
       </div>
     </div>`).join('')}
   </main>
