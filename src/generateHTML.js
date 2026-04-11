@@ -44,6 +44,18 @@ function buildScheduleRow(match, cupColor) {
 
   const resultText = match.result ? escapeHtml(match.result) : '–';
 
+  let resultClass = 'schedule-result';
+  if (match.result) {
+    const parts = match.result.split(':');
+    if (parts.length === 2) {
+      const own = parseInt(parts[match.isHome ? 0 : 1], 10);
+      const opp = parseInt(parts[match.isHome ? 1 : 0], 10);
+      if (!isNaN(own) && !isNaN(opp)) {
+        resultClass += own > opp ? ' schedule-result--win' : ' schedule-result--loss';
+      }
+    }
+  }
+
   const rowClass = match.isNext
     ? 'schedule-row schedule-next'
     : (match.result ? 'schedule-row schedule-row--past' : 'schedule-row');
@@ -60,7 +72,7 @@ function buildScheduleRow(match, cupColor) {
     `<span class="${badgeClass}">${badgeLabel}</span>` +
     `<span class="schedule-opponent">${dateLabel} · ${escapeHtml(match.opponent)}${nextLabel}</span>` +
     `<span class="schedule-competition"${compStyle}>${compText}</span>` +
-    `<span class="schedule-result">${resultText}</span>` +
+    `<span class="${resultClass}">${resultText}</span>` +
     `</div>`;
 }
 
@@ -335,6 +347,12 @@ function buildSharedStyles(primary, accent, cupColor) {
     .schedule-next-label { font-size: 0.75rem; font-weight: 600; color: var(--color-primary); margin-left: 4px; }
     .schedule-competition { font-size: 0.75rem; color: var(--color-text); white-space: nowrap; }
     .schedule-result { font-size: 0.88rem; font-weight: 600; white-space: nowrap; min-width: 44px; text-align: right; color: var(--color-text); }
+    .schedule-result--win  { color: #1a7f3c; }
+    .schedule-result--loss { color: #b91c1c; }
+    @media (prefers-color-scheme: dark) {
+      .schedule-result--win  { color: #4ade80; }
+      .schedule-result--loss { color: #f87171; }
+    }
     .btn-group { display: flex; flex-direction: column; gap: 8px; }
     .btn { display: inline-flex; align-items: center; gap: 8px; background: var(--color-surface); color: var(--color-primary); border: 1.5px solid var(--color-border); padding: 9px 14px; border-radius: 7px; font-size: 0.82rem; font-weight: 600; text-decoration: none; transition: background 0.15s, border-color 0.15s; }
     .btn:hover { background: var(--color-primary-light); border-color: var(--color-primary); }
