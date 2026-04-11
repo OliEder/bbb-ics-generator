@@ -15,13 +15,17 @@ function makeGoogleCalLink(filename) {
   return 'https://www.google.com/calendar/render?cid=' + encodeURIComponent(makeWebcalLink(filename));
 }
 
-function genderSymbol(gender) {
+// Returns an HTML span with a visible symbol and a screen-reader label.
+// The symbol alone is unreliably pronounced by screen readers.
+function genderSpan(gender) {
   if (!gender) return '';
   const g = String(gender).toLowerCase().trim();
-  if (g === 'männlich' || g === 'male' || g === 'm') return '♂';
-  if (g === 'weiblich' || g === 'female' || g === 'w' || g === 'f') return '♀';
-  if (g === 'mix' || g === 'mixed') return '⚥';
-  return '';
+  let sym, label;
+  if (g === 'männlich' || g === 'male' || g === 'm')          { sym = '♂'; label = 'männlich'; }
+  else if (g === 'weiblich' || g === 'female' || g === 'w' || g === 'f') { sym = '♀'; label = 'weiblich'; }
+  else if (g === 'mix' || g === 'mixed')                      { sym = '⚥'; label = 'gemischt'; }
+  else return '';
+  return `<span class="gender-sym" aria-label="${label}">${sym}</span>`;
 }
 
 function escapeHtml(str) {
@@ -147,11 +151,11 @@ function buildNavigation(teams, activePage) {
     const rawSuffix = t.teamName ? t.teamName.replace(/^.*?Neumarkt\s*/i, '').trim() : '';
     // Only use suffix if it's a short disambiguator (not the full name unchanged)
     const suffix = rawSuffix && rawSuffix !== t.teamName ? rawSuffix : '';
-    const sym = genderSymbol(t.gender);
+    const sym = genderSpan(t.gender);
     const base = t.ageGroup
       ? (suffix ? `${t.ageGroup} · ${suffix}` : t.ageGroup)
       : (t.teamName || '');
-    const label = escapeHtml(sym ? `${base} ${sym}` : base);
+    const label = escapeHtml(base) + (sym ? ` ${sym}` : '');
     return `<a href="${href}"${active ? ' aria-current="page"' : ''}>${label}</a>`;
   }).join('');
 
@@ -230,7 +234,7 @@ function buildTeaserCard(team) {
   return `<div class="teaser-card">
   <div class="teaser-header">
     ${logoHtml}
-    <span class="teaser-team-name">${team.ageGroup ? escapeHtml(team.ageGroup) : escapeHtml(team.teamName)}${genderSymbol(team.gender) ? ` <span class="gender-sym" aria-hidden="true">${genderSymbol(team.gender)}</span>` : ''}${team.ageGroup ? `<small> ${escapeHtml(team.teamName)}</small>` : ''}</span>
+    <span class="teaser-team-name">${team.ageGroup ? escapeHtml(team.ageGroup) : escapeHtml(team.teamName)}${genderSpan(team.gender) ? ` ${genderSpan(team.gender)}` : ''}${team.ageGroup ? `<small> ${escapeHtml(team.teamName)}</small>` : ''}</span>
     ${streakHtml}
   </div>
   <div class="teaser-results">${resultRows}</div>
@@ -541,7 +545,7 @@ function buildTeamPage(team, allTeams, theme) {
     <div class="team-page-header">
       ${logoHtml}
       <div>
-        <h1 class="team-page-title">${team.ageGroup ? escapeHtml(team.ageGroup) : escapeHtml(team.teamName)}${genderSymbol(team.gender) ? ` <span class="gender-sym" aria-hidden="true">${genderSymbol(team.gender)}</span>` : ''}</h1>
+        <h1 class="team-page-title">${team.ageGroup ? escapeHtml(team.ageGroup) : escapeHtml(team.teamName)}${genderSpan(team.gender) ? ` ${genderSpan(team.gender)}` : ''}</h1>
         ${team.ageGroup ? `<p class="team-page-club">${escapeHtml(team.teamName)}</p>` : ''}
         <p class="team-page-meta">Stand: ${lastUpdate}</p>
       </div>
