@@ -4,35 +4,7 @@
 
 Das System kennt zwei Umgebungen: die lokale Entwicklungsumgebung und die Produktionsumgebung auf GitHub.
 
-....
-+---------------------------+        +-------------------------------------------+
-|  Lokale Entwicklung       |        |  Produktionsumgebung (GitHub)             |
-|                           |        |                                           |
-|  Developer-Maschine       |        |  +---------------------+                 |
-|                           |        |  | GitHub Actions      |                 |
-|  node src/cronUpdate.js   |        |  | ubuntu-latest Runner|                 |
-|  node src/generateHTML.js |        |  |                     |                 |
-|  node src/server.js       |        |  | node-version: 18    |                 |
-|  (Port 3000)              |        |  | npm install         |                 |
-|                           |        |  | npm run update      |                 |
-|  generated/               |        |  | npm run generate-html                |
-|    *.ics                  |        |  +----------+----------+                 |
-|    index.html             |        |             |                            |
-|    teams-cache.json       |        |             | upload artifact            |
-|    metadata.json          |        |             v                            |
-|                           |        |  +---------------------+                 |
-+---------------------------+        |  | GitHub Pages        |                 |
-                                     |  | (Static Hosting)    |                 |
-                                     |  |                     |                 |
-                                     |  | *.ics Dateien       |                 |
-                                     |  | index.html          |                 |
-                                     |  |                     |                 |
-                                     |  | URL: https://       |                 |
-                                     |  | olieder.github.io/  |                 |
-                                     |  | bbb-ics-generator/  |                 |
-                                     |  +---------------------+                 |
-                                     +-------------------------------------------+
-....
+image::https://mermaid.ink/svg/Zmxvd2NoYXJ0IExSCiAgICBzdWJncmFwaCBMT0NBTFsiTG9rYWxlIEVudHdpY2tsdW5nIl0KICAgICAgICBERVZbIkRldmVsb3BlcgpNYXNjaGluZSJdIC0tPiBOU1sibm9kZSBzcmMvY3JvblVwZGF0ZS5qcyJdCiAgICAgICAgREVWIC0tPiBOSFsibm9kZSBzcmMvZ2VuZXJhdGVIVE1MLmpzIl0KICAgICAgICBERVYgLS0-IE5TMlsibm9kZSBzcmMvc2VydmVyLmpzClBvcnQgMzAwMCJdCiAgICBlbmQKICAgIHN1YmdyYXBoIEdJVEhVQlsiUHJvZHVrdGlvbnN1bWdlYnVuZyAoR2l0SHViKSJdCiAgICAgICAgR0hBWyJHaXRIdWIgQWN0aW9ucwp1YnVudHUtbGF0ZXN0Ck5vZGUuanMgMTgiXSAtLT58dXBsb2FkIGFydGlmYWN0fCBHUFsiR2l0SHViIFBhZ2VzCmh0dHBzOi8vb2xpZWRlci5naXRodWIuaW8vCmJiYi1pY3MtZ2VuZXJhdG9yLyJdCiAgICBlbmQ[Verteilungssicht Deployment-Diagramm,link="https://mermaid.ink/svg/Zmxvd2NoYXJ0IExSCiAgICBzdWJncmFwaCBMT0NBTFsiTG9rYWxlIEVudHdpY2tsdW5nIl0KICAgICAgICBERVZbIkRldmVsb3BlcgpNYXNjaGluZSJdIC0tPiBOU1sibm9kZSBzcmMvY3JvblVwZGF0ZS5qcyJdCiAgICAgICAgREVWIC0tPiBOSFsibm9kZSBzcmMvZ2VuZXJhdGVIVE1MLmpzIl0KICAgICAgICBERVYgLS0-IE5TMlsibm9kZSBzcmMvc2VydmVyLmpzClBvcnQgMzAwMCJdCiAgICBlbmQKICAgIHN1YmdyYXBoIEdJVEhVQlsiUHJvZHVrdGlvbnN1bWdlYnVuZyAoR2l0SHViKSJdCiAgICAgICAgR0hBWyJHaXRIdWIgQWN0aW9ucwp1YnVudHUtbGF0ZXN0Ck5vZGUuanMgMTgiXSAtLT58dXBsb2FkIGFydGlmYWN0fCBHUFsiR2l0SHViIFBhZ2VzCmh0dHBzOi8vb2xpZWRlci5naXRodWIuaW8vCmJiYi1pY3MtZ2VuZXJhdG9yLyJdCiAgICBlbmQ"]
 
 === GitHub Actions Workflow
 

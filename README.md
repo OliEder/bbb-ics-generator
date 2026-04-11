@@ -33,23 +33,20 @@ Die Team-Daten werden automatisch über die Basketball-Bund API ermittelt.
 
 ## Datenfluss
 
-```
-Basketball-Bund API
-       │
-       ▼
-cronUpdate.js          (API-Abruf, Filterung nach Heim/Auswärts)
-       │
-       ▼
-icsGenerator.js        (ICS-Eventgenerierung, RFC 5545)
-       │
-       ▼
-generated/{teamId}_{type}.ics   +   metadata.json
-       │
-       ▼
-generateHTML.js        (index.html mit Abonnement-Links)
-       │
-       ▼
-GitHub Pages           (öffentlich unter olieder.github.io/bbb-ics-generator/)
+```mermaid
+flowchart TD
+    API["Basketball-Bund REST-API"] --> CU["cronUpdate.js\nOrchestrator"]
+    CU --> AC["apiClient.js\nAPI-Facade"]
+    CU --> IG["icsGenerator.js\nRFC 5545 Renderer"]
+    CU --> ST["storage.js\nPersistenz"]
+    ST --> GEN["generated/\n{teamId}_{type}.ics\nmetadata.json"]
+    GEN --> GH["generateHTML.js\nHTML-Generator"]
+    GH --> HTML["generated/index.html"]
+    GEN --> GP["GitHub Pages\nolieder.github.io/\nbbb-ics-generator/"]
+    HTML --> GP
+    GP --> iOS["iOS / macOS\nKalender-App"]
+    GP --> AND["Android\nGoogle Calendar"]
+    GP --> DL["ICS Download\nOutlook / Thunderbird"]
 ```
 
 ## Projektstruktur

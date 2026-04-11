@@ -4,45 +4,7 @@
 
 Das folgende Diagramm zeigt den BBB ICS Generator im Kontext seiner Kommunikationspartner:
 
-....
-                           +----------------------------------+
-                           |                                  |
-                           |    Basketball-Bund REST-API      |
-                           |  https://www.basketball-bund.net |
-                           |             /rest                |
-                           |                                  |
-                           +----------------------------------+
-                                           |
-                              HTTP GET     |
-                              (axios)      |
-                                           v
-+-------------------+      +--------------+-----------------+      +----------------------+
-|                   |      |                                |      |                      |
-|   GitHub          |      |       BBB ICS GENERATOR        |      |   GitHub Pages       |
-|   Actions         +----->+                                +----->+   (Static Hosting)   |
-|   (CI/CD)         |      |   src/cronUpdate.js            |      |                      |
-|   Cron: */6h      |      |   src/apiClient.js             |      |   generated/*.ics    |
-|   Push: main      |      |   src/icsGenerator.js          |      |   generated/         |
-|   manuell         |      |   src/storage.js               |      |     index.html       |
-|                   |      |   src/generateHTML.js          |      |                      |
-+-------------------+      |                                |      +----------+-----------+
-                           |   config.json (clubId: 4468)   |                 |
-                           |   generated/ (ICS + HTML)      |                 |
-                           |                                |          webcal:// / HTTPS
-                           +--------------------------------+                 |
-                                                                              |
-                               +------------------+      +-------------------+--+
-                               |                  |      |                      |
-                               |   iOS Calendar   |      |   Google Calendar /  |
-                               |   Apple Mail     |      |   Android            |
-                               |                  |      |                      |
-                               +------------------+      +----------------------+
-                               |                  |      |                      |
-                               |   MS Outlook     |      |   Mozilla            |
-                               |   (Windows/Mac)  |      |   Thunderbird        |
-                               |                  |      |                      |
-                               +------------------+      +----------------------+
-....
+image::https://mermaid.ink/svg/Zmxvd2NoYXJ0IFRECiAgICBHSEFbIkdpdEh1YiBBY3Rpb25zCkNyb246IGFsbGUgNmgKUHVzaDogbWFpbiJdIC0tPnxucG0gcnVuIHVwZGF0ZXwgU1lTCiAgICBTWVNbIkJCQiBJQ1MgR2VuZXJhdG9yCmNyb25VcGRhdGUuanMKYXBpQ2xpZW50LmpzCmljc0dlbmVyYXRvci5qcwpzdG9yYWdlLmpzCmdlbmVyYXRlSFRNTC5qcyJdIC0tPnxIVFRQIEdFVHwgQkJCQVBJWyJCYXNrZXRiYWxsLUJ1bmQKUkVTVC1BUEkiXQogICAgU1lTIC0tPnx1cGxvYWQgYXJ0aWZhY3R8IEdIUEFHRVNbIkdpdEh1YiBQYWdlcwpvbGllZGVyLmdpdGh1Yi5pby8KYmJiLWljcy1nZW5lcmF0b3IvIl0KICAgIEdIUEFHRVMgLS0-fHdlYmNhbDovL3wgSU9TWyJpT1MgLyBtYWNPUwpLYWxlbmRlci5hcHAiXQogICAgR0hQQUdFUyAtLT58R29vZ2xlIENhbGVuZGFyIFVSTHwgQU5EWyJBbmRyb2lkCkdvb2dsZSBDYWxlbmRhciJdCiAgICBHSFBBR0VTIC0tPnxIVFRQUyBEb3dubG9hZHwgT1RIRVJbIk91dGxvb2sKVGh1bmRlcmJpcmQiXQ[BBB ICS Generator Systemkontext,link="https://mermaid.ink/svg/Zmxvd2NoYXJ0IFRECiAgICBHSEFbIkdpdEh1YiBBY3Rpb25zCkNyb246IGFsbGUgNmgKUHVzaDogbWFpbiJdIC0tPnxucG0gcnVuIHVwZGF0ZXwgU1lTCiAgICBTWVNbIkJCQiBJQ1MgR2VuZXJhdG9yCmNyb25VcGRhdGUuanMKYXBpQ2xpZW50LmpzCmljc0dlbmVyYXRvci5qcwpzdG9yYWdlLmpzCmdlbmVyYXRlSFRNTC5qcyJdIC0tPnxIVFRQIEdFVHwgQkJCQVBJWyJCYXNrZXRiYWxsLUJ1bmQKUkVTVC1BUEkiXQogICAgU1lTIC0tPnx1cGxvYWQgYXJ0aWZhY3R8IEdIUEFHRVNbIkdpdEh1YiBQYWdlcwpvbGllZGVyLmdpdGh1Yi5pby8KYmJiLWljcy1nZW5lcmF0b3IvIl0KICAgIEdIUEFHRVMgLS0-fHdlYmNhbDovL3wgSU9TWyJpT1MgLyBtYWNPUwpLYWxlbmRlci5hcHAiXQogICAgR0hQQUdFUyAtLT58R29vZ2xlIENhbGVuZGFyIFVSTHwgQU5EWyJBbmRyb2lkCkdvb2dsZSBDYWxlbmRhciJdCiAgICBHSFBBR0VTIC0tPnxIVFRQUyBEb3dubG9hZHwgT1RIRVJbIk91dGxvb2sKVGh1bmRlcmJpcmQiXQ"]
 
 === Fachlicher Kontext
 
