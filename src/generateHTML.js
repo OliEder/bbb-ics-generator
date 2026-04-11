@@ -38,7 +38,6 @@ function buildScheduleRow(match, cupColor) {
   const cup = !isLiga(match.competition);
   const badgeClass = cup ? 'badge badge--cup' : (match.isHome ? 'badge badge--home' : 'badge badge--away');
   const badgeLabel = match.isHome ? 'H' : 'A';
-  const badgeStyle = '';
 
   const compStyle = cup ? ` style="color:${escapeHtml(cupColor)};font-weight:600"` : '';
   const compText  = escapeHtml(match.competition);
@@ -58,7 +57,7 @@ function buildScheduleRow(match, cupColor) {
   const nextLabel = match.isNext ? ' <span class="schedule-next-label">Nächstes →</span>' : '';
 
   return `<div class="${rowClass}">` +
-    `<span class="${badgeClass}"${badgeStyle}>${badgeLabel}</span>` +
+    `<span class="${badgeClass}">${badgeLabel}</span>` +
     `<span class="schedule-opponent">${dateLabel} · ${escapeHtml(match.opponent)}${nextLabel}</span>` +
     `<span class="schedule-competition"${compStyle}>${compText}</span>` +
     `<span class="schedule-result">${resultText}</span>` +
@@ -335,6 +334,7 @@ function genHTML(theme = {}) {
       }
       .btn:hover { background: var(--color-surface-card); }
       .badge--cup { background: color-mix(in srgb, var(--color-cup) 25%, black); color: color-mix(in srgb, var(--color-cup) 80%, white); }
+      .badge--away { color: color-mix(in srgb, #b84a00 80%, white); }
     }
     /* Legend */
     .schedule-legend {
