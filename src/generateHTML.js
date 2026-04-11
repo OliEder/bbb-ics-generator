@@ -144,9 +144,11 @@ function buildNavigation(teams, activePage) {
       ? `teams/${escapeHtml(t.teamId)}.html`
       : `${escapeHtml(t.teamId)}.html`;
     const sym = genderSpan(t.gender);
-    const agePart = t.ageGroup ? escapeHtml(t.ageGroup) : '';
-    const namePart = t.teamName ? `<span class="nav-team-name">${escapeHtml(t.teamName)}</span>` : '';
-    const label = (agePart ? agePart : '') + (sym ? ` ${sym}` : '') + (namePart ? ` ${namePart}` : '');
+    const ag = String(t.ageGroup || '').trim().toUpperCase();
+    const isSenioren = ag === 'SENIOREN' || ag === 'HERREN';
+    const namePart = escapeHtml(t.teamName || '');
+    const agePart = (!isSenioren && t.ageGroup) ? ` <span class="nav-age">${escapeHtml(t.ageGroup)}</span>` : '';
+    const label = namePart + agePart + (sym ? ` ${sym}` : '');
     return `<a href="${href}"${active ? ' aria-current="page"' : ''}>${label}</a>`;
   }).join('');
 
@@ -389,7 +391,7 @@ function buildSharedStyles(primary, accent, cupColor) {
     .nav-toggle span { display: block; width: 22px; height: 2px; background: var(--color-on-primary); border-radius: 1px; }
     .nav-drawer { background: var(--color-surface-card); border-bottom: 1px solid var(--color-border); padding: 8px 0; }
     .nav-drawer a { display: block; padding: 10px 16px; color: var(--color-text); text-decoration: none; font-weight: 500; font-size: 0.9rem; text-align: right; }
-    .nav-team-name { opacity: 0.65; font-weight: 400; }
+    .nav-age { opacity: 0.65; font-weight: 400; }
     .nav-drawer a[aria-current="page"] { background: var(--color-tab-active-bg); color: var(--color-primary); font-weight: 700; }
     .nav-drawer a:hover { background: var(--color-primary-light); }
     /* Header */
