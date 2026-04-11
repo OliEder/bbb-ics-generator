@@ -38,7 +38,7 @@ jobs:
         run: npm ci
 
       - name: Run unit and e2e tests
-        run: node --test 'tests/e2e/*.test.js'
+        run: node --test tests/e2e/*.test.js
 
   accessibility:
     name: Accessibility Tests (Playwright + axe)
