@@ -389,7 +389,7 @@ function buildSharedStyles(primary, accent, cupColor) {
     .nav-toggle span { display: block; width: 22px; height: 2px; background: var(--color-on-primary); border-radius: 1px; }
     .nav-drawer { background: var(--color-surface-card); border-bottom: 1px solid var(--color-border); padding: 8px 0; }
     .nav-drawer a { display: block; padding: 10px 16px; color: var(--color-text); text-decoration: none; font-weight: 500; font-size: 0.9rem; text-align: right; }
-    .nav-team-name { font-size: 0.78rem; opacity: 0.65; font-weight: 400; }
+    .nav-team-name { opacity: 0.65; font-weight: 400; }
     .nav-drawer a[aria-current="page"] { background: var(--color-tab-active-bg); color: var(--color-primary); font-weight: 700; }
     .nav-drawer a:hover { background: var(--color-primary-light); }
     /* Header */
@@ -405,7 +405,8 @@ function buildSharedStyles(primary, accent, cupColor) {
     .teaser-card { border: 1px solid var(--color-border); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
     .teaser-header { background: var(--color-primary); color: var(--color-on-primary); padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
     .teaser-team-name { font-weight: 700; font-size: 0.92rem; flex: 1; }
-    .gender-sym { font-size: 0.8em; opacity: 0.75; }
+    .gender-sym { opacity: 0.75; }
+    .teaser-team-name .gender-sym, .team-page-title .gender-sym { font-size: 0.8em; }
     .teaser-streak-info { font-size: 0.82rem; color: var(--color-text); padding: 6px 14px 0; }
     .teaser-streak-label { font-weight: 700; }
     .teaser-results { flex: 1; padding: 8px 14px; }
