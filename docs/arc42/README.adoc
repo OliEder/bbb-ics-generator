@@ -634,8 +634,8 @@ sequenceDiagram
 . `createEvents()` der ics-Bibliothek erzeugt RFC-5545-konforme VEVENT-Blöcke.
 . Post-Processing: VCALENDAR-Header wird mit X-WR-CALNAME, X-WR-TIMEZONE etc. angereichert.
 . `saveICS(teamId, type, ics)` schreibt die Datei nach `generated/{teamId}_{type}.ics`.
-. Nach allen Teams: `metadata.json` wird mit Update-Zeitstempel und Spielzahlen geschrieben.
-. GitHub Actions führt danach `npm run generate-html` aus, das `index.html` aus `metadata.json` erzeugt.
+. Nach allen Teams: `metadata.json` wird mit Update-Zeitstempel, Spielzahlen und `logoUrl` je Team geschrieben. Die `logoUrl` wird direkt konstruiert: `https://www.basketball-bund.net/media/team/{teamPermanentId}/logo` — kein zusätzlicher API-Aufruf.
+. GitHub Actions führt danach `npm run generate-html` aus, das `index.html` aus `metadata.json` erzeugt (Tab-UI mit Logos, ARIA-Tab-Pattern, eingebettetem Keyboard-Nav-JS).
 . Das `generated/`-Verzeichnis wird als GitHub Pages Artefakt hochgeladen und deployed.
 
 === Szenario 2: Update-Zyklus mit Cache-MISS (erster Start oder Cache abgelaufen)
@@ -752,6 +752,54 @@ concurrency:
 ----
 
 Verhindert parallele Deployments: Ein laufendes Deployment wird nicht abgebrochen, wenn ein neues getriggert wird. Das neue Deployment wartet, bis das aktuelle abgeschlossen ist.
+
+=== GitHub Actions Workflow: Test-Pipeline
+
+Neben dem Deploy-Workflow existiert `.github/workflows/test.yml`, der die automatisierten Tests ausführt.
+
+==== Trigger mit Paths-Filter
+
+Der Workflow läuft *nur* bei Code-Änderungen — nicht bei Calendar-Update-Commits (die ausschließlich `generated/` berühren):
+
+[source,yaml]
+----
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'playwright.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/test.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'playwright.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+----
+
+==== Jobs
+
+Der Workflow hat zwei parallele Jobs:
+
+[cols="2,4", options="header"]
+|===
+| Job | Beschreibung
+
+| `unit-and-e2e`
+| Führt `node --test tests/e2e/*.test.js` aus — alle Unit- und E2E-Tests mit Node.js built-in test runner.
+
+| `accessibility`
+| Installiert Playwright + Chromium, führt `npx playwright test` aus (WCAG 2.1 AA Tests via axe-core). Lädt den Playwright HTML Report als Artifact hoch (30 Tage aufbewahrt, abrufbar unter Actions → Run → Artifacts).
+|===
+
+==== Playwright Report Artifact
+
+Nach jedem Accessibility-Job-Lauf (auch bei Fehlern, `if: always()`) wird `playwright-report/` als Artifact `playwright-report` hochgeladen. Das ermöglicht das Betrachten der detaillierten Testergebnisse direkt in der GitHub Actions Web-UI.
 
 === Verzeichnisstruktur nach erfolgreichem Build
 
@@ -950,6 +998,54 @@ Das System verwendet ausschließlich `console.log`, `console.warn` und `console.
 
 Ein strukturiertes Logging-Framework (Winston, Pino) ist nicht vorhanden. Bei Bedarf wäre die Einführung eines solchen Frameworks eine sinnvolle Verbesserung, da GitHub Actions-Logs per se keine Log-Level-Filterung unterstützen.
 
+=== Barrierefreiheit (WCAG 2.1 AA)
+
+Die generierte `index.html` erfüllt die technischen Kriterien der WCAG 2.1 Level AA. Die Einhaltung wird durch automatisierte Playwright-Tests mit `@axe-core/playwright` sichergestellt.
+
+==== ARIA-Tab-Pattern
+
+Jede Team-Card verwendet das standardisierte ARIA-Tab-Pattern:
+
+* `role="tablist"` mit `aria-label` am Tab-Container
+* `role="tab"` mit `aria-selected`, `aria-controls` und `tabindex` an den Tabs
+* `role="tabpanel"` mit `aria-labelledby` an den Panel-Containern
+* Inaktive Panels tragen das `hidden`-Attribut
+
+==== Tastaturnavigation
+
+Der eingebettete JavaScript-Block implementiert die ARIA Authoring Practices Guide Navigation für Tablisten:
+
+[cols="2,4", options="header"]
+|===
+| Taste | Wirkung
+
+| `ArrowRight` / `ArrowLeft`
+| Wechselt zum nächsten / vorherigen Tab (Wrapping am Ende)
+
+| `Home` / `End`
+| Springt zum ersten / letzten Tab
+
+| `Tab`
+| Verlässt die Tablist, springt zum nächsten fokussierbaren Element
+|===
+
+Alle interaktiven Elemente (Tabs, Buttons, Links) erhalten sichtbare `:focus-visible`-Outline.
+
+==== Farbkontrast
+
+Alle Texte erfüllen das Kontrastverhältnis 4,5:1 (normaler Text). Die Farben werden über CSS Custom Properties aus den konfigurierten Theme-Werten (`primary`, `accent`) berechnet. `sanitizeCssColor()` verhindert CSS-Injection bei der Theme-Interpolation.
+
+==== Dekorative Bilder
+
+Team-Logos und Club-Logo sind mit `alt=""` und `aria-hidden="true"` als dekorativ markiert, da der Teamname bereits als sichtbarer Text vorhanden ist.
+
+==== Automatisierte Tests
+
+Die WCAG-Konformität wird durch `tests/accessibility/wcag.spec.js` (Playwright + axe-core) geprüft:
+
+* 3 vollständige axe-core-Scans (ohne Logo, mit Logo, leere Teamliste)
+* 8 strukturelle Einzelprüfungen (Seitentitel, `lang`-Attribut, Landmarks, `<h1>`, `aria-controls`-Integrität, Tablist-Label, Tastaturnavigation, `alt`-Attribute)
+
 === Zeitzonenbehandlung
 
 Alle Spieltermine werden in der deutschen Lokalzeit (Europe/Berlin) gespeichert. Die ICS-Dateien verwenden `DTSTART` und `DTEND` ohne UTC-Konvertierung, kombiniert mit:
@@ -1115,6 +1211,68 @@ a|
 * Negative: Das Zeitfenster ist für alle Spiele gleich — Überstunden (Verlängerung, Overtime) werden nicht dynamisch erfasst. Die Kickoff-Zeit stammt aus der API; Zeitplanänderungen kurzfristig vor dem Spiel werden erst beim nächsten Update-Zyklus reflektiert.
 |===
 
+=== ADR-007: Tab-basierte UI statt Flat-Button-Liste
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-04-11
+
+| *Kontext*
+| Die Übersichtsseite zeigte pro Team 9 Buttons (3 Plattformen × 3 Varianten: Alle / Heim / Auswärts). Das ist für Nutzer unübersichtlich und die Seite war nicht mit der Tastatur bedienbar.
+
+| *Entscheidung*
+| Verwendung des ARIA-Tab-Patterns: 3 Tabs pro Team-Card (Alle / Heim / Auswärts), jeweils mit 3 Plattform-Buttons im aktiven Tab-Panel. Immer nur 3 Buttons gleichzeitig sichtbar.
+
+| *Begründung*
+a|
+* Reduziert die kognitive Last: 3 Aktionen statt 9 auf einmal.
+* ARIA-Tab-Pattern ist der vom W3C empfohlene Mechanismus für diese Art der Inhaltsauswahl.
+* Vollständige Tastaturnavigation (ArrowLeft/Right/Home/End) ohne zusätzliche Libraries.
+* Erfüllt WCAG 2.1 AA automatisch prüfbar (axe-core).
+
+| *Konsequenzen*
+a|
+* Positive: Übersichtlicher, tastaturzugänglich, WCAG-konform, dark-mode-fähig.
+* Negative: Etwas mehr JavaScript im generierten HTML (~30 Zeilen eingebetteter Inline-Code). Nutzer müssen bei Bedarf zwischen Tabs wechseln statt alle Links auf einen Blick zu sehen.
+|===
+
+=== ADR-008: Logo-URL-Konstruktion aus teamPermanentId statt API-Aufruf
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-04-11
+
+| *Kontext*
+| Die Übersichtsseite sollte Vereins- und Team-Logos anzeigen. Ursprünglich war `fetchClubInfo()` vorgesehen, das den Club-Endpunkt abfragen sollte. Der Endpunkt (`/rest/club/id/{clubId}/actualmatches`) liefert jedoch kein Logo-URL-Feld.
+
+| *Entscheidung*
+| Logos werden nicht per API-Call abgerufen, sondern die URL direkt aus der bereits bekannten `teamPermanentId` konstruiert: `https://www.basketball-bund.net/media/team/{teamPermanentId}/logo`. `fetchClubInfo()` wurde vollständig entfernt.
+
+| *Begründung*
+a|
+* Das Basketball-Bund-Medien-Endpoint liefert unter dieser URL zuverlässig das Logo.
+* Alle Teams eines Vereins teilen dasselbe Club-Logo — jede `teamPermanentId` desselben Vereins zeigt auf dasselbe Bild.
+* Kein zusätzlicher API-Call erforderlich: die `teamPermanentId` ist bereits durch `fetchClubTeams()` bekannt.
+* Einfacher und ausfallsicherer: kein Logo-Fetch kann fehlschlagen (Bild wird lazy durch den Browser geladen).
+
+| *Konsequenzen*
+a|
+* Positive: Kein zusätzlicher API-Aufruf, keine zusätzliche Fehlerbehandlung, `apiClient.js` schlanker.
+* Negative: Wenn basketball-bund.net die Media-URL-Struktur ändert, müssen alle Logo-URLs angepasst werden. Das Logo-Bild wird vom Browser beim Öffnen der Seite geladen (kann scheitern, falls URL nicht erreichbar — `<img>` zeigt dann keinen Broken-Image-Indikator da `alt=""`).
+|===
+
 === ADR-006: X-ALT-DESC für HTML-Beschreibungen (aktuell deaktiviert)
 
 [cols="2,5", options="header"]
@@ -1197,14 +1355,28 @@ BBB ICS Generator — Qualitätsanforderungen
 |       +-- Szenario: Neuer Contributor versteht Ablauf durch Lesen von cronUpdate.js
 |
 +-- Sicherheit (mittlere Priorität)
+|   |
+|   +-- Input-Validierung
+|   |   +-- Szenario: teamId "../etc/passwd" → Exception, keine Datei geschrieben
+|   |   +-- Szenario: type "../../config" → Exception, keine Datei geschrieben
+|   |
+|   +-- Output-Encoding
+|       +-- Szenario: Teamname mit "<script>" → in HTML escaped, kein XSS
+|       +-- Szenario: Hallenname mit Komma → ICS-escaped, keine Strukturfehler
+|
++-- Barrierefreiheit (mittlere Priorität)
     |
-    +-- Input-Validierung
-    |   +-- Szenario: teamId "../etc/passwd" → Exception, keine Datei geschrieben
-    |   +-- Szenario: type "../../config" → Exception, keine Datei geschrieben
+    +-- Tastaturzugänglichkeit
+    |   +-- Szenario: Vollständige Bedienung der Übersichtsseite ohne Maus
+    |   +-- Szenario: Tab-Wechsel per ArrowRight/ArrowLeft/Home/End
     |
-    +-- Output-Encoding
-        +-- Szenario: Teamname mit "<script>" → in HTML escaped, kein XSS
-        +-- Szenario: Hallenname mit Komma → ICS-escaped, keine Strukturfehler
+    +-- WCAG 2.1 AA
+    |   +-- Szenario: axe-core meldet keine Violations (wcag2a + wcag2aa Tags)
+    |   +-- Szenario: Alle Texte erreichen Kontrastverhältnis 4,5:1
+    |
+    +-- ARIA-Korrektheit
+        +-- Szenario: aria-controls zeigt auf existierende Panels mit role="tabpanel"
+        +-- Szenario: Alle <img> haben alt-Attribut (leer oder beschreibend)
 ....
 
 === Qualitätsszenarien im Detail
@@ -1251,6 +1423,21 @@ BBB ICS Generator — Qualitätsanforderungen
 | Q-08
 | Der HTML-Generator liest einen Teamnamen mit `<script>alert('xss')</script>` aus `metadata.json`.
 | `escapeHtml()` wandelt `<` und `>` um. Das HTML enthält nur den escapeten String, kein ausführbares Script.
+| Mittel
+
+| Q-09
+| Ein Nutzer bedient die Übersichtsseite ausschließlich mit der Tastatur (kein Mausklick).
+| Alle Tabs sind per ArrowRight/ArrowLeft erreichbar, alle Platform-Buttons per Tab/Enter aktivierbar. Fokus ist jederzeit sichtbar (`:focus-visible`-Outline).
+| Mittel
+
+| Q-10
+| axe-core scannt die generierte `index.html` mit Tags `wcag2a` und `wcag2aa`.
+| Keine Violations. Alle ARIA-Rollen, Kontrastverhältnisse und semantischen Anforderungen erfüllt.
+| Mittel
+
+| Q-11
+| Die `theme.primary`-Farbe in `config.json` enthält eine CSS-Injection-Sequenz (`red; background: url(evil)`).
+| `sanitizeCssColor()` verwirft den Wert und verwendet den Fallback `#004174`. Die generierte CSS enthält keine Injection.
 | Mittel
 |===
 
