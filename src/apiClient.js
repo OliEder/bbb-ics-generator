@@ -1,3 +1,5 @@
+'use strict';
+
 const axios = require('axios');
 const BASE_URL = 'https://www.basketball-bund.net/rest';
 
@@ -50,25 +52,4 @@ async function fetchClubTeams(clubId) {
   }
 }
 
-async function fetchClubInfo(clubId) {
-  const url = `${BASE_URL}/club/id/${clubId}/actualmatches?justHome=false&rangeDays=150`;
-  try {
-    const res = await axios.get(url);
-    const matches = res.data?.data?.matches || [];
-    // Logo aus erstem Match-Objekt des eigenen Clubs extrahieren
-    for (const match of matches) {
-      for (const teamObj of [match.homeTeam, match.guestTeam]) {
-        if (!teamObj || Number(teamObj.clubId) !== Number(clubId)) continue;
-        if (teamObj.clubLogoUrl) {
-          return { logoUrl: teamObj.clubLogoUrl };
-        }
-      }
-    }
-    return { logoUrl: null };
-  } catch (err) {
-    console.error('API error for club info', clubId, err.response ? err.response.status : err.message);
-    return { logoUrl: null };
-  }
-}
-
-module.exports = { fetchTeamMatches, fetchMatchInfo, fetchClubTeams, fetchClubInfo };
+module.exports = { fetchTeamMatches, fetchMatchInfo, fetchClubTeams };
