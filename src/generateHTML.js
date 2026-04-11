@@ -160,12 +160,26 @@ function buildTeaserCard(team) {
   const pastMatches = allMatches.filter(m => m.result).slice(-3);
   const nextMatch   = allMatches.find(m => m.isNext);
 
-  const resultRows = [...pastMatches].reverse().map(m =>
-    `<div class="teaser-result">` +
-    `<span class="teaser-opponent">${escapeHtml(m.opponent)}</span>` +
-    `<span class="teaser-score">${escapeHtml(m.result)}</span>` +
-    `</div>`
-  ).join('');
+  const resultRows = [...pastMatches].reverse().map(m => {
+    const badgeClass = isLiga(m.competition)
+      ? (m.isHome ? 'badge badge--home' : 'badge badge--away')
+      : 'badge badge--cup';
+    const badgeLabel = m.isHome ? 'H' : 'A';
+    let scoreClass = 'teaser-score';
+    const parts = (m.result || '').split(':');
+    if (parts.length === 2) {
+      const own = parseInt(parts[m.isHome ? 0 : 1], 10);
+      const opp = parseInt(parts[m.isHome ? 1 : 0], 10);
+      if (!isNaN(own) && !isNaN(opp)) {
+        scoreClass += own > opp ? ' schedule-result--win' : ' schedule-result--loss';
+      }
+    }
+    return `<div class="teaser-result">` +
+      `<span class="${badgeClass}">${badgeLabel}</span>` +
+      `<span class="teaser-opponent">${escapeHtml(m.opponent)}</span>` +
+      `<span class="${scoreClass}">${escapeHtml(m.result)}</span>` +
+      `</div>`;
+  }).join('');
 
   const nextHtml = nextMatch
     ? `<div class="teaser-next">Nächstes: ${escapeHtml(String(nextMatch.date || '').slice(5).split('-').reverse().join('.'))} · ${escapeHtml(nextMatch.opponent)}</div>`
