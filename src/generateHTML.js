@@ -121,7 +121,8 @@ function buildNavigation(teams, activePage) {
     const href = homeActive
       ? `teams/${escapeHtml(t.teamId)}.html`
       : `${escapeHtml(t.teamId)}.html`;
-    return `<a href="${href}"${active ? ' aria-current="page"' : ''}>${escapeHtml(t.teamName)}</a>`;
+    const label = t.ageGroup ? escapeHtml(t.ageGroup) : escapeHtml(t.teamName);
+    return `<a href="${href}"${active ? ' aria-current="page"' : ''}>${label}</a>`;
   }).join('');
 
   return `<nav class="site-nav" aria-label="Seitennavigation">
