@@ -200,9 +200,7 @@ function buildTeaserCard(team) {
         else break;
       }
       if (count > 1) {
-        streakText = last
-          ? `${count} Siege in Folge`
-          : `${count} Niederlagen in Folge`;
+        streakText = last ? `${count} Siege` : `${count} Niederlagen`;
       }
     }
   }
@@ -235,7 +233,7 @@ function buildTeaserCard(team) {
     ${logoHtml}
     <span class="teaser-team-name">${team.ageGroup ? escapeHtml(team.ageGroup) : escapeHtml(team.teamName)}${genderSpan(team.gender) ? ` ${genderSpan(team.gender)}` : ''}${team.ageGroup ? `<small> ${escapeHtml(team.teamName)}</small>` : ''}</span>
   </div>
-  ${streakText ? `<div class="teaser-streak-info">${escapeHtml(streakText)}</div>` : ''}
+  ${streakText ? `<div class="teaser-streak-info"><span class="teaser-streak-label">Serie:</span> ${escapeHtml(streakText)}</div>` : ''}
   <div class="teaser-results">${resultRows}</div>
   ${nextHtml}
   <a class="teaser-link" href="teams/${escapeHtml(team.teamId)}.html">Zum Team →</a>
@@ -393,7 +391,8 @@ function buildSharedStyles(primary, accent, cupColor) {
     .teaser-header { background: var(--color-primary); color: var(--color-on-primary); padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
     .teaser-team-name { font-weight: 700; font-size: 0.92rem; flex: 1; }
     .gender-sym { font-size: 0.8em; opacity: 0.75; }
-    .teaser-streak-info { font-size: 0.72rem; color: var(--color-text); opacity: 0.6; padding: 4px 14px 0; }
+    .teaser-streak-info { font-size: 0.82rem; color: var(--color-text); padding: 6px 14px 0; }
+    .teaser-streak-label { font-weight: 700; }
     .teaser-results { flex: 1; padding: 8px 14px; }
     .teaser-result { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--color-border); font-size: 0.82rem; }
     .teaser-score { font-weight: 600; }
