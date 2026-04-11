@@ -280,7 +280,7 @@ function genHTML(theme = {}) {
     /* Schedule */
     .schedule-list { margin-bottom: 12px; }
     .schedule-header {
-      font-size: 0.72rem; font-weight: 700; color: var(--color-text-muted);
+      font-size: 0.72rem; font-weight: 700; color: var(--color-text);
       text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px;
     }
     .schedule-row {
@@ -309,7 +309,7 @@ function genHTML(theme = {}) {
       margin-left: 4px;
     }
     .schedule-competition {
-      font-size: 0.75rem; color: var(--color-text-muted); white-space: nowrap;
+      font-size: 0.75rem; color: var(--color-text); white-space: nowrap;
     }
     .schedule-result {
       font-size: 0.88rem; font-weight: 600; white-space: nowrap;
@@ -339,7 +339,7 @@ function genHTML(theme = {}) {
     /* Legend */
     .schedule-legend {
       margin-top: 8px; padding: 10px 14px;
-      font-size: 0.75rem; color: var(--color-text-muted);
+      font-size: 0.75rem; color: var(--color-text);
       display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;
     }
     .schedule-legend span { display: flex; align-items: center; gap: 5px; }
