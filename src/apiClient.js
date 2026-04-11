@@ -7,10 +7,16 @@ async function fetchTeamMatches(teamId) {
   const url = `${BASE_URL}/team/id/${teamId}/matches`;
   try {
     const res = await axios.get(url);
-    return res.data?.data?.matches || [];
+    const data = res.data?.data || {};
+    const genderId = data.team?.teamGenderId;
+    let gender = '';
+    if (genderId === 1) gender = 'männlich';
+    else if (genderId === 2) gender = 'weiblich';
+    else if (genderId === 3) gender = 'mix';
+    return { matches: data.matches || [], gender };
   } catch (err) {
     console.error('API error for matches', teamId, err.response ? err.response.status : err.message);
-    return [];
+    return { matches: [], gender: '' };
   }
 }
 
