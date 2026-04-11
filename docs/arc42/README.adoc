@@ -1,0 +1,1408 @@
+= BBB ICS Generator — Architekturdokumentation
+:doctype: book
+:toc: left
+:toc-title: Inhalt
+:toclevels: 3
+:sectnums:
+:icons: font
+:source-highlighter: highlight.js
+:lang: de
+:author: Oliver-Marcus Eder
+:revdate: 2026-04-10
+:revnumber: 1.0
+
+== Einführung und Ziele
+
+=== Aufgabenstellung
+
+Der *BBB ICS Generator* ist ein automatisierter Kalender-Feed-Dienst für die *Fibalon Baskets Neumarkt*.
+Er ruft Spieltermine für alle Teams des Vereins über die öffentliche REST-API des Deutschen Basketball-Bundes (DBB) ab und stellt diese als abonnierbare ICS-Feeds bereit.
+
+Die Feeds können von Fans, Spielern und Betreuern direkt in ihre Kalenderanwendungen (iOS Calendar, Google Calendar, Outlook, Thunderbird u. a.) abonniert werden.
+Nach einmaliger Einrichtung erhalten Abonnenten automatisch alle neuen und geänderten Spieltermine, ohne manuelles Eingreifen.
+
+Die Kernfunktionalität umfasst:
+
+* Automatischer Abruf aller aktiven Teams des Vereins über die `clubId`
+* Abruf der Spielplandaten (Gegner, Datum, Uhrzeit, Liga, Spielfeld) pro Team
+* Erzeugung valider ICS-Dateien nach RFC 5545 in drei Varianten: alle Spiele, nur Heimspiele, nur Auswärtsspiele
+* Bereitstellung als statische Dateien über GitHub Pages mit webcal://, HTTPS- und Google-Calendar-Links
+* Automatische Aktualisierung alle sechs Stunden über GitHub Actions
+
+=== Qualitätsziele
+
+Die folgende Tabelle listet die drei wichtigsten Qualitätsziele in absteigender Priorität:
+
+[cols="1,2,4", options="header"]
+|===
+| Priorität | Qualitätsziel | Beschreibung und Messbarkeit
+
+| 1
+| *Kompatibilität*
+| Die erzeugten ICS-Dateien müssen von allen verbreiteten Kalenderanwendungen fehlerfrei importiert und abonniert werden können — insbesondere iOS Calendar, Google Calendar, Microsoft Outlook und Mozilla Thunderbird. Grundlage ist die strikte Einhaltung von RFC 5545 inklusive Line-Folding und korrekt escapeter Sonderzeichen.
+
+| 2
+| *Zuverlässigkeit*
+| Der tägliche Aktualisierungsprozess muss auch bei temporärer Nichtverfügbarkeit der Basketball-Bund-API stabil laufen. Bereits generierte ICS-Dateien bleiben unverändert erhalten; der nächste erfolgreiche Lauf überschreibt sie. Ein 30-Tage-Cache für die Team-Metadaten verhindert unnötige API-Aufrufe und schützt vor Ausfällen der Club-Teams-API.
+
+| 3
+| *Wartbarkeit*
+| Neue Teams werden automatisch über die `clubId` erkannt — keine manuelle Pflege einer Teamliste. Die gesamte Konfiguration beschränkt sich auf eine einzige Datei (`config.json`) mit einer einzigen Variable (`clubId`). Das Hinzufügen weiterer Vereine erfordert lediglich eine weitere Instanz des Systems.
+|===
+
+=== Stakeholder
+
+[cols="2,2,4", options="header"]
+|===
+| Rolle | Beschreibung | Interesse / Erwartung
+
+| Fans und Zuschauer
+| Interessierte Personen, die Spieltermine verfolgen möchten
+| Zuverlässiger, immer aktueller Kalender-Feed ohne manuelle Pflege; einfache Subscription über webcal- oder Google-Calendar-Link
+
+| Spielerinnen und Spieler
+| Aktive Mitglieder der Teams des Vereins
+| Terminbenachrichtigungen rechtzeitig vor dem Spielbeginn; korrekte Heimspiel-/Auswärtsspiel-Unterscheidung mit angepassten Alarm-Zeiten
+
+| Trainer und Betreuer
+| Verantwortliche für die Organisation der Teams
+| Übersicht aller Spiele eines Teams; korrekte Spielfeldinformationen (Halle, Adresse)
+
+| Vereinsverantwortliche (Fibalon Baskets Neumarkt)
+| Administration des Vereins (clubId: 4468)
+| Automatischer Betrieb ohne manuelle Pflege; keine laufenden Kosten
+
+| Systemadministrator / Maintainer
+| Person, die das GitHub-Repository betreut
+| Einfache Konfiguration; verständlicher Code; klare Fehlermeldungen im Actions-Log
+
+| GitHub Actions / GitHub Pages
+| Technische Infrastruktur
+| Keine dauerhaften Prozesse; reine Build-und-Deploy-Pipeline; Einhaltung der GitHub-Pages-Größenbeschränkungen
+|===
+
+== Randbedingungen
+
+=== Technische Randbedingungen
+
+[cols="2,4,3", options="header"]
+|===
+| Randbedingung | Beschreibung | Konsequenz
+
+| *Node.js 18*
+| Die GitHub Actions-Pipeline verwendet explizit `node-version: '18'`. Alle verwendeten npm-Pakete müssen mit Node.js 18 kompatibel sein.
+| Kein Einsatz von Node.js-21+-only-Features; Abhängigkeiten müssen LTS-kompatibel sein.
+
+| *RFC 5545 (iCalendar)*
+| Die erzeugten Dateien müssen dem iCalendar-Standard RFC 5545 entsprechen. Pflichtfelder (`DTSTART`, `DTEND`, `UID`, `DTSTAMP`) müssen vorhanden sein. Sonderzeichen müssen nach ICS-Escape-Regeln kodiert werden. Zeilen dürfen maximal 75 Oktetts lang sein (Line-Folding).
+| Das Bibliothek-Paket `ics` (v3) übernimmt das grundlegende Rendering; manuelle Nachbearbeitung ist für X-Properties und VCALENDAR-Header erforderlich.
+
+| *Statisches Hosting (GitHub Pages)*
+| Alle öffentlich zugänglichen Dateien müssen statisch sein. Kein serverseitiges Rendering, keine Datenbanken, keine laufenden Prozesse auf GitHub Pages.
+| Alle ICS-Dateien und die HTML-Übersichtsseite werden im `generated/`-Verzeichnis vorgebaut und als Artefakt deployed.
+
+| *Keine Infrastrukturkosten*
+| Das gesamte System muss im kostenlosen Tier von GitHub betrieben werden können (GitHub Actions Free Tier: 2.000 Minuten/Monat für öffentliche Repos; GitHub Pages: kostenlos für öffentliche Repos).
+| Alle 6 Stunden läuft ein Build von ca. 1–2 Minuten = ca. 240 Builds/Monat * 2 min = 480 min/Monat — gut im Rahmen.
+
+| *Öffentliche API ohne Authentifizierung*
+| Die Basketball-Bund REST-API unter `https://www.basketball-bund.net/rest` ist öffentlich zugänglich und erfordert keine API-Keys oder OAuth.
+| Kein Secret-Management erforderlich. Kein Rate-Limiting durch Authentifizierungsebene — Risiko von IP-basiertem Rate-Limiting bleibt.
+
+| *Abhängigkeit von npm-Paketen*
+| Verwendete Pakete: `axios` (HTTP-Client), `ics` (ICS-Rendering), `express` (lokaler Dev-Server), `node-cron` (lokaler Cron-Trigger).
+| Sicherheitsrelevante Updates müssen durch Ausführen von `npm install` im CI-Lauf aufgenommen werden. Kein Lockfile-Enforcement in der Pipeline.
+
+| *Kein persistenter Speicher in GitHub Actions*
+| GitHub Actions-Runner sind ephemer. Der `teams-cache.json` wird bei jedem Lauf neu erzeugt, da das `generated/`-Verzeichnis nicht zwischen Runs persistiert wird.
+| Der 30-Tage-TTL-Cache für Teams hat effektiv keine Wirkung in der GitHub-Actions-Umgebung; er ist nur für lokale Entwicklung relevant. Bei jedem CI-Lauf wird die Club-API erneut aufgerufen.
+|===
+
+=== Organisatorische Randbedingungen
+
+[cols="2,4,3", options="header"]
+|===
+| Randbedingung | Beschreibung | Konsequenz
+
+| *Einzelpersonen-Projekt*
+| Das Projekt wird von einer einzelnen Person (Oliver-Marcus Eder) entwickelt und betrieben. Kein formales Review-Prozess, kein Team.
+| Keine formalen PR-Reviews, kein Pair-Programming. Pragmatische Entscheidungen haben Vorrang vor Vollständigkeit.
+
+| *Open-Source auf GitHub*
+| Der Quellcode ist öffentlich auf GitHub verfügbar. Die `clubId` (4468) ist im Repository sichtbar.
+| Keine sensiblen Daten im Repository (keine API-Keys, keine persönlichen Daten). Die `clubId` ist keine vertrauliche Information.
+
+| *Keine automatisierten Tests*
+| Zum Zeitpunkt der Dokumentation existieren keine Unit- oder Integrationstests.
+| Qualitätssicherung erfolgt durch manuelle Verifikation der ICS-Ausgabe und implizit durch den CI-Lauf (Fehler im Prozess brechen den Build).
+
+| *Basketball-Bund API als externer Dienst*
+| Der Betreiber der Basketball-Bund-API ist nicht der Betreiber dieses Systems. API-Änderungen, Downtimes oder strukturelle Anpassungen liegen außerhalb des Einflussbereichs.
+| Das System muss resilient gegenüber vorübergehenden API-Ausfällen sein. Strukturelle API-Änderungen erfordern manuelle Anpassungen im Code.
+
+| *Datenschutz*
+| Die verarbeiteten Daten (Spieltermine, Teamnamen, Hallenadressen) sind öffentlich zugängliche Spielplandaten. Es werden keine personenbezogenen Daten gespeichert oder verarbeitet.
+| Kein Datenschutz-Compliance-Aufwand (DSGVO) erforderlich.
+|===
+
+== Kontextabgrenzung
+
+=== Systemkontextdiagramm
+
+Das folgende Diagramm zeigt den BBB ICS Generator im Kontext seiner Kommunikationspartner:
+
+image::https://mermaid.ink/svg/Zmxvd2NoYXJ0IFRECiAgICBHSEFbIkdpdEh1YiBBY3Rpb25zCkNyb246IGFsbGUgNmgKUHVzaDogbWFpbiJdIC0tPnxucG0gcnVuIHVwZGF0ZXwgU1lTCiAgICBTWVNbIkJCQiBJQ1MgR2VuZXJhdG9yCmNyb25VcGRhdGUuanMKYXBpQ2xpZW50LmpzCmljc0dlbmVyYXRvci5qcwpzdG9yYWdlLmpzCmdlbmVyYXRlSFRNTC5qcyJdIC0tPnxIVFRQIEdFVHwgQkJCQVBJWyJCYXNrZXRiYWxsLUJ1bmQKUkVTVC1BUEkiXQogICAgU1lTIC0tPnx1cGxvYWQgYXJ0aWZhY3R8IEdIUEFHRVNbIkdpdEh1YiBQYWdlcwpvbGllZGVyLmdpdGh1Yi5pby8KYmJiLWljcy1nZW5lcmF0b3IvIl0KICAgIEdIUEFHRVMgLS0-fHdlYmNhbDovL3wgSU9TWyJpT1MgLyBtYWNPUwpLYWxlbmRlci5hcHAiXQogICAgR0hQQUdFUyAtLT58R29vZ2xlIENhbGVuZGFyIFVSTHwgQU5EWyJBbmRyb2lkCkdvb2dsZSBDYWxlbmRhciJdCiAgICBHSFBBR0VTIC0tPnxIVFRQUyBEb3dubG9hZHwgT1RIRVJbIk91dGxvb2sKVGh1bmRlcmJpcmQiXQ[BBB ICS Generator Systemkontext,link="https://mermaid.ink/svg/Zmxvd2NoYXJ0IFRECiAgICBHSEFbIkdpdEh1YiBBY3Rpb25zCkNyb246IGFsbGUgNmgKUHVzaDogbWFpbiJdIC0tPnxucG0gcnVuIHVwZGF0ZXwgU1lTCiAgICBTWVNbIkJCQiBJQ1MgR2VuZXJhdG9yCmNyb25VcGRhdGUuanMKYXBpQ2xpZW50LmpzCmljc0dlbmVyYXRvci5qcwpzdG9yYWdlLmpzCmdlbmVyYXRlSFRNTC5qcyJdIC0tPnxIVFRQIEdFVHwgQkJCQVBJWyJCYXNrZXRiYWxsLUJ1bmQKUkVTVC1BUEkiXQogICAgU1lTIC0tPnx1cGxvYWQgYXJ0aWZhY3R8IEdIUEFHRVNbIkdpdEh1YiBQYWdlcwpvbGllZGVyLmdpdGh1Yi5pby8KYmJiLWljcy1nZW5lcmF0b3IvIl0KICAgIEdIUEFHRVMgLS0-fHdlYmNhbDovL3wgSU9TWyJpT1MgLyBtYWNPUwpLYWxlbmRlci5hcHAiXQogICAgR0hQQUdFUyAtLT58R29vZ2xlIENhbGVuZGFyIFVSTHwgQU5EWyJBbmRyb2lkCkdvb2dsZSBDYWxlbmRhciJdCiAgICBHSFBBR0VTIC0tPnxIVFRQUyBEb3dubG9hZHwgT1RIRVJbIk91dGxvb2sKVGh1bmRlcmJpcmQiXQ"]
+
+=== Fachlicher Kontext
+
+[cols="2,2,5", options="header"]
+|===
+| Kommunikationspartner | Richtung | Beschreibung der Schnittstelle
+
+| *Basketball-Bund REST-API*
+| BBB ICS Generator ← API (HTTP GET)
+| Das System ruft drei Endpunkte ab: (1) Club-Teams über `/rest/club/id/{clubId}/actualmatches`, (2) Team-Spielplan über `/rest/team/id/{teamId}/matches`, (3) Match-Details über `/rest/match/id/{matchId}/matchInfo`. Alle Endpunkte liefern JSON. Keine Authentifizierung erforderlich.
+
+| *GitHub Actions*
+| GitHub Actions → BBB ICS Generator (triggert Build)
+| Führt den Node.js-Prozess (`npm run update` und `npm run generate-html`) in einer Ubuntu-Runner-Umgebung aus. Trigger: Cron alle 6 Stunden, Push auf `main`, manueller `workflow_dispatch`.
+
+| *GitHub Pages*
+| BBB ICS Generator → GitHub Pages (HTTP Upload via Actions)
+| Das `generated/`-Verzeichnis wird als Pages-Artefakt hochgeladen und über `https://olieder.github.io/bbb-ics-generator/` bereitgestellt.
+
+| *Kalender-Clients (Abonnenten)*
+| GitHub Pages → Kalender-Clients (HTTP GET / webcal)
+| Endnutzer abonnieren ICS-Feeds via `webcal://`-Protokoll (iOS/macOS) oder `https://`-URLs (Google Calendar, Outlook, Thunderbird). Der Client fragt die URL periodisch ab und synchronisiert Änderungen.
+|===
+
+=== Technischer Kontext
+
+[cols="2,3,3", options="header"]
+|===
+| Schnittstelle | Protokoll / Format | Technische Details
+
+| Basketball-Bund API → apiClient.js
+| HTTPS / JSON
+| `axios` HTTP-Client; GET-Anfragen ohne Body; Antwortstruktur `{ data: { matches: [...] } }`; Timeout und Retry nicht explizit konfiguriert; Fehlerbehandlung per try/catch mit Rückgabe von `[]` oder `null`
+
+| cronUpdate.js → generated/
+| Dateisystem (Node.js `fs`)
+| Schreibt `{teamId}_{type}.ics` und `metadata.json` via `fs.writeFileSync`; Verzeichnis `generated/` wird bei Bedarf angelegt
+
+| generateHTML.js → generated/index.html
+| Dateisystem (Node.js `fs`)
+| Liest `generated/metadata.json`; schreibt `generated/index.html` mit hartcodierten Links zur GitHub-Pages-URL `https://olieder.github.io/bbb-ics-generator/`
+
+| GitHub Actions → GitHub Pages
+| GitHub Actions API / HTTP Upload
+| Artefakt-Upload via `actions/upload-pages-artifact@v3`; Deployment via `actions/deploy-pages@v4`; Concurrency-Gruppe `pages` verhindert parallele Deployments
+
+| GitHub Pages → Kalender-Clients
+| HTTPS (TLS 1.2+) / text/calendar
+| Statische Datei-Auslieferung; kein Content-Negotiation; `Content-Type: text/calendar` für `.ics`-Dateien
+|===
+
+=== Externe API-Endpunkte im Detail
+
+[cols="3,2,4", options="header"]
+|===
+| Endpunkt | Methode | Beschreibung
+
+| `/rest/club/id/{clubId}/actualmatches?justHome=false&rangeDays=150`
+| GET
+| Liefert alle Spiele des Vereins in den nächsten 150 Tagen. Wird zum Ermitteln aller aktiven Teams (teamPermanentId) des Vereins verwendet. Antwort enthält `homeTeam` und `guestTeam` mit Teammetadaten.
+
+| `/rest/team/id/{teamId}/matches`
+| GET
+| Liefert alle Spiele eines Teams (Vergangenheit und Zukunft). Enthält Basisdaten: `matchId`, `kickoffDate`, `kickoffTime`, `homeTeam`, `guestTeam`, `ligaData`.
+
+| `/rest/match/id/{matchId}/matchInfo`
+| GET
+| Liefert Detailinfos zu einem einzelnen Spiel: vollständige Teamnamen, Spielfeld (`spielfeld`) mit Hallen-Bezeichnung, Straße, PLZ, Ort, und erweiterte Liga-Metadaten.
+|===
+
+== Lösungsstrategie
+
+=== Überblick der grundlegenden Entscheidungen
+
+Die Architektur des BBB ICS Generators basiert auf vier zentralen strategischen Entscheidungen, die gemeinsam ein einfaches, robustes und wartungsarmes System ergeben.
+
+=== Warum ICS statt CalDAV?
+
+ICS (RFC 5545) ist ein Pull-basiertes, dateibasiertes Format. Der Client ruft die Datei periodisch ab und synchronisiert lokal. CalDAV ist ein serverbasiertes Protokoll, das eine aktive Serverinstanz mit persistentem Speicher, Authentifizierung und Synchronisationslogik erfordert.
+
+*Entscheidung:* ICS-Dateien als statische Ressourcen.
+
+*Begründung:*
+
+* Statische Dateien können auf GitHub Pages gehostet werden — kostenlos, wartungsfrei, hochverfügbar.
+* Alle gängigen Kalenderanwendungen (iOS, Google, Outlook, Thunderbird) unterstützen ICS-Subscriptions nativ.
+* Kein Server, keine Datenbank, keine Laufzeitumgebung erforderlich.
+* Ausfälle des Generators beeinträchtigen bestehende Subscriptions nicht — der Client zeigt schlimmstenfalls veraltete Daten, aber keine Fehler.
+
+=== Warum GitHub Pages als Hosting?
+
+GitHub Pages ist das natürliche Hosting-Pendant zu GitHub Actions für statische Inhalte.
+
+*Entscheidung:* GitHub Pages als alleinige Hosting-Plattform.
+
+*Begründung:*
+
+* Kostenlos für öffentliche Repositories ohne Bandbreitenbeschränkung für typische Kalender-Payloads.
+* Nahtlose Integration mit GitHub Actions über `actions/upload-pages-artifact` und `actions/deploy-pages`.
+* HTTPS ist out-of-the-box vorhanden — Voraussetzung für `webcal://`-Subscriptions auf modernen iOS-Versionen.
+* Keine separate Infrastruktur, kein separates Deployment-System.
+* Verfügbarkeit von GitHub Pages liegt typischerweise bei über 99,9 % — ausreichend für einen Kalender-Feed.
+
+=== Warum ein 30-Tage-Cache für Teams?
+
+Die Team-Metadaten (welche Teams gehören zum Verein?) ändern sich selten — typischerweise einmal pro Saison, wenn neue Altersklassen-Teams dazukommen oder wegfallen.
+
+*Entscheidung:* `teams-cache.json` mit 30-Tage-TTL.
+
+*Begründung:*
+
+* Jeder API-Aufruf an `/rest/club/id/{clubId}/actualmatches` kostet Latenz und belastet die externe API.
+* Bei 4 Läufen pro Tag und ~8 Teams wären das ohne Cache zusätzliche ~120 API-Aufrufe pro Monat allein für Teamdaten.
+* 30 Tage deckt den gesamten Zeitraum ab, in dem sich Teamzusammensetzungen nicht ändern.
+* Bei Cache-Ablauf wird die API erneut aufgerufen; bei API-Fehler wird der abgelaufene Cache als Fallback verwendet.
+
+*Hinweis:* In der GitHub-Actions-Umgebung ist das `generated/`-Verzeichnis nicht persistent zwischen Runs. Der Cache wirkt dort de facto nicht — er ist primär für lokale Entwicklungsumgebungen relevant. Dieser Sachverhalt ist als technische Schuld dokumentiert (siehe Kapitel 11).
+
+=== Warum eine einzige clubId als Konfiguration?
+
+Das System ist als Single-Verein-Lösung konzipiert. Die gesamte Konfiguration besteht aus einer einzigen Datei mit einer einzigen Variablen.
+
+*Entscheidung:* `config.json` mit nur `{ "clubId": "4468" }`.
+
+*Begründung:*
+
+* Einfachheit hat Priorität. Der Betreiber ist Mitglied des Vereins und hat ein klar definiertes Einsatzszenario.
+* Alle Teams des Vereins werden automatisch über die Club-API ermittelt — keine manuelle Pflege einer Teamliste.
+* Ein neues Team wird automatisch beim nächsten Cache-Ablauf erkannt.
+* Für andere Vereine kann eine separate Instanz des Systems mit einer anderen `clubId` betrieben werden.
+
+=== Zusammenfassung der strategischen Entscheidungen
+
+[cols="3,3,3", options="header"]
+|===
+| Strategie | Alternative | Ausschlaggebendes Kriterium
+
+| ICS (RFC 5545) als Ausgabeformat
+| CalDAV, proprietäre APIs
+| Universelle Kompatibilität, kein Server nötig
+
+| GitHub Pages als Hosting
+| Eigener Server, Netlify, Vercel, S3
+| Keine Kosten, nahtlose GitHub-Integration
+
+| 30-Tage-Cache für Teamdaten
+| Kein Cache (immer API-Aufruf), kein TTL
+| API-Effizienz, Ausfalltoleranz
+
+| Eine clubId als einzige Konfiguration
+| Multi-Club-Konfiguration, Datenbank
+| Einfachheit, Self-Service durch Club-API
+|===
+
+== Bausteinsicht
+
+=== Whitebox-Gesamtsystem
+
+Das System besteht aus sechs aktiven Modulen und einem ungenutzten Modul. Die Module sind lose gekoppelt und kommunizieren ausschließlich über Funktionsaufrufe (CommonJS `require`).
+
+[source,mermaid]
+----
+graph LR
+    CU["cronUpdate.js\nOrchestrator"] --> AC["apiClient.js\nAPI-Facade"]
+    CU --> IG["icsGenerator.js\nRFC 5545 Renderer"]
+    CU --> ST["storage.js\nPersistenz"]
+    CU --> GH["generateHTML.js\nHTML-Generator"]
+    GH --> ST
+    SV["server.js\nDev-Server"] -.->|nur lokal| ST
+    GEO["geocode.js\nnicht genutzt"]
+----
+
+=== Modul: cronUpdate.js (Orchestrator)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *Verantwortlichkeit*
+| Einstiegspunkt des Update-Prozesses. Orchestriert den kompletten Daten-Refresh: Teams ermitteln, Spielpläne abrufen, ICS generieren, Dateien speichern, Metadaten schreiben.
+
+| *Schnittstellen (eingehend)*
+| Keine. Wird direkt via `node src/cronUpdate.js` gestartet (durch GitHub Actions oder manuell).
+
+| *Schnittstellen (ausgehend)*
+| `apiClient.js`: `fetchTeamMatches(teamId)`, `fetchMatchInfo(matchId)`, `fetchClubTeams(clubId)` +
+`icsGenerator.js`: `generateICS(matches, details, teamId, kind, teamName)` +
+`storage.js`: `saveICS(teamId, type, data)`, `saveTeamsCache(teams)`, `loadTeamsCache()` +
+`config.json`: `clubId`
+
+| *Wichtige Logik*
+| Zweistufige Strategie für Team-Ermittlung: (1) Cache-HIT → sofortige Nutzung, (2) Cache-MISS → API-Aufruf + Cache-Befüllung, (3) API-Fehler + abgelaufener Cache → Fallback auf alten Cache. Pro Team werden drei ICS-Varianten erzeugt: `all`, `home`, `away`.
+
+| *Fehlerbehandlung*
+| Fehler pro Team werden geloggt, aber der Gesamtprozess wird für die verbleibenden Teams fortgesetzt (Fail-Graceful per Team-Isolation in try/catch).
+
+| *Abhängigkeiten*
+| `./apiClient`, `./icsGenerator`, `./storage`, `../config.json`, `fs`, `path`
+|===
+
+=== Modul: apiClient.js (API-Facade)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *Verantwortlichkeit*
+| Kapselt alle HTTP-Aufrufe an die Basketball-Bund REST-API. Abstrahiert die API-Struktur und gibt normalisierte Daten zurück. Fehlerbehandlung auf Transport-Ebene.
+
+| *Exportierte Funktionen*
+a|
+* `fetchTeamMatches(teamId)` → `Array<Match>` (leer bei Fehler)
+* `fetchMatchInfo(matchId)` → `MatchInfo \| null` (null bei Fehler)
+* `fetchClubTeams(clubId)` → `Array<Team> \| null` (null bei Fehler, leer wenn keine Matches)
+
+| *Schnittstellen (ausgehend)*
+| Basketball-Bund REST-API via `axios` HTTP-Client. Basis-URL: `https://www.basketball-bund.net/rest`.
+
+| *Wichtige Logik*
+| `fetchClubTeams` dedupliziert Teams per `teamPermanentId` (Set-basiertes Seen-Tracking). Nur Teams, deren `clubId` mit der übergebenen `clubId` übereinstimmt, werden zurückgegeben.
+
+| *Fehlerbehandlung*
+| Alle Funktionen fangen HTTP-Fehler und Netzwerkfehler via try/catch. Bei Fehler: `fetchTeamMatches` → `[]`, `fetchMatchInfo` → `null`, `fetchClubTeams` → `null`.
+
+| *Abhängigkeiten*
+| `axios`
+|===
+
+=== Modul: icsGenerator.js (RFC 5545 Renderer)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *Verantwortlichkeit*
+| Transformiert rohe Spielplan-Daten in valide ICS-Kalender-Dateien nach RFC 5545. Handhabt Zeitberechnung, Beschreibungsformatierung, ICS-Escaping und VCALENDAR-Header-Injection.
+
+| *Exportierte Funktionen*
+a|
+* `generateICS(matches, details, teamId, type, teamName)` → `Promise<string \| null>`
+
+| *Interne Funktionen*
+a|
+* `buildEvent(match, matchInfo, teamId, calendarType)` → `Promise<EventObject>`
+* `icsEscape(text)` → escaping nach RFC 5545 (Backslash, Semikolon, Komma, Newline)
+* `escapeHtml(str)` → HTML-Escaping für X-ALT-DESC
+* `createHtmlDescription(lines, feld)` → HTML-Snippet für X-ALT-DESC
+* `dateToArr(d)` → Date-Objekt zu `[year, month, day, hour, minute]` Array
+* `formatKickoff(dateStr, timeStr)` → Deutsche Datumsformatierung für Beschreibungstext
+
+| *Zeitberechnung*
+a|
+* `dtstart` = Kickoff − 60 Minuten (Anreisepuffer)
+* `dtend` = Kickoff + 150 Minuten (2,5 Stunden Spielzeit inkl. Puffer)
+* Alarm: 30 Minuten vor `dtstart` bei Heimspielen, 60 Minuten bei Auswärtsspielen
+
+| *Wichtige Logik*
+| Die `ics`-Bibliothek erzeugt RFC-konforme VEVENT-Blöcke. Der Generator führt danach eine zeilenbasierte Post-Processing-Pipeline aus: VCALENDAR-Header-Ersetzung mit X-WR-*-Properties, X-ALT-DESC-Injektion nach DESCRIPTION unter Berücksichtigung von Line-Folding, Entfernung automatisch generierter Duplikat-Header.
+
+| *ICS-Escaping*
+| `icsEscape` kodiert die vier RFC-5545-Sonderzeichen: `\` → `\\`, `;` → `\;`, `,` → `\,`, `\n` → `\n` (literal), `\r` wird entfernt. HTML-Beschreibungen werden zusätzlich von echten Newlines bereinigt.
+
+| *Abhängigkeiten*
+| `ics` (npm-Paket v3)
+|===
+
+=== Modul: storage.js (Persistenz)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *Verantwortlichkeit*
+| Kapselt alle Lese- und Schreibzugriffe auf das Dateisystem. Stellt sicher, dass keine Path-Traversal-Angriffe möglich sind. Verwaltet den Team-Cache mit TTL.
+
+| *Exportierte Funktionen*
+a|
+* `saveICS(teamId, type, data)` → `string` (Dateipfad)
+* `readICS(teamId, type)` → `string \| null`
+* `saveTeamsCache(teams)` → schreibt `teams-cache.json`
+* `loadTeamsCache()` → `{ teams: Array \| null, stale: boolean }`
+
+| *Sicherheitsmechanismen*
+a|
+* *Whitelist-Validierung für `type`*: Nur `'all'`, `'home'`, `'away'` erlaubt (via `Set`-Lookup).
+* *Regex-Validierung für `teamId`*: Nur reine Zahlenketten erlaubt (`/^\d+$/`).
+* Beide Prüfungen verhindern Path-Traversal (z. B. `../../etc/passwd`).
+
+| *Cache-Logik*
+| `teams-cache.json` enthält `{ cachedAt: ISO-8601-String, teams: [...] }`. TTL = 30 Tage. `loadTeamsCache` gibt `stale: true` zurück wenn `Date.now() - cachedAt >= 30 * 24 * 60 * 60 * 1000`. Bei Parse-Fehler wird `{ teams: null, stale: true }` zurückgegeben.
+
+| *Ausgabeverzeichnis*
+| `generated/` (relativ zum Projektroot). Wird bei Start automatisch angelegt wenn nicht vorhanden.
+
+| *Abhängigkeiten*
+| `fs`, `path` (Node.js Stdlib)
+|===
+
+=== Modul: generateHTML.js (HTML-Generator)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *Verantwortlichkeit*
+| Erzeugt die statische HTML-Übersichtsseite `generated/index.html` mit Subscription-Links für alle Teams.
+
+| *Eingang*
+| `generated/metadata.json` (erzeugt von `cronUpdate.js`) mit Teamname, Altersgruppe, Spielanzahlen und Timestamp.
+
+| *Ausgang*
+| `generated/index.html` mit drei Link-Gruppen pro Team: webcal:// (iOS/macOS), Google Calendar Render-URL (Android), direkte HTTPS-URL (Download).
+
+| *Wichtige Logik*
+| HTML-Escaping aller aus `metadata.json` gelesenen Strings via `escapeHtml()`. Hartcodierte Base-URL `https://olieder.github.io/bbb-ics-generator/` (bekannte technische Schuld, siehe Kapitel 11).
+
+| *Abhängigkeiten*
+| `fs`, `path` (Node.js Stdlib)
+|===
+
+=== Modul: server.js (Lokaler Entwicklungsserver)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *Verantwortlichkeit*
+| Stellt die generierten Dateien lokal unter `http://localhost:3000` bereit, damit Entwickler die Ausgabe ohne GitHub Pages testen können.
+
+| *Verwendung*
+| Ausschließlich für lokale Entwicklung. Wird in GitHub Actions nicht aufgerufen.
+
+| *Abhängigkeiten*
+| `express`
+|===
+
+=== Modul: geocode.js (OSM Geocoding — aktuell nicht genutzt)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *Verantwortlichkeit*
+| War als Integration für OpenStreetMap Nominatim Geocoding vorgesehen, um Hallenadressen in GPS-Koordinaten umzuwandeln.
+
+| *Status*
+| Das Modul ist im Repository vorhanden, wird aber von keinem anderen Modul importiert oder aufgerufen. Es ist aktuell funktionslos (Dead Code).
+
+| *Geplante Verwendung*
+| Zukünftige Integration: LOCATION-Eigenschaft in VEVENT-Events mit GPS-Koordinaten anreichern, damit Kalender-Apps direkt zur Sporthalle navigieren können.
+
+| *Abhängigkeiten*
+| Unbekannt (nicht in Verwendung); vermutlich `axios` für HTTP-Anfragen an Nominatim.
+|===
+
+=== Abhängigkeitsmatrix
+
+[cols="2,1,1,1,1,1,1,1", options="header"]
+|===
+| Modul | cronUpdate | apiClient | icsGenerator | storage | generateHTML | server | geocode
+
+| *cronUpdate.js*
+| —
+| nutzt
+| nutzt
+| nutzt
+| —
+| —
+| —
+
+| *apiClient.js*
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+
+| *icsGenerator.js*
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+
+| *storage.js*
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+
+| *generateHTML.js*
+| —
+| —
+| —
+| liest FS direkt
+| —
+| —
+| —
+
+| *server.js*
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+
+| *geocode.js*
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+|===
+
+== Laufzeitsicht
+
+=== Szenario 1: Update-Zyklus mit Cache-HIT (Normalfall)
+
+Dieser Ablauf tritt ein, wenn der Team-Cache jünger als 30 Tage ist. Dies ist der reguläre Ablauf für die meisten der täglich vier Ausführungen.
+
+[source,mermaid]
+----
+sequenceDiagram
+    participant GHA as GitHub Actions
+    participant CU as cronUpdate.js
+    participant ST as storage.js
+    participant AC as apiClient.js
+    participant IG as icsGenerator.js
+    GHA->>CU: npm run update
+    CU->>ST: loadTeamsCache()
+    ST-->>CU: {teams, stale:false}
+    loop fuer jedes Team
+        CU->>AC: fetchTeamMatches(teamId)
+        AC-->>CU: Array<Match>
+        loop fuer jedes Match
+            CU->>AC: fetchMatchInfo(matchId)
+            AC-->>CU: MatchInfo
+        end
+        CU->>IG: generateICS(matches, details, teamId, type)
+        IG-->>CU: ICS-String
+        CU->>ST: saveICS(teamId, type, ics)
+    end
+    CU->>CU: schreibt metadata.json
+    CU->>CU: genHTML(theme)
+----
+
+==== Ablauf als nummerierte Schritte
+
+. GitHub Actions startet den Runner und führt `node src/cronUpdate.js` aus.
+. `cronUpdate.js` ruft `loadTeamsCache()` auf.
+. `storage.js` liest `generated/teams-cache.json`. Das `cachedAt`-Datum ist weniger als 30 Tage alt.
+. `loadTeamsCache()` gibt `{ teams: [...], stale: false }` zurück.
+. `cronUpdate.js` nutzt die gecachten Teams direkt (kein API-Aufruf für Club-Teams).
+. Für jedes Team: `fetchTeamMatches(teamId)` liefert alle Spiele des Teams als Array.
+. Für jedes Match: `fetchMatchInfo(matchId)` liefert Detailinfos (Hallenname, Adresse, vollständige Teamnamen).
+. Die Matches werden in drei Gruppen aufgeteilt: alle (`all`), nur Heimspiele (`home`), nur Auswärtsspiele (`away`).
+. Für jede Gruppe: `generateICS(...)` erzeugt einen vollständigen ICS-String.
+. In `buildEvent()` werden Zeiten berechnet: dtstart = Kickoff − 60 min, dtend = Kickoff + 150 min.
+. Der Alarm wird gesetzt: 30 min vor dtstart bei Heimspiel, 60 min bei Auswärtsspiel.
+. `createEvents()` der ics-Bibliothek erzeugt RFC-5545-konforme VEVENT-Blöcke.
+. Post-Processing: VCALENDAR-Header wird mit X-WR-CALNAME, X-WR-TIMEZONE etc. angereichert.
+. `saveICS(teamId, type, ics)` schreibt die Datei nach `generated/{teamId}_{type}.ics`.
+. Nach allen Teams: `metadata.json` wird mit Update-Zeitstempel und Spielzahlen geschrieben.
+. GitHub Actions führt danach `npm run generate-html` aus, das `index.html` aus `metadata.json` erzeugt.
+. Das `generated/`-Verzeichnis wird als GitHub Pages Artefakt hochgeladen und deployed.
+
+=== Szenario 2: Update-Zyklus mit Cache-MISS (erster Start oder Cache abgelaufen)
+
+Dieser Ablauf tritt beim ersten Start oder wenn der Cache älter als 30 Tage ist.
+
+==== Ablauf als nummerierte Schritte
+
+. GitHub Actions startet den Runner und führt `node src/cronUpdate.js` aus.
+. `cronUpdate.js` ruft `loadTeamsCache()` auf.
+. `storage.js` findet entweder keine `teams-cache.json` oder das `cachedAt`-Datum ist älter als 30 Tage.
+. `loadTeamsCache()` gibt `{ teams: null, stale: false }` (kein Cache) oder `{ teams: [...], stale: true }` (abgelaufen) zurück.
+. `cronUpdate.js` erkennt den Cache-MISS (`!cached || stale`) und ruft `fetchClubTeams(clubId)` auf.
+. `apiClient.js` sendet GET-Anfrage an `https://www.basketball-bund.net/rest/club/id/4468/actualmatches?justHome=false&rangeDays=150`.
+. Die API antwortet mit einer Liste aller Spiele des Vereins in den nächsten 150 Tagen.
+. `fetchClubTeams` extrahiert unique Teams (per `teamPermanentId`): iteriert über `homeTeam` und `guestTeam` jedes Spiels, filtert nach `clubId`, dedupliziert via Set.
+. Das Ergebnis ist ein Array von `{ id, name, ageGroup }` Objekten.
+. `saveTeamsCache(teams)` schreibt `{ cachedAt: <jetzt>, teams: [...] }` nach `generated/teams-cache.json`.
+. Ab hier identisch mit Szenario 1, Schritt 6 ff.
+
+==== Fehlerfall: Club-API nicht erreichbar
+
+Wenn Schritt 6 fehlschlägt (HTTP-Fehler oder Netzwerkfehler):
+
+. `fetchClubTeams` gibt `null` zurück.
+. `cronUpdate.js` prüft: `fresh === null` → prüft ob `cached` (abgelaufener Cache) vorhanden.
+. Falls abgelaufener Cache vorhanden: Warnung wird geloggt, abgelaufene Teams werden als Fallback verwendet.
+. Falls kein Cache vorhanden: Fehlermeldung wird geloggt, `[]` wird zurückgegeben — kein ICS-Update in diesem Lauf.
+
+== Verteilungssicht
+
+=== Übersicht der Deployment-Umgebungen
+
+Das System kennt zwei Umgebungen: die lokale Entwicklungsumgebung und die Produktionsumgebung auf GitHub.
+
+[source,mermaid]
+----
+flowchart LR
+    subgraph LOCAL["Lokale Entwicklung"]
+        DEV["Developer\nMaschine"] --> NS["node src/cronUpdate.js"]
+        DEV --> NH["node src/generateHTML.js"]
+        DEV --> NS2["node src/server.js\nPort 3000"]
+    end
+    subgraph GITHUB["Produktionsumgebung (GitHub)"]
+        GHA["GitHub Actions\nubuntu-latest\nNode.js 18"] -->|upload artifact| GP["GitHub Pages\nhttps://olieder.github.io/\nbbb-ics-generator/"]
+    end
+----
+
+=== GitHub Actions Workflow
+
+Der einzige CI/CD-Workflow ist in `.github/workflows/deploy.yml` definiert.
+
+==== Trigger
+
+[cols="2,4", options="header"]
+|===
+| Trigger | Beschreibung
+
+| `schedule: cron: '0 */6 * * *'`
+| Automatischer Start alle 6 Stunden (0:00, 6:00, 12:00, 18:00 UTC). Stellt sicher, dass Spielplanänderungen zeitnah übernommen werden.
+
+| `push: branches: [main]`
+| Automatischer Start bei jedem Push auf den `main`-Branch. Sinnvoll nach Code-Änderungen und Konfigurationsanpassungen.
+
+| `workflow_dispatch`
+| Manueller Start über die GitHub Actions Web-UI. Für sofortige Aktualisierungen oder Debugging.
+|===
+
+==== Berechtigungen
+
+Der Workflow benötigt drei spezifische Permissions:
+
+[cols="2,3", options="header"]
+|===
+| Permission | Zweck
+
+| `contents: read`
+| Checkout des Repository-Inhalts
+
+| `pages: write`
+| Upload und Deployment auf GitHub Pages
+
+| `id-token: write`
+| OIDC-Token für die pages-Deployment-Action
+|===
+
+==== Workflow-Schritte im Detail
+
+. *Checkout* (`actions/checkout@v4`): Klont den `main`-Branch in das Runner-Arbeitsverzeichnis. Enthält `src/`, `config.json`, `package.json`.
+
+. *Setup Node.js* (`actions/setup-node@v4`, `node-version: '18'`): Installiert Node.js 18 LTS auf dem Ubuntu-Runner.
+
+. *Install dependencies* (`npm install`): Installiert alle npm-Abhängigkeiten aus `package.json` (`axios`, `ics`, `express`, `node-cron`). Kein `--ci`-Flag, kein Lockfile-Enforcement.
+
+. *Generate ICS files* (`npm run update` → `node src/cronUpdate.js`): Hauptschritt. Ruft die Basketball-Bund-API ab, erzeugt alle ICS-Dateien und schreibt `metadata.json` in `generated/`.
+
+. *Generate HTML* (`npm run generate-html` → `node src/generateHTML.js`): Erzeugt `generated/index.html` aus `metadata.json`.
+
+. *List generated files (debug)* (`ls -la generated/`, `find generated/ -name "*.ics" -ls`): Diagnostik-Schritt, listet alle erzeugten Dateien im Actions-Log.
+
+. *Setup Pages* (`actions/configure-pages@v4`): Konfiguriert GitHub Pages für den aktuellen Repository-Kontext.
+
+. *Upload artifact* (`actions/upload-pages-artifact@v3`, `path: ./generated`): Packt das `generated/`-Verzeichnis als Pages-Artefakt.
+
+. *Deploy to GitHub Pages* (`actions/deploy-pages@v4`): Deployed das Artefakt auf GitHub Pages. Gibt die öffentliche URL als Output `page_url` zurück.
+
+==== Concurrency-Steuerung
+
+[source,yaml]
+----
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+----
+
+Verhindert parallele Deployments: Ein laufendes Deployment wird nicht abgebrochen, wenn ein neues getriggert wird. Das neue Deployment wartet, bis das aktuelle abgeschlossen ist.
+
+=== Verzeichnisstruktur nach erfolgreichem Build
+
+....
+generated/
+├── {teamId}_all.ics       # Alle Spiele eines Teams
+├── {teamId}_home.ics      # Nur Heimspiele
+├── {teamId}_away.ics      # Nur Auswärtsspiele
+├── ... (3 Dateien pro Team)
+├── metadata.json          # Update-Metadaten für HTML-Generator
+├── teams-cache.json       # Team-Cache (effektiv nur lokal relevant)
+└── index.html             # Übersichtsseite mit Subscription-Links
+....
+
+=== Nutzer-Subscription
+
+Endnutzer können die ICS-Feeds auf drei Arten abonnieren:
+
+[cols="2,3,4", options="header"]
+|===
+| Methode | URL-Schema | Zielplattformen
+
+| *webcal://*
+| `webcal://olieder.github.io/bbb-ics-generator/{teamId}_{type}.ics`
+| iOS Calendar (iPhone/iPad), macOS Calendar, Outlook 2016+
+
+| *Google Calendar Render-URL*
+| `https://www.google.com/calendar/render?cid=webcal%3A%2F%2Folieder.github.io%2F...`
+| Google Calendar (Web), Android (Kalender-App)
+
+| *Direkte HTTPS-URL*
+| `https://olieder.github.io/bbb-ics-generator/{teamId}_{type}.ics`
+| Thunderbird, manuelle ICS-Downloads, Outlook (Web-Abo)
+|===
+
+==== Subscription-Prozess unter iOS
+
+. Nutzer öffnet `https://olieder.github.io/bbb-ics-generator/` im Browser.
+. Klickt auf den gewünschten "iOS/Mac: ..." Link.
+. iOS fragt: "Kalender abonnieren?" — Bestätigung durch Nutzer.
+. iOS Calendar synchronisiert den Feed initial und danach automatisch alle paar Stunden.
+. Spieltermine erscheinen im persönlichen Kalender mit Alarm 30/60 Minuten vor dem Event.
+
+==== Subscription-Prozess unter Android (Google Calendar)
+
+. Nutzer öffnet die Übersichtsseite und klickt auf "Android: ..." Link.
+. Browser öffnet `google.com/calendar/render?cid=...`
+. Google Calendar fragt nach Bestätigung zum Hinzufügen des Kalenders.
+. Synchronisierung erfolgt durch Google-Server (nicht durch das Gerät direkt).
+
+== Querschnittliche Konzepte
+
+=== Fehlerbehandlung (Fail-Graceful-Prinzip)
+
+Das System folgt dem Prinzip der ausfalltoleranten Weiterführung: Ein Fehler bei einem einzelnen Team oder einer einzelnen API-Anfrage stoppt nicht den gesamten Update-Prozess.
+
+==== Fehlerbehandlungsstrategie pro Ebene
+
+[cols="2,3,4", options="header"]
+|===
+| Ebene | Fehlertyp | Verhalten
+
+| *Team-Ebene* (cronUpdate.js)
+| Fehler bei der Verarbeitung eines Teams (beliebige Exception)
+| `console.error` mit Stack-Trace; das Team wird übersprungen; alle anderen Teams werden normal verarbeitet. Implementiert via `try/catch` im `for...of`-Loop.
+
+| *API-Ebene* (apiClient.js)
+| HTTP-Fehler (4xx, 5xx), Netzwerkfehler (ECONNRESET, ETIMEDOUT)
+| `fetchTeamMatches` → `[]`; `fetchMatchInfo` → `null`; `fetchClubTeams` → `null`. Fehlerdetails werden via `console.error` geloggt (HTTP-Status oder Fehlermeldung).
+
+| *Cache-Ebene* (storage.js)
+| Abgelaufener Cache, kein Cache, defekte Cache-Datei (JSON-Parse-Fehler)
+| Abgelaufener Cache: wird als Fallback zurückgegeben mit `stale: true`. Kein Cache: `{ teams: null, stale: false }`. Parse-Fehler: `{ teams: null, stale: true }` — impliziter API-Aufruf.
+
+| *Club-Teams-API-Fehler* (cronUpdate.js)
+| `fetchClubTeams` gibt `null` zurück, aber abgelaufener Cache vorhanden
+| `[WARN]` Meldung; abgelaufene Cache-Daten werden als Fallback verwendet — letzter bekannter Zustand bleibt aktiv.
+
+| *Club-Teams-API-Fehler* (cronUpdate.js)
+| `fetchClubTeams` gibt `null` zurück, kein Cache vorhanden
+| `[ERROR]` Meldung; leeres Array — kein ICS-Update in diesem Lauf. Bestehende ICS-Dateien bleiben unverändert.
+
+| *ICS-Generierung* (icsGenerator.js)
+| `matches` ist leer oder `null`
+| `generateICS` gibt `null` zurück; `cronUpdate.js` prüft auf `null` vor `saveICS` und loggt `[WARN]`.
+|===
+
+==== Konsequenz für bestehende ICS-Abonnenten
+
+Bei einem komplett fehlgeschlagenen Update-Lauf (z. B. API dauerhaft nicht erreichbar) werden bestehende ICS-Dateien auf GitHub Pages *nicht überschrieben*. Abonnenten sehen weiterhin die zuletzt erfolgreich generierten Daten. Erst bei einem erfolgreichen nächsten Lauf (alle 6 Stunden) werden die Dateien aktualisiert.
+
+=== Caching-Strategie (Zwei-Layer-Cache)
+
+Das System verwendet konzeptionell zwei Cache-Schichten:
+
+==== Layer 1: Team-Metadaten-Cache (30-Tage-TTL)
+
+* *Datei:* `generated/teams-cache.json`
+* *Inhalt:* `{ cachedAt: ISO-8601-String, teams: [{ id, name, ageGroup }, ...] }`
+* *TTL:* 30 Tage (2.592.000.000 Millisekunden)
+* *Invalidierung:* Ausschließlich zeitbasiert (TTL-Ablauf)
+* *Fallback:* Abgelaufener Cache wird bei API-Fehler weiterverwendet
+* *Wirksamkeit:* In GitHub Actions nicht wirksam (ephemerer Runner); primär für lokale Entwicklung
+
+==== Layer 2: ICS-Dateien auf GitHub Pages (kein explizites Expiry)
+
+* *Dateien:* `generated/{teamId}_{type}.ics`
+* *Lebensdauer:* Bis zum nächsten erfolgreichen Update-Lauf
+* *Cache-Control:* Wird von GitHub Pages gesetzt (typischerweise kurze TTL für statische Assets)
+* *Funktion:* Abonnenten erhalten bei temporärer GitHub-Pages-Nichterreichbarkeit die zuletzt gecachten Daten durch ihren Kalender-Client
+
+=== Sicherheit
+
+==== Input-Validierung in storage.js
+
+Alle externen Eingaben, die als Teil von Dateipfaden verwendet werden, werden validiert:
+
+[source,javascript]
+----
+const VALID_TYPES = new Set(['all', 'home', 'away']);
+
+function saveICS(teamId, type, data) {
+  if (!VALID_TYPES.has(type)) throw new Error(`Ungültiger ICS-Typ: ${type}`);
+  if (!/^\d+$/.test(String(teamId))) throw new Error(`Ungültige teamId: ${teamId}`);
+  const filepath = path.join(ICS_DIR, `${teamId}_${type}.ics`);
+  // ...
+}
+----
+
+* `type` wird gegen eine Whitelist geprüft (`Set`-Lookup in O(1)) — verhindert beliebige Pfadsegmente
+* `teamId` wird gegen `/^\d+$/` geprüft — erlaubt ausschließlich Ziffern, verhindert `../` und andere Path-Traversal-Muster
+
+==== HTML-Escaping in generateHTML.js
+
+Alle aus der API stammenden Strings, die in HTML-Output eingebettet werden, durchlaufen `escapeHtml()`:
+
+[source,javascript]
+----
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+----
+
+* Verhindert XSS-Angriffe in der generierten HTML-Seite
+* Betrifft: Teamnamen, Altersgruppen-Bezeichnungen, Dateinamen in Link-Attributen
+
+==== ICS-Escaping in icsGenerator.js
+
+Alle Freitext-Felder in ICS-Properties werden durch `icsEscape()` normiert:
+
+[source,javascript]
+----
+function icsEscape(text) {
+  if (!text) return '';
+  return text
+    .replace(/\\/g, '\\\\')  // Backslash → \\
+    .replace(/;/g, '\\;')    // Semikolon → \;
+    .replace(/,/g, '\\,')    // Komma → \,
+    .replace(/\n/g, '\\n')   // Newline → \n (literal)
+    .replace(/\r/g, '');     // Carriage Return entfernen
+}
+----
+
+* Verhindert, dass Sonderzeichen die ICS-Struktur brechen (Property-Injection)
+* Betrifft: Kalendernamen (X-WR-CALNAME), HTML-Beschreibungen (X-ALT-DESC)
+* Für DESCRIPTION übernimmt die `ics`-Bibliothek das Escaping
+
+==== Kein Secret-Management erforderlich
+
+Die Basketball-Bund-API erfordert keine Authentifizierung. Es werden keine API-Keys, Tokens oder Passwörter verwendet. Das Repository enthält keine sensiblen Daten — lediglich die öffentlich bekannte `clubId: 4468`.
+
+=== Logging
+
+Das System verwendet ausschließlich `console.log`, `console.warn` und `console.error`. In GitHub Actions erscheinen diese Ausgaben im Actions-Log.
+
+[cols="2,3,3", options="header"]
+|===
+| Level | Verwendung | Beispiel
+
+| `console.log` / `[DEBUG]`
+| Normale Prozessschritte: Team-Lade-Ergebnis, ICS-Länge, Datei-Speicherung
+| `[DEBUG] Teams aus Cache geladen (3 Teams)`
+
+| `console.warn` / `[WARN]`
+| Unerwartete aber nicht kritische Zustände: leere Match-Liste, API-Fallback auf alten Cache
+| `[WARN] Club-API fehlgeschlagen, verwende abgelaufenen Cache`
+
+| `console.error` / `[ERROR]`
+| Fehler, die einen Team-Update verhindern: Exception bei Team-Verarbeitung, keine Teams verfügbar
+| `[ERROR] Keine Teams verfügbar — weder API noch Cache`
+|===
+
+Ein strukturiertes Logging-Framework (Winston, Pino) ist nicht vorhanden. Bei Bedarf wäre die Einführung eines solchen Frameworks eine sinnvolle Verbesserung, da GitHub Actions-Logs per se keine Log-Level-Filterung unterstützen.
+
+=== Zeitzonenbehandlung
+
+Alle Spieltermine werden in der deutschen Lokalzeit (Europe/Berlin) gespeichert. Die ICS-Dateien verwenden `DTSTART` und `DTEND` ohne UTC-Konvertierung, kombiniert mit:
+
+* `startInputType: 'local'` und `startOutputType: 'local'` in der ics-Bibliothek
+* `X-WR-TIMEZONE:Europe/Berlin` im VCALENDAR-Header
+
+Dies bedeutet, dass die generierten Zeiten "floating" sind — sie werden von Kalender-Clients in der lokalen Zeitzone des Abonnenten interpretiert, nicht als UTC. Für Abonnenten in Deutschland (Europe/Berlin) ist das korrekt. Abonnenten in anderen Zeitzonen würden falsche Zeiten angezeigt bekommen — dies ist ein bekanntes Trade-off zugunsten der Einfachheit.
+
+== Architekturentscheidungen
+
+=== ADR-001: ICS (RFC 5545) statt CalDAV als Ausgabeformat
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2024
+
+| *Kontext*
+| Spieltermine der Fibalon Baskets Neumarkt sollen für Fans und Vereinsmitglieder in deren persönliche Kalender-Apps abrufbar sein. Dabei sollen verschiedene Plattformen (iOS, Android, Windows, macOS) unterstützt werden, ohne dass Nutzer eine App installieren müssen.
+
+| *Entscheidung*
+| Verwendung von statischen ICS-Dateien nach RFC 5545 als abonnierbare Kalender-Feeds. Keine CalDAV-Server-Implementation.
+
+| *Begründung*
+a|
+* ICS wird nativ von iOS Calendar, Google Calendar, Outlook, Thunderbird und praktisch allen anderen Kalenderanwendungen unterstützt.
+* CalDAV erfordert einen dauerhaft laufenden Server mit Authentifizierung, Session-Management und Datenbank.
+* Statische ICS-Dateien können auf GitHub Pages gehostet werden — kostenlos und wartungsfrei.
+* ICS ist ein Pull-Protokoll: der Client fragt die URL periodisch ab. Server-seitige Push-Logik ist nicht erforderlich.
+* Ein Ausfall des Generators hat keine sofortige Auswirkung auf Abonnenten (bestehende Daten bleiben abrufbar).
+
+| *Konsequenzen*
+a|
+* Positive: Keine Infrastrukturkosten, universelle Kompatibilität, kein laufender Server.
+* Negative: Keine Echtzeit-Updates (Client bestimmt die Sync-Frequenz, typischerweise stündlich). Keine bidirektionale Synchronisation möglich (Nutzer können keine Events bearbeiten).
+|===
+
+=== ADR-002: Eine clubId als einzige Konfiguration
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2024
+
+| *Kontext*
+| Das System soll für einen bestimmten Verein (Fibalon Baskets Neumarkt, clubId: 4468) betrieben werden. Es muss entschieden werden, wie Teams konfiguriert werden.
+
+| *Entscheidung*
+| Die gesamte Konfiguration besteht aus `config.json` mit einer einzigen Variable: `{ "clubId": "4468" }`. Teams werden dynamisch über die Club-API ermittelt.
+
+| *Begründung*
+a|
+* Die Basketball-Bund-API bietet einen Endpunkt, der alle Teams eines Vereins liefert — manuelle Pflege ist nicht nötig.
+* Neue Teams (z. B. neue Altersklassen) werden automatisch beim nächsten Cache-Ablauf erkannt.
+* Einfachheit hat Priorität: ein Parameter statt einer gepflegten Teamliste.
+* Die `clubId` ist eine stabile, unveränderliche Kennung des Vereins im DBB-System.
+
+| *Konsequenzen*
+a|
+* Positive: Zero-Maintenance bei Teamänderungen, eine einzige Konfigurationsdatei, einfaches Onboarding für neue Vereine.
+* Negative: Bei strukturellen Änderungen der Club-API müssen die Felder neu gemappt werden. Teams, die in den nächsten 150 Tagen keine Spiele haben, erscheinen nicht im Feed.
+|===
+
+=== ADR-003: 30-Tage-Cache für Team-Metadaten
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2024
+
+| *Kontext*
+| Die Club-Teams werden bei jedem der täglich vier Update-Zyklen benötigt. Die Team-Zusammensetzung eines Vereins ändert sich selten (typischerweise einmal pro Saison).
+
+| *Entscheidung*
+| Team-Metadaten werden in `generated/teams-cache.json` mit einer TTL von 30 Tagen zwischengespeichert.
+
+| *Begründung*
+a|
+* Ohne Cache: ~120 zusätzliche API-Aufrufe pro Monat an `/actualmatches` nur für Team-Ermittlung.
+* 30 Tage ist lang genug um Saison-Wechsel abzudecken, kurz genug um bei echten Änderungen aktuell zu bleiben.
+* Bei API-Fehler kann der abgelaufene Cache als Notfall-Fallback dienen.
+
+| *Konsequenzen*
+a|
+* Positive: Reduzierte API-Last, Ausfalltoleranz bei temporären API-Problemen, schnellere Ausführung.
+* Negative: In GitHub Actions ist der Cache wirkungslos (ephemerer Runner). Wenn ein Team hinzukommt, erscheint es erst nach Cache-Ablauf (maximal 30 Tage verzögert). Dies ist als technische Schuld dokumentiert.
+|===
+
+=== ADR-004: Differenzierte Alarm-Zeiten (Heim 30 min / Auswärts 60 min)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2024
+
+| *Kontext*
+| Kalender-Events sollen einen Alarm (VALARM) enthalten, der Abonnenten rechtzeitig an das Spiel erinnert. Bei Heimspielen ist die Sporthalle in der Nähe; bei Auswärtsspielen muss mehr Anreisezeit eingeplant werden.
+
+| *Entscheidung*
+| VALARM-Trigger: 30 Minuten vor `DTSTART` bei Heimspielen, 60 Minuten bei Auswärtsspielen. `DTSTART` liegt bereits 60 Minuten vor dem eigentlichen Kickoff.
+
+| *Begründung*
+a|
+* Heimspielfans/-besucher sind oft in der Nähe der Halle — 30 min Vorlauf zur Erinnerung ausreichend.
+* Auswärtsspiele erfordern Anreise — 60 min Vorlauf gibt mehr Puffer.
+* Die Unterscheidung Heim/Auswärts ist bereits per `teamPermanentId`-Vergleich bekannt.
+* Da `DTSTART` 60 min vor Kickoff liegt, entspricht ein Alarm 30 min vor `DTSTART` dem tatsächlichen Zeitraum von 90 min vor Kickoff bei Heimspielen, bzw. 120 min vor Kickoff bei Auswärtsspielen.
+
+| *Konsequenzen*
+a|
+* Positive: Individuell sinnvolle Erinnerungszeiten je nach Spieltyp.
+* Negative: Nur ein Alarm pro Event (keine mehrstufigen Erinnerungen). Abonnenten können den Alarm in ihrer Kalender-App manuell anpassen.
+|===
+
+=== ADR-005: Event-Zeitfenster (DTSTART = Kickoff −1h, DTEND = Kickoff +2,5h)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2024
+
+| *Kontext*
+| Ein Basketballspiel dauert offiziell 40 Minuten (4 × 10 Min.) plus Pausen. Der Termin im Kalender soll den realen Aufwand eines Spielbesuchs abbilden: Anreise + Anpfiff + Spiel + Nachspielzeit.
+
+| *Entscheidung*
+| `DTSTART` = Kickoff − 60 Minuten (Anreise-/Aufwärmpuffer), `DTEND` = Kickoff + 150 Minuten (2,5 Stunden für Spielzeit inkl. Pausen und Nachspielzeit).
+
+| *Begründung*
+a|
+* 60 Minuten Vorlauf: Typische Anreisezeit plus Einlass plus Aufwärmen der Teams.
+* 150 Minuten Gesamtspieldauer: 40 Min. Spielzeit + 15 Min. Halbzeit + Verlängerungen + Auslaufen = ca. 90–120 Min. aktive Spielzeit, plus Puffer.
+* Dieses Zeitfenster blockiert den Kalender realistisch und vermeidet Überschneidungen mit anderen Terminen.
+
+| *Konsequenzen*
+a|
+* Positive: Realistisches Zeitfenster im Kalender, sinnvolle Alarm-Berechnung.
+* Negative: Das Zeitfenster ist für alle Spiele gleich — Überstunden (Verlängerung, Overtime) werden nicht dynamisch erfasst. Die Kickoff-Zeit stammt aus der API; Zeitplanänderungen kurzfristig vor dem Spiel werden erst beim nächsten Update-Zyklus reflektiert.
+|===
+
+=== ADR-006: X-ALT-DESC für HTML-Beschreibungen (aktuell deaktiviert)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Deferred (vorläufig deaktiviert, Code vorhanden)
+
+| *Datum*
+| 2024
+
+| *Kontext*
+| ICS `DESCRIPTION` unterstützt nur Plain-Text. Microsoft Outlook und einige andere Clients unterstützen die nicht-standardisierte X-Property `X-ALT-DESC;FMTTYPE=text/html`, die eine HTML-Version der Beschreibung enthält und eine reichere Darstellung ermöglicht.
+
+| *Entscheidung*
+| Die Infrastruktur für `X-ALT-DESC` ist vollständig implementiert (`createHtmlDescription()`, Post-Processing-Logik in `generateICS()`), aber in der Event-Erzeugung temporär auskommentiert (`// htmlDescription`).
+
+| *Begründung*
+a|
+* `X-ALT-DESC` ist keine RFC-5545-Property — manche Clients ignorieren sie, andere verarbeiten sie fehlerhaft.
+* Debugging-Schwierigkeiten: HTML in ICS-Strings ist schwer zu verifizieren.
+* Implementierung ist fertig, Aktivierung erfordert Verifikation auf allen Zielclients.
+* Die Deaktivierung ist ein bewusstes temporäres Trade-off — Plain-Text DESCRIPTION ist universell kompatibel.
+
+| *Konsequenzen*
+a|
+* Aktuelle Konsequenz: Alle Clients zeigen Plain-Text-Beschreibungen. Funktionalität vollständig erhalten.
+* Zukünftige Aktivierung: Muss `buildEvent()` `htmlDescription` wieder befüllen und `createHtmlDescription()` testen. Besondere Sorgfalt bei Line-Folding (75-Zeichen-Limit) und HTML-in-ICS-Escaping erforderlich.
+|===
+
+== Qualitätsanforderungen
+
+=== Qualitätsbaum
+
+Der folgende Qualitätsbaum zeigt die wichtigsten Qualitätsziele und ihre konkreten Szenarien:
+
+....
+BBB ICS Generator — Qualitätsanforderungen
+|
++-- Kompatibilität (höchste Priorität)
+|   |
+|   +-- ICS-Konformität (RFC 5545)
+|   |   +-- Szenario: iOS importiert ICS ohne Fehler
+|   |   +-- Szenario: Google Calendar zeigt alle Events korrekt an
+|   |   +-- Szenario: Outlook 2019 importiert VALARM korrekt
+|   |
+|   +-- Zeichenkodierung
+|   |   +-- Szenario: Umlaute (ä, ö, ü) in Teamnamen werden korrekt übertragen
+|   |   +-- Szenario: Sonderzeichen in Hallennamen brechen ICS-Struktur nicht
+|   |
+|   +-- Subscription-Protokolle
+|       +-- Szenario: webcal:// öffnet iOS Calendar direkt
+|       +-- Szenario: Google Calendar Render-URL funktioniert ohne Fehler
+|
++-- Zuverlässigkeit (hohe Priorität)
+|   |
+|   +-- API-Ausfalltoleranz
+|   |   +-- Szenario: API nicht erreichbar → bestehende ICS-Dateien bleiben gültig
+|   |   +-- Szenario: Einzelner matchInfo-Call schlägt fehl → Team-ICS enthält verbleibende Matches
+|   |
+|   +-- Aktualität
+|   |   +-- Szenario: Spielplanänderung wird innerhalb von 6 Stunden reflektiert
+|   |   +-- Szenario: Neues Team erscheint spätestens nach 30 Tagen Cache-Ablauf
+|   |
+|   +-- Fehlerlogging
+|       +-- Szenario: Fehler bei Team X ist im GitHub Actions Log sichtbar
+|       +-- Szenario: Lauf für Team Y läuft trotz Fehler bei Team X weiter
+|
++-- Wartbarkeit (mittlere Priorität)
+|   |
+|   +-- Konfiguration
+|   |   +-- Szenario: Vereinswechsel durch Änderung einer einzigen Zeile in config.json
+|   |
+|   +-- Erweiterbarkeit
+|   |   +-- Szenario: Neues Ausgabeformat (z.B. JSON-LD) durch neues Modul addierbar
+|   |   +-- Szenario: Anderer HTTP-Client durch apiClient.js-Austausch möglich
+|   |
+|   +-- Verständlichkeit
+|       +-- Szenario: Neuer Contributor versteht Ablauf durch Lesen von cronUpdate.js
+|
++-- Sicherheit (mittlere Priorität)
+    |
+    +-- Input-Validierung
+    |   +-- Szenario: teamId "../etc/passwd" → Exception, keine Datei geschrieben
+    |   +-- Szenario: type "../../config" → Exception, keine Datei geschrieben
+    |
+    +-- Output-Encoding
+        +-- Szenario: Teamname mit "<script>" → in HTML escaped, kein XSS
+        +-- Szenario: Hallenname mit Komma → ICS-escaped, keine Strukturfehler
+....
+
+=== Qualitätsszenarien im Detail
+
+[cols="1,3,3,2", options="header"]
+|===
+| ID | Szenario | Reaktion des Systems | Priorität
+
+| Q-01
+| Ein iOS-Nutzer abonniert den webcal-Link für Team X, alle Spiele. iOS Calendar synchronisiert den Feed.
+| Alle Spiele erscheinen korrekt mit Titel, Datum, Uhrzeit, Ort und Alarm. Keine Import-Fehlermeldung.
+| Kritisch
+
+| Q-02
+| Ein Spiel hat einen Teamnamen mit Umlauten (z. B. "Würzburg Baskets").
+| Der Umlaut wird korrekt in UTF-8 in der ICS-Datei gespeichert. Der Kalender-Client zeigt den korrekten Namen an.
+| Kritisch
+
+| Q-03
+| Die Basketball-Bund-API ist für 2 Stunden nicht erreichbar. Während dieser Zeit triggert ein Cron-Lauf.
+| Der Lauf schlägt fehl, aber bestehende ICS-Dateien auf GitHub Pages bleiben unverändert. Abonnenten sehen weiterhin ihre Termine. Beim nächsten erfolgreichen Lauf werden die Dateien aktualisiert.
+| Hoch
+
+| Q-04
+| Ein Spielplan hat einen Termin mit einer Adresse, die Komma und Semikolon enthält.
+| `icsEscape()` kodiert die Sonderzeichen korrekt. Die LOCATION-Property der ICS-Datei ist syntaktisch valide.
+| Hoch
+
+| Q-05
+| Eine Änderung der `clubId` in `config.json` auf einen anderen Verein wird committed und auf main gepusht.
+| GitHub Actions triggert, fetcht die Teamdaten des neuen Vereins und generiert korrekte ICS-Dateien.
+| Mittel
+
+| Q-06
+| `fetchMatchInfo` gibt für zwei von zehn Matches `null` zurück (z. B. bei HTTP 404).
+| Die `buildEvent()`-Funktion verwendet Fallback-Werte (`match.homeTeam` statt `matchInfo.homeTeam`). Die ICS-Datei enthält alle zehn Events — die zwei ohne Detailinfo mit reduzierten Beschreibungen.
+| Mittel
+
+| Q-07
+| Eine `teamId` mit dem Wert `"../../../etc"` wird als Parameter an `saveICS` übergeben.
+| `storage.js` wirft eine Exception: `Ungültige teamId: ../../../etc`. Keine Datei wird geschrieben.
+| Hoch
+
+| Q-08
+| Der HTML-Generator liest einen Teamnamen mit `<script>alert('xss')</script>` aus `metadata.json`.
+| `escapeHtml()` wandelt `<` und `>` um. Das HTML enthält nur den escapeten String, kein ausführbares Script.
+| Mittel
+|===
+
+== Risiken und technische Schulden
+
+=== Risikotabelle
+
+[cols="1,3,2,2,4", options="header"]
+|===
+| ID | Risiko | Eintrittswahrscheinlichkeit | Auswirkung | Gegenmaßnahme / Mitigierung
+
+| R-01
+| *Basketball-Bund API-Downtime*: Die externe API unter `basketball-bund.net` ist temporär oder dauerhaft nicht erreichbar.
+| Mittel (externe Abhängigkeit, keine SLA)
+| Mittel (keine frischen Daten, aber bestehende ICS-Dateien gültig)
+| Fail-Graceful-Strategie: Bestehende ICS-Dateien werden nicht überschrieben. Abgelaufener Teams-Cache wird als Fallback verwendet. Bei dauerhaftem Ausfall: manueller Eingriff oder Migration zu einer alternativen Datenquelle.
+
+| R-02
+| *GitHub Pages Downtime*: GitHub Pages ist nicht erreichbar; Kalender-Clients können die ICS-Dateien nicht abrufen.
+| Niedrig (GitHub SLA > 99,9 %)
+| Hoch (alle Abonnenten betroffen solange Downtime anhält)
+| Keine Gegenmaßnahme sinnvoll (kostenlose Infrastruktur). Alternativlösung wäre Mirroring auf zweitem Hosting-Provider, aber overengineered für diesen Use Case.
+
+| R-03
+| *API-Strukturänderung*: Der Basketball-Bund ändert die JSON-Antwortstruktur (Felder werden umbenannt, verschoben oder entfernt).
+| Niedrig bis Mittel (öffentliche API ohne Versionierung oder Changelog)
+| Hoch (ICS-Dateien werden mit Standardwerten oder leer generiert)
+| Kein aktives Monitoring. Mitigation: Fehlerlogging in GitHub Actions wird sichtbare Warnungen erzeugen. Manuelle Anpassung des `apiClient.js` nach Analyse der neuen Struktur.
+
+| R-04
+| *ics-Bibliothek veraltet / Breaking Change*: Das npm-Paket `ics` (v3) veröffentlicht eine Breaking-Change-Version.
+| Niedrig (stabile Bibliothek, semantisches Versioning)
+| Mittel (generierte ICS-Struktur bricht, RFC-Konformität verloren)
+| `package.json` pinnt auf `^3.8.1` (Minor-Updates erlaubt, Major blockiert). Regelmäßige Abhängigkeits-Überprüfung empfohlen. Kein automatisches Dependency-Update (Dependabot nicht konfiguriert).
+
+| R-05
+| *GitHub Actions Free-Tier-Überschreitung*: Aktionen übersteigen das monatliche Kontingent (bei öffentlichen Repos: unbegrenzt).
+| Sehr niedrig (öffentliches Repository hat unlimitierte Minuten)
+| Niedrig
+| Kein unmittelbares Risiko für öffentliche Repos. Wenn das Repo auf privat gesetzt wird: ca. 480 min/Monat Verbrauch (4 Runs/Tag × 2 min × 30 Tage = 240 Runs × 2 min) — im kostenlosen Tier (2.000 min/Monat) noch komfortabel.
+
+| R-06
+| *Zeitzonenprobleme bei Sommerzeit-Wechsel*: Spieltermine, die rund um den Sommerzeit-/Winterzeit-Wechsel liegen, werden falsch gespeichert.
+| Niedrig
+| Niedrig (Kalender-Clients handeln Zeitzone meist korrekt)
+| ICS-Dateien verwenden floating times mit `X-WR-TIMEZONE:Europe/Berlin`. Korrekte Interpretation liegt beim Client. Eigentliche IANA-Zeitzonensemantik (VTIMEZONE-Komponente) ist nicht implementiert.
+|===
+
+=== Tabelle der technischen Schulden
+
+[cols="1,3,2,3", options="header"]
+|===
+| ID | Technische Schuld | Schweregrad | Empfohlene Maßnahme
+
+| TD-01
+| *Keine automatisierten Tests*: Es existieren weder Unit- noch Integrationstests für `icsGenerator.js`, `apiClient.js`, `storage.js` oder `cronUpdate.js`.
+| Hoch
+| Einführung von Unit-Tests (z. B. mit Jest oder Node's eingebautem `node:test`). Priorität: `icsGenerator.js` (RFC-5545-Validierung), `storage.js` (Path-Traversal-Schutz). Integrationstests mit gemockten API-Antworten für `cronUpdate.js`.
+
+| TD-02
+| *geocode.js nicht genutzt*: Das Modul `src/geocode.js` ist vorhanden, aber wird von keinem anderen Modul importiert oder aufgerufen (Dead Code).
+| Niedrig
+| Entweder in `icsGenerator.js` integrieren (GPS-Koordinaten in LOCATION-Property einbinden) oder aus dem Repository entfernen, um Verwirrung zu vermeiden.
+
+| TD-03
+| *Hartcodierte Base-URL in generateHTML.js*: `const BASE_URL = 'https://olieder.github.io/bbb-ics-generator/'` ist direkt im Code — nicht konfigurierbar.
+| Mittel
+| URL in `config.json` als `baseUrl`-Feld auslagern. `generateHTML.js` liest die URL aus der Konfiguration. Ermöglicht Einsatz des Systems für andere Vereine oder unter anderen GitHub-Usernamen ohne Code-Änderung.
+
+| TD-04
+| *Kein Linting / Code-Formatting*: Es existieren keine ESLint- oder Prettier-Konfigurationen. Code-Stil ist inkonsistent (z. B. `var` vs. `const`, gemischte Callback- und Promise-Stile).
+| Niedrig
+| `.eslintrc.json` und `.prettierrc` einrichten. GitHub Actions kann Linting als optionalen Pre-Deploy-Check ausführen. Wert steigt bei mehreren Contributern.
+
+| TD-05
+| *Teams-Cache ohne Wirkung in CI*: Der 30-Tage-TTL-Cache in `teams-cache.json` persistiert nicht zwischen GitHub Actions Runs (ephemerer Runner). Die Cache-Logik ist für die Produktionsumgebung faktisch wirkungslos.
+| Mittel
+| Entweder Cache über GitHub Actions Artefakte oder GitHub Releases persistent machen, oder explizit dokumentieren, dass der Cache nur für lokale Entwicklung gedacht ist. Alternativ: GitHub Actions Cache (`actions/cache`) für `generated/teams-cache.json` nutzen.
+
+| TD-06
+| *Kein Monitoring / Alerting*: Es gibt keine Benachrichtigung wenn ein Cron-Lauf fehlschlägt. GitHub Actions sendet standardmäßig keine E-Mail bei Workflow-Fehlern (außer bei aktivierter Notification-Einstellung im GitHub-Account).
+| Mittel
+| GitHub Actions Notification-Emails im Account aktivieren. Alternativ: Slack-/E-Mail-Benachrichtigung als letzten Workflow-Schritt hinzufügen, der nur bei Fehler ausgelöst wird.
+
+| TD-07
+| *X-ALT-DESC deaktiviert (ADR-006)*: Der Code für HTML-Beschreibungen (`createHtmlDescription`, Post-Processing-Logik) ist vollständig implementiert aber auskommentiert.
+| Niedrig
+| Aktivierung und Verifikation auf iOS, Google Calendar und Outlook. Line-Folding für lange HTML-Strings sicherstellen. Wenn nicht zeitnah aktiviert: Code entfernen oder in separaten Feature-Branch auslagern.
+
+| TD-08
+| *Keine Versionierung der API-Responses*: `apiClient.js` geht von einer stabilen JSON-Struktur aus. Abweichungen führen zu stillen Fehlern (z. B. `undefined` in Feldern).
+| Mittel
+| Schema-Validierung der API-Antworten (z. B. mit `zod` oder `joi`) einführen. Explizite Fehlermeldung wenn erwartete Felder fehlen. Verhindert stille Datenverluste bei API-Änderungen.
+|===
+
+== Glossar
+
+[cols="2,5", options="header"]
+|===
+| Begriff | Erklärung
+
+| *RFC 5545*
+| "Internet Calendaring and Scheduling Core Object Specification". Der Internet-Standard (Request for Comments Nr. 5545 der IETF, veröffentlicht 2009), der das iCalendar-Datenformat definiert. Legt Syntax, Pflichtfelder und Escape-Regeln für Kalender-Dateien fest. Ablösung von RFC 2445. Wichtigste Einschränkung: Textzeilen dürfen maximal 75 Oktetts lang sein (Line-Folding erforderlich).
+
+| *ICS*
+| Dateiendung und umgangssprachliche Bezeichnung für iCalendar-Dateien nach RFC 5545. Der MIME-Type ist `text/calendar`. ICS-Dateien können einzelne oder mehrere Kalender-Ereignisse (VEVENT) enthalten und von allen gängigen Kalenderanwendungen importiert oder abonniert werden.
+
+| *VCALENDAR*
+| Das äußere Container-Objekt einer ICS-Datei, begrenzt durch `BEGIN:VCALENDAR` und `END:VCALENDAR`. Enthält Calendar-Properties wie `PRODID`, `VERSION`, `CALSCALE`, `METHOD` und X-Properties wie `X-WR-CALNAME`, sowie alle enthaltenen VEVENT-Objekte.
+
+| *VEVENT*
+| Ein einzelnes Kalenderereignis innerhalb einer ICS-Datei, begrenzt durch `BEGIN:VEVENT` und `END:VEVENT`. Pflichtfelder nach RFC 5545: `DTSTART` (Startzeit), `UID` (eindeutige ID), `DTSTAMP` (Zeitstempel der Erzeugung). Im BBB ICS Generator enthält jedes VEVENT auch `DTEND`, `SUMMARY`, `DESCRIPTION`, `LOCATION`, `BUSYSTATUS` und ein `VALARM`.
+
+| *VALARM*
+| Eine Unterkomponente eines VEVENT, die eine Erinnerung (Alarm) definiert, begrenzt durch `BEGIN:VALARM` und `END:VALARM`. Felder: `ACTION` (z. B. `DISPLAY`), `DESCRIPTION` (Alarmtext), `TRIGGER` (relativer Zeitversatz, z. B. `-PT30M` für 30 Minuten vor DTSTART).
+
+| *UID*
+| "Unique Identifier". Pflichtfeld in VEVENT nach RFC 5545. Muss global eindeutig sein und über alle Versionen eines Events konstant bleiben, damit Kalender-Clients Updates (nicht Duplikate) erkennen. Im BBB ICS Generator: `{matchId}@basketball-bund.net`.
+
+| *webcal://*
+| Ein URI-Schema (kein eigenes Protokoll), das HTTPS für Kalender-Subscriptions signalisiert. `webcal://` ist funktional identisch mit `https://`, wird aber von iOS Calendar, macOS Calendar und Outlook als Trigger für die Subscription-Logik erkannt. Der Browser öffnet beim Klick automatisch die Kalender-App.
+
+| *teamPermanentId*
+| Die dauerhafte, unveränderliche ID eines Teams im Basketball-Bund-System. Im Gegensatz zu `teamId` bleibt die `teamPermanentId` über Saisons hinweg stabil. Im BBB ICS Generator als `teamId` verwendet und als Dateinamen-Bestandteil (`{teamPermanentId}_{type}.ics`).
+
+| *clubId*
+| Die eindeutige ID eines Basketballvereins im DBB-System. Im BBB ICS Generator die einzige Konfigurationsvariable (`config.json`). Für die Fibalon Baskets Neumarkt: `4468`. Alle Teams, ICS-Feeds und Links werden von dieser einen ID abgeleitet.
+
+| *spielfeld*
+| Feldname im Basketball-Bund API-Response (`matchInfo.matchInfo.spielfeld`). Enthält Informationen zur Spielhalle: `bezeichnung` (Name der Halle), `strasse` (Straße), `plz` (Postleitzahl), `ort` (Stadt). Wird in der `LOCATION`-Property des VEVENT und in der DESCRIPTION verwendet.
+
+| *Line-Folding*
+| Pflicht-Mechanismus nach RFC 5545: ICS-Textzeilen dürfen maximal 75 Oktetts lang sein. Längere Zeilen müssen mit einem CRLF gefolgt von einem einzelnen Leerzeichen oder Tab umgebrochen werden. Die `ics`-Bibliothek übernimmt Line-Folding für Standard-Properties. Bei manuell eingefügten X-Properties (z. B. `X-ALT-DESC`) muss Line-Folding manuell berücksichtigt werden.
+
+| *X-Property*
+| Eine proprietäre, nicht-standardisierte Property in einer ICS-Datei, erkennbar am `X-`-Präfix. Erlaubt durch RFC 5545 als Erweiterungsmechanismus. Beispiele im BBB ICS Generator: `X-WR-CALNAME` (Kalenderanzeigename), `X-WR-TIMEZONE` (bevorzugte Zeitzone), `X-WR-CALDESC` (Kalenderbeschreibung). Werden von Kalender-Clients unterschiedlich stark unterstützt.
+
+| *X-ALT-DESC*
+| Eine spezifische X-Property mit dem Wert `FMTTYPE=text/html`, die eine HTML-Version der DESCRIPTION enthält. Wird von Microsoft Outlook und einigen anderen Clients für eine reichere Darstellung verwendet. Nicht im RFC 5545 definiert. Im BBB ICS Generator implementiert aber vorläufig deaktiviert (ADR-006).
+
+| *ICS-Escape*
+| Die Zeichenmaskierung, die innerhalb von ICS-Property-Werten erforderlich ist, um Syntaxkonflikte zu vermeiden. Nach RFC 5545 müssen folgende Zeichen in Textwerten escapt werden: Backslash (`\`) → `\\`, Semikolon (`;`) → `\;`, Komma (`,`) → `\,`, Newline (`\n`) → `\n` (literal zwei Zeichen). Implementiert in `icsGenerator.js::icsEscape()`.
+
+| *PRODID*
+| "Product Identifier". Pflichtfeld im VCALENDAR-Container nach RFC 5545. Identifiziert das Programm, das die ICS-Datei erzeugt hat. Im BBB ICS Generator: `-//bbb-ics-generator//DE`. Format: `-//Organisation//Produkt//Sprache`.
+
+| *CALSCALE*
+| "Calendar Scale". VCALENDAR-Property, die den verwendeten Kalender-Standard angibt. Standardwert: `GREGORIAN` (Gregorianischer Kalender). Im BBB ICS Generator explizit auf `GREGORIAN` gesetzt.
+
+| *METHOD*
+| VCALENDAR-Property, die den Verwendungszweck der ICS-Datei beschreibt. Wert `PUBLISH` bedeutet: der Kalender wird veröffentlicht (kein iTIP-Workflow). Alternative: `REQUEST` für Meeting-Einladungen. Im BBB ICS Generator: `METHOD:PUBLISH`.
+
+| *DTSTART / DTEND*
+| "Date-Time Start / End". Pflicht- bzw. Optionalfelder im VEVENT. Definieren Beginn und Ende eines Kalendereintrags. Können als lokale Zeit (floating), UTC-Zeit (mit `Z`-Suffix) oder mit expliziter Zeitzone (`TZID`-Parameter) angegeben werden. Im BBB ICS Generator: floating times mit `startInputType/startOutputType: 'local'`.
+
+| *DTSTAMP*
+| "Date-Time Stamp". Pflichtfeld im VEVENT nach RFC 5545. Enthält den UTC-Zeitpunkt, zu dem das Event-Objekt erzeugt wurde. Wird von der `ics`-Bibliothek automatisch gesetzt.
+
+| *Kickoff*
+| Fachbegriff für den Anpfiff-Zeitpunkt eines Basketballspiels, wie er aus der Basketball-Bund-API als `kickoffDate` (Datum) und `kickoffTime` (Uhrzeit, Format `HH:MM`) geliefert wird. `DTSTART` im generierten Event liegt 60 Minuten vor dem Kickoff.
+
+| *teamname / teamnameSmall*
+| Felder im Basketball-Bund API-Response. `teamname` ist der vollständige Teamname (z. B. "Fibalon Baskets Neumarkt"). `teamnameSmall` ist die Kurzform (z. B. "Baskets Neumarkt"), die im VEVENT-`SUMMARY` verwendet wird. Wenn `teamnameSmall` nicht verfügbar ist, wird `teamname` als Fallback verwendet.
+|===
