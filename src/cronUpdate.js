@@ -32,7 +32,12 @@ async function updateAll() {
   const teams = await getTeams();
 
   // Build theme from API + config overrides
-  const apiInfo = await fetchClubInfo(config.clubId);
+  let apiInfo = { logoUrl: null };
+  try {
+    apiInfo = await fetchClubInfo(config.clubId);
+  } catch (e) {
+    console.warn('[WARN] fetchClubInfo fehlgeschlagen, nutze Fallback-Logo:', e.message);
+  }
   const theme = {
     primary: config.theme?.primary || '#004174',
     accent: config.theme?.accent || '#009ef3',
