@@ -64,7 +64,10 @@ async function fetchLeagueTable(ligaId, ownTeamId) {
       played:   row.anzspiele || 0,
       won:      row.s  || 0,
       lost:     row.n || 0,
-      points:   `${row.anzGewinnpunkte || 0}:${row.anzVerlustpunkte || 0}`,
+      points:   row.anzGewinnpunkte || 0,
+      koerbe:   row.koerbe || 0,
+      gegenKoerbe: row.gegenKoerbe || 0,
+      korbdiff: row.korbdiff || 0,
       isOwn:    String(row.team?.teamPermanentId) === String(ownTeamId),
     }));
   } catch (err) {

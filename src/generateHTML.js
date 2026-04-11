@@ -246,20 +246,61 @@ function buildStandingsTable(comp) {
   if (!comp.table) {
     return `<p class="comp-unavailable">Tabelle noch nicht verfügbar.</p>`;
   }
-  const rows = comp.table.map(row =>
-    `<tr${row.isOwn ? ' class="standings-own"' : ''}>` +
-    `<td>${escapeHtml(String(row.rank))}</td>` +
-    `<td>${escapeHtml(row.teamName)}</td>` +
-    `<td>${escapeHtml(String(row.played))}</td>` +
-    `<td>${escapeHtml(String(row.won))}</td>` +
-    `<td>${escapeHtml(String(row.lost))}</td>` +
-    `<td>${escapeHtml(String(row.points))}</td>` +
-    `</tr>`
-  ).join('');
-  return `<table class="standings-table" aria-label="${escapeHtml(comp.liganame)} Tabelle">` +
-    `<thead><tr><th>#</th><th>Team</th><th>Sp</th><th>S</th><th>N</th><th>Pkt.</th></tr></thead>` +
-    `<tbody>${rows}</tbody>` +
-    `</table>`;
+  const table = comp.table;
+  const leader = table[0];
+
+  const officialRows = table.map(row => {
+    const diff = row.korbdiff > 0 ? `+${row.korbdiff}` : String(row.korbdiff);
+    return `<tr${row.isOwn ? ' class="standings-own"' : ''}>` +
+      `<td class="standings-rank">${escapeHtml(String(row.rank))}</td>` +
+      `<td>${escapeHtml(row.teamName)}</td>` +
+      `<td class="standings-num">${escapeHtml(String(row.played))}</td>` +
+      `<td class="standings-num">${escapeHtml(String(row.points))}</td>` +
+      `<td class="standings-num">${escapeHtml(String(row.won))}</td>` +
+      `<td class="standings-num">${escapeHtml(String(row.lost))}</td>` +
+      `<td class="standings-num standings-diff">${escapeHtml(diff)}</td>` +
+      `</tr>`;
+  }).join('');
+
+  // GB = Games Behind leader: ((leaderW - teamW) + (teamL - leaderL)) / 2
+  const gbRows = [...table]
+    .map(row => {
+      const gb = row === leader
+        ? null
+        : ((leader.won - row.won) + (row.lost - leader.lost)) / 2;
+      return { ...row, gb };
+    })
+    .sort((a, b) => (a.gb ?? -1) - (b.gb ?? -1))
+    .map((row, i) => {
+      const diff = row.korbdiff > 0 ? `+${row.korbdiff}` : String(row.korbdiff);
+      const gbCell = row.gb === null ? '–' : (Number.isInteger(row.gb) ? String(row.gb) : row.gb.toFixed(1));
+      return `<tr${row.isOwn ? ' class="standings-own"' : ''}>` +
+        `<td class="standings-rank">${i + 1}</td>` +
+        `<td>${escapeHtml(row.teamName)}</td>` +
+        `<td class="standings-num">${escapeHtml(String(row.played))}</td>` +
+        `<td class="standings-num">${escapeHtml(String(row.points))}</td>` +
+        `<td class="standings-num">${escapeHtml(String(row.won))}</td>` +
+        `<td class="standings-num">${escapeHtml(String(row.lost))}</td>` +
+        `<td class="standings-num standings-gb">${escapeHtml(gbCell)}</td>` +
+        `<td class="standings-num standings-diff">${escapeHtml(diff)}</td>` +
+        `</tr>`;
+    }).join('');
+
+  const tableId = `standings-${escapeHtml(String(comp.ligaId || comp.liganame))}`;
+  return `<div class="standings-tabs">` +
+    `<div class="standings-tab-bar">` +
+    `<button class="standings-tab-btn standings-tab-btn--active" data-target="${tableId}-official" aria-selected="true">Offizielle Tabelle</button>` +
+    `<button class="standings-tab-btn" data-target="${tableId}-gb" aria-selected="false">Ranking nach GB</button>` +
+    `</div>` +
+    `<div id="${tableId}-official" class="standings-panel">` +
+    `<table class="standings-table" aria-label="${escapeHtml(comp.liganame)} Tabelle">` +
+    `<thead><tr><th>#</th><th>Team</th><th>Sp</th><th>GP</th><th>S</th><th>N</th><th>+/−</th></tr></thead>` +
+    `<tbody>${officialRows}</tbody></table></div>` +
+    `<div id="${tableId}-gb" class="standings-panel" hidden>` +
+    `<table class="standings-table" aria-label="${escapeHtml(comp.liganame)} Ranking nach GB">` +
+    `<thead><tr><th>#</th><th>Team</th><th>Sp</th><th>GP</th><th>S</th><th>N</th><th>GB</th><th>+/−</th></tr></thead>` +
+    `<tbody>${gbRows}</tbody></table></div>` +
+    `</div>`;
 }
 
 function buildBracket(comp) {
@@ -368,9 +409,17 @@ function buildSharedStyles(primary, accent, cupColor) {
     .comp-heading--cup { color: var(--color-cup); border-left-color: var(--color-cup); }
     .comp-unavailable { font-size: 0.82rem; color: var(--color-text); padding: 8px 0; }
     /* Standings */
+    .standings-tabs { margin-bottom: 4px; }
+    .standings-tab-bar { display: flex; gap: 4px; margin-bottom: 8px; }
+    .standings-tab-btn { background: var(--color-surface-card); border: 1px solid var(--color-border); border-radius: 6px; padding: 5px 12px; font-size: 0.8rem; font-weight: 500; color: var(--color-text); cursor: pointer; }
+    .standings-tab-btn--active { background: var(--color-primary); color: var(--color-on-primary); border-color: var(--color-primary); font-weight: 700; }
     .standings-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-bottom: 4px; }
     .standings-table th { text-align: left; color: var(--color-text); font-weight: 600; border-bottom: 1px solid var(--color-border); padding: 4px 8px; }
     .standings-table td { padding: 4px 8px; border-bottom: 1px solid var(--color-border); }
+    .standings-num { text-align: right; }
+    .standings-rank { text-align: center; font-weight: 600; }
+    .standings-diff { color: var(--color-text); opacity: 0.7; }
+    .standings-gb { font-weight: 700; }
     .standings-own { background: var(--color-badge-home-bg); font-weight: 600; }
     /* Bracket */
     .bracket { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px; }
@@ -452,6 +501,23 @@ function buildTabScript() {
         var panel = document.getElementById(tab.getAttribute('aria-controls'));
         if (panel) panel.hidden = false;
       }
+    });
+    document.querySelectorAll('.standings-tab-bar').forEach(function(bar) {
+      var btns = Array.from(bar.querySelectorAll('.standings-tab-btn'));
+      btns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          btns.forEach(function(b) {
+            b.classList.remove('standings-tab-btn--active');
+            b.setAttribute('aria-selected', 'false');
+            var p = document.getElementById(b.getAttribute('data-target'));
+            if (p) p.hidden = true;
+          });
+          btn.classList.add('standings-tab-btn--active');
+          btn.setAttribute('aria-selected', 'true');
+          var panel = document.getElementById(btn.getAttribute('data-target'));
+          if (panel) panel.hidden = false;
+        });
+      });
     });
   </script>`;
 }
