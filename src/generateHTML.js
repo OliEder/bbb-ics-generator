@@ -133,7 +133,11 @@ function buildNavigation(teams, activePage) {
     const href = homeActive
       ? `teams/${escapeHtml(t.teamId)}.html`
       : `${escapeHtml(t.teamId)}.html`;
-    const label = t.ageGroup ? escapeHtml(t.ageGroup) : escapeHtml(t.teamName);
+    // Build a unique label: prefer "U16 · Neumarkt 2" over bare "U16"
+    const suffix = t.teamName ? t.teamName.replace(/^.*?Neumarkt\s*/i, '').trim() : '';
+    const label = t.ageGroup
+      ? escapeHtml(suffix ? `${t.ageGroup} · ${suffix}` : t.ageGroup)
+      : escapeHtml(t.teamName);
     return `<a href="${href}"${active ? ' aria-current="page"' : ''}>${label}</a>`;
   }).join('');
 
@@ -308,7 +312,7 @@ function buildSharedStyles(primary, accent, cupColor) {
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--color-surface); color: var(--color-text); min-height: 100vh; }
     /* Navigation */
-    .site-nav { background: var(--color-primary); }
+    .site-nav { background: var(--color-primary); position: sticky; top: 0; z-index: 100; }
     .nav-bar { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; }
     .nav-logo { color: var(--color-on-primary); font-weight: 700; font-size: 1rem; text-decoration: none; }
     .nav-toggle { background: transparent; border: none; cursor: pointer; padding: 4px; display: flex; flex-direction: column; gap: 4px; }
