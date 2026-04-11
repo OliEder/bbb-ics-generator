@@ -151,6 +151,7 @@ async function updateAll() {
         teamId:         t.id,
         teamName:       t.name,
         ageGroup:       t.ageGroup,
+        gender:         t.gender,
         lastUpdate:     new Date().toISOString(),
         matchCount:     matches.length,
         homeMatchCount: homeMatches.length,

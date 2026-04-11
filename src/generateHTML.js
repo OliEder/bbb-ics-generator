@@ -143,16 +143,10 @@ function buildNavigation(teams, activePage) {
     const href = homeActive
       ? `teams/${escapeHtml(t.teamId)}.html`
       : `${escapeHtml(t.teamId)}.html`;
-    // Build a unique label: prefer "U16 · 2 ♂" over bare "U16 ♂"
-    // suffix = anything after the club name in teamName (e.g. "2" from "FBN Neumarkt 2")
-    const rawSuffix = t.teamName ? t.teamName.replace(/^.*?Neumarkt\s*/i, '').trim() : '';
-    // Only use suffix if it's a short disambiguator (not the full name unchanged)
-    const suffix = rawSuffix && rawSuffix !== t.teamName ? rawSuffix : '';
     const sym = genderSpan(t.gender);
-    const base = t.ageGroup
-      ? (suffix ? `${t.ageGroup} · ${suffix}` : t.ageGroup)
-      : (t.teamName || '');
-    const label = escapeHtml(base) + (sym ? ` ${sym}` : '');
+    const agePart = t.ageGroup ? escapeHtml(t.ageGroup) : '';
+    const namePart = t.teamName ? `<span class="nav-team-name">${escapeHtml(t.teamName)}</span>` : '';
+    const label = (agePart ? agePart : '') + (sym ? ` ${sym}` : '') + (namePart ? ` ${namePart}` : '');
     return `<a href="${href}"${active ? ' aria-current="page"' : ''}>${label}</a>`;
   }).join('');
 
@@ -395,6 +389,7 @@ function buildSharedStyles(primary, accent, cupColor) {
     .nav-toggle span { display: block; width: 22px; height: 2px; background: var(--color-on-primary); border-radius: 1px; }
     .nav-drawer { background: var(--color-surface-card); border-bottom: 1px solid var(--color-border); padding: 8px 0; }
     .nav-drawer a { display: block; padding: 10px 16px; color: var(--color-text); text-decoration: none; font-weight: 500; font-size: 0.9rem; text-align: right; }
+    .nav-team-name { font-size: 0.78rem; opacity: 0.65; font-weight: 400; }
     .nav-drawer a[aria-current="page"] { background: var(--color-tab-active-bg); color: var(--color-primary); font-weight: 700; }
     .nav-drawer a:hover { background: var(--color-primary-light); }
     /* Header */
