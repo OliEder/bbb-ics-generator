@@ -168,7 +168,7 @@ function buildTeaserCard(team) {
   ).join('');
 
   const nextHtml = nextMatch
-    ? `<div class="teaser-next">Nächstes: ${escapeHtml(nextMatch.date.slice(5).split('-').reverse().join('.'))} · ${escapeHtml(nextMatch.opponent)}</div>`
+    ? `<div class="teaser-next">Nächstes: ${escapeHtml(String(nextMatch.date || '').slice(5).split('-').reverse().join('.'))} · ${escapeHtml(nextMatch.opponent)}</div>`
     : '';
 
   return `<div class="teaser-card">
@@ -193,7 +193,7 @@ function buildStandingsTable(comp) {
     `<td>${escapeHtml(String(row.played))}</td>` +
     `<td>${escapeHtml(String(row.won))}</td>` +
     `<td>${escapeHtml(String(row.lost))}</td>` +
-    `<td>${escapeHtml(row.points)}</td>` +
+    `<td>${escapeHtml(String(row.points))}</td>` +
     `</tr>`
   ).join('');
   return `<table class="standings-table" aria-label="${escapeHtml(comp.liganame)} Tabelle">` +
@@ -208,7 +208,7 @@ function buildBracket(comp) {
   }
   const rounds = comp.bracket.map(round => {
     const matches = round.matches.map(m => {
-      const homeClass = m.homeWon ? ' bracket-winner' : (m.homeBye ? ' bracket-bye' : '');
+      const homeClass = m.homeWon === true ? ' bracket-winner' : (m.homeBye ? ' bracket-bye' : '');
       const guestClass = m.homeWon === false ? ' bracket-winner' : (m.guestBye ? ' bracket-bye' : '');
       return `<div class="bracket-match">` +
         `<div class="bracket-team${homeClass}">${escapeHtml(m.home)}</div>` +

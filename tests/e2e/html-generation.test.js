@@ -546,9 +546,23 @@ test('buildTeaserCard: shows last 3 results, next match, and team link', () => {
   assert.ok(html.includes('Freising'), 'next match missing');
   assert.ok(html.includes('teaser-next'), 'next highlight class missing');
   assert.ok(html.includes('teams/100.html'), 'team page link missing');
-  const safeTeam = { ...team, teamName: '<script>alert(1)</script>' };
-  const safeHtml = buildTeaserCard(safeTeam);
-  assert.ok(!safeHtml.includes('<script>'), 'XSS not escaped');
+});
+
+test('buildTeaserCard: escapes XSS in teamName', () => {
+  const modPath = require.resolve('../../src/generateHTML.js');
+  delete require.cache[modPath];
+  const { _testExports } = require('../../src/generateHTML.js');
+  const { buildTeaserCard } = _testExports;
+
+  const xssTeam = {
+    teamId: 'test',
+    teamName: '<script>alert(1)</script>',
+    logoUrl: null,
+    matches: [],
+  };
+  const html = buildTeaserCard(xssTeam);
+  assert.ok(!html.includes('<script>alert'), 'raw script tag must not appear');
+  assert.ok(html.includes('&lt;script&gt;'), 'escaped form must be present');
 });
 
 test('buildTeaserCard: results rendered most recent first', () => {
