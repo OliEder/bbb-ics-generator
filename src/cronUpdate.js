@@ -1,4 +1,4 @@
-const { fetchTeamMatches, fetchMatchInfo, fetchClubTeams } = require('./apiClient');
+const { fetchTeamMatches, fetchMatchInfo, fetchClubTeams, fetchLeagueTable, fetchTournamentRounds } = require('./apiClient');
 const { generateICS } = require('./icsGenerator');
 const { saveICS, saveTeamsCache, loadTeamsCache } = require('./storage');
 const { genHTML } = require('./generateHTML');
@@ -7,6 +7,10 @@ const fs = require('fs');
 const path = require('path');
 
 const CURRENT_SEASON = 2025; // Saison 2025/26
+
+function isLiga(liganame) {
+  return String(liganame || '').toLowerCase().includes('liga');
+}
 
 async function getTeams() {
   const { teams: cached, stale } = loadTeamsCache();
@@ -118,6 +122,31 @@ async function updateAll() {
         };
       });
 
+      // Collect unique competitions from this season's matches
+      const compMap = new Map();
+      for (const m of seasonMatches) {
+        const ligaId = String(m.ligaData?.ligaId || '');
+        if (!ligaId || compMap.has(ligaId)) continue;
+        compMap.set(ligaId, {
+          ligaId,
+          liganame: m.ligaData?.liganame || '',
+          isLiga:   isLiga(m.ligaData?.liganame),
+        });
+      }
+
+      // Fetch table or bracket for each competition in parallel
+      const competitions = await Promise.all(
+        Array.from(compMap.values()).map(async comp => {
+          if (comp.isLiga) {
+            const table = await fetchLeagueTable(comp.ligaId, t.id);
+            return { ...comp, table: table || null, bracket: null };
+          } else {
+            const bracket = await fetchTournamentRounds(comp.ligaId);
+            return { ...comp, table: null, bracket: bracket || null };
+          }
+        })
+      );
+
       meta.push({
         teamId:         t.id,
         teamName:       t.name,
@@ -128,6 +157,7 @@ async function updateAll() {
         awayMatchCount: awayMatches.length,
         logoUrl:        `${BBB_MEDIA_BASE}/${t.id}/logo`,
         matches:        mappedMatches,
+        competitions,
       });
     } catch (e) {
       console.error(`Fehler beim Update Team ${t.id}:`, e.stack || e);
