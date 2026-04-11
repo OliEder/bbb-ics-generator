@@ -182,7 +182,7 @@ test('Kein club-logo img wenn logoUrl null', () => {
     const { genHTML } = requireGenHTML(dir);
     genHTML({ primary: '#004174', accent: '#009ef3', logoUrl: null });
     const html = readFileSync(join(dir, 'index.html'), 'utf8');
-    assert.ok(!html.includes('class="club-logo"'), 'club-logo img-Klasse sollte nicht vorhanden sein wenn kein Logo');
+    assert.ok(!html.includes('class="club-logo"'), 'club-logo im Header sollte nicht vorhanden sein wenn kein Logo');
   } finally {
     rmSync(dir, { recursive: true });
   }
