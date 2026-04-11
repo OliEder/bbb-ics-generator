@@ -634,8 +634,8 @@ sequenceDiagram
 . `createEvents()` der ics-Bibliothek erzeugt RFC-5545-konforme VEVENT-Blöcke.
 . Post-Processing: VCALENDAR-Header wird mit X-WR-CALNAME, X-WR-TIMEZONE etc. angereichert.
 . `saveICS(teamId, type, ics)` schreibt die Datei nach `generated/{teamId}_{type}.ics`.
-. Nach allen Teams: `metadata.json` wird mit Update-Zeitstempel, Spielzahlen und `logoUrl` je Team geschrieben. Die `logoUrl` wird direkt konstruiert: `https://www.basketball-bund.net/media/team/{teamPermanentId}/logo` — kein zusätzlicher API-Aufruf.
-. GitHub Actions führt danach `npm run generate-html` aus, das `index.html` aus `metadata.json` erzeugt (Tab-UI mit Logos, ARIA-Tab-Pattern, eingebettetem Keyboard-Nav-JS).
+. Nach allen Teams: `metadata.json` wird je Team mit Update-Zeitstempel, Spielzahlen, `logoUrl` und einem `matches`-Array geschrieben. Das `matches`-Array enthält alle Spiele der aktuellen Saison (seasonId 2025), gefiltert aus den Roh-API-Daten, aufsteigend nach Datum sortiert. Jeder Eintrag enthält: `date`, `time`, `opponent`, `isHome`, `result` (null = noch nicht gespielt), `competition` (Liga-Name), `isNext` (erstes Spiel ohne Ergebnis). Die `logoUrl` wird direkt konstruiert: `https://www.basketball-bund.net/media/team/{teamPermanentId}/logo` — kein zusätzlicher API-Aufruf.
+. GitHub Actions führt danach `npm run generate-html` aus, das `index.html` aus `metadata.json` erzeugt (Tab-UI mit Logos, ARIA-Tab-Pattern, eingebettetem Keyboard-Nav-JS). Jeder Tab-Panel zeigt oben den gefilterten Spielplan (Alle/Heim/Auswärts) mit H/A-Badges und Wettbewerbs-Label, darunter die Kalender-Abo-Buttons.
 . Das `generated/`-Verzeichnis wird als GitHub Pages Artefakt hochgeladen und deployed.
 
 === Szenario 2: Update-Zyklus mit Cache-MISS (erster Start oder Cache abgelaufen)
@@ -1271,6 +1271,38 @@ a|
 a|
 * Positive: Kein zusätzlicher API-Aufruf, keine zusätzliche Fehlerbehandlung, `apiClient.js` schlanker.
 * Negative: Wenn basketball-bund.net die Media-URL-Struktur ändert, müssen alle Logo-URLs angepasst werden. Das Logo-Bild wird vom Browser beim Öffnen der Seite geladen (kann scheitern, falls URL nicht erreichbar — `<img>` zeigt dann keinen Broken-Image-Indikator da `alt=""`).
+|===
+
+=== ADR-009: Spielplan-Anzeige in Team-Cards (Saison-gefiltertes matches-Array)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-04-11
+
+| *Kontext*
+| Die Übersichtsseite soll pro Team den Spielplan der aktuellen Saison anzeigen — vergangene Spiele mit Ergebnis, kommende ohne — direkt in den Tab-Panels, oberhalb der Kalender-Abo-Buttons.
+
+| *Entscheidung*
+| `cronUpdate.js` filtert die rohen API-Matches auf `seasonId === 2025`, sortiert sie aufsteigend und speichert sie als `matches[]`-Array in `metadata.json`. `generateHTML.js` rendert dieses Array als HTML-Tabelle im jeweiligen Tab-Panel (Alle/Heim/Auswärts). Liga-Erkennung per Namens-Heuristik: enthält `liganame` das Wort "Liga" → Liga-Typ, sonst Cup/Pokal. Cup-Farbe ist konfigurierbar via `config.theme.cupColor` (Default `#7c3aed`).
+
+| *Begründung*
+a|
+* Matches sind bereits per `fetchTeamMatches()` geladen — kein zusätzlicher API-Aufruf nötig.
+* Saison-Filter (`seasonId === 2025`) ist im Daten-Layer (`cronUpdate.js`), nicht im View-Layer — `generateHTML.js` bekommt nur saubere, vorverarbeitete Daten.
+* `isNext`-Flag kennzeichnet das nächste anstehende Spiel bereits beim Schreiben der Metadaten — keine Zeitberechnungen im Template nötig.
+* Konfigurierbare Cup-Farbe (`config.theme.cupColor`) ermöglicht Anpassung ohne Code-Änderung.
+* Harte Saison-Konstante (`CURRENT_SEASON = 2025`) auf Modul-Ebene ist dokumentierter Trade-off: einfach, aber erfordert jährliche Code-Änderung.
+
+| *Konsequenzen*
+a|
+* Positive: Spielplan ohne zusätzliche API-Calls, Tab-Filterung (Alle/Heim/Auswärts) konsistent mit Kalender-Abo-Struktur, WCAG-konform (axe-core-geprüft).
+* Negative: `CURRENT_SEASON` muss jährlich aktualisiert werden. `metadata.json` wächst durch das `matches`-Array (bei typisch 14–20 Spielen pro Team vernachlässigbar). Liga-Heuristik ("liga" im Namen) kann bei ungewöhnlichen Wettbewerbsnamen fehlschlagen.
 |===
 
 === ADR-006: X-ALT-DESC für HTML-Beschreibungen (aktuell deaktiviert)
