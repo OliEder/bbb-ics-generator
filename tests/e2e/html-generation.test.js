@@ -503,6 +503,22 @@ test('buildNavigation: active page has aria-current, all teams linked', () => {
   assert.ok(html.includes('teams/200.html'), 'U16 link missing');
 });
 
+test('buildNavigation: contains inline script for toggle', () => {
+  const modPath = require.resolve('../../src/generateHTML.js');
+  delete require.cache[modPath];
+  const { _testExports } = require('../../src/generateHTML.js');
+  const { buildNavigation } = _testExports;
+
+  const teams = [
+    { teamId: '100', teamName: 'Herren', ageGroup: '' },
+  ];
+  const html = buildNavigation(teams, 'index');
+  assert.ok(html.includes('<script>'), 'inline script tag missing');
+  assert.ok(html.includes('nav-toggle'), 'script should reference nav-toggle');
+  assert.ok(html.includes('nav-drawer'), 'script should reference nav-drawer');
+  assert.ok(html.includes('aria-expanded'), 'script should toggle aria-expanded');
+});
+
 // --- buildTeaserCard ---
 test('buildTeaserCard: shows last 3 results, next match, and team link', () => {
   const modPath = require.resolve('../../src/generateHTML.js');
@@ -533,6 +549,31 @@ test('buildTeaserCard: shows last 3 results, next match, and team link', () => {
   const safeTeam = { ...team, teamName: '<script>alert(1)</script>' };
   const safeHtml = buildTeaserCard(safeTeam);
   assert.ok(!safeHtml.includes('<script>'), 'XSS not escaped');
+});
+
+test('buildTeaserCard: results rendered most recent first', () => {
+  const modPath = require.resolve('../../src/generateHTML.js');
+  delete require.cache[modPath];
+  const { _testExports } = require('../../src/generateHTML.js');
+  const { buildTeaserCard } = _testExports;
+
+  const team = {
+    teamId: '100',
+    teamName: 'Herren',
+    ageGroup: '',
+    logoUrl: null,
+    matches: [
+      { date: '2025-03-01', opponent: 'OldestOpponent', result: '50:60', isHome: true,  isNext: false, competition: 'Bayernliga' },
+      { date: '2025-03-08', opponent: 'MiddleOpponent',  result: '55:61', isHome: false, isNext: false, competition: 'Bayernliga' },
+      { date: '2025-03-15', opponent: 'NewestOpponent',  result: '80:74', isHome: true,  isNext: false, competition: 'Bayernliga' },
+    ],
+  };
+  const html = buildTeaserCard(team);
+  const newestPos = html.indexOf('NewestOpponent');
+  const oldestPos = html.indexOf('OldestOpponent');
+  assert.ok(newestPos !== -1, 'newest result missing');
+  assert.ok(oldestPos !== -1, 'oldest result missing');
+  assert.ok(newestPos < oldestPos, 'most recent result should appear before oldest result');
 });
 
 test('buildTeaserCard: fewer than 3 results — no empty rows', () => {

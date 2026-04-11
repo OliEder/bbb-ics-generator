@@ -135,7 +135,20 @@ function buildNavigation(teams, activePage) {
     ${homeLink}
     ${teamLinks}
   </div>
-</nav>`;
+</nav>
+<script>
+  (function() {
+    var btn = document.querySelector('.nav-toggle');
+    var drawer = document.getElementById('nav-drawer');
+    if (btn && drawer) {
+      btn.addEventListener('click', function() {
+        var expanded = btn.getAttribute('aria-expanded') === 'true';
+        btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+        if (expanded) { drawer.setAttribute('hidden', ''); } else { drawer.removeAttribute('hidden'); }
+      });
+    }
+  })();
+</script>`;
 }
 
 function buildTeaserCard(team) {
@@ -147,7 +160,7 @@ function buildTeaserCard(team) {
   const pastMatches = allMatches.filter(m => m.result).slice(-3);
   const nextMatch   = allMatches.find(m => m.isNext);
 
-  const resultRows = pastMatches.map(m =>
+  const resultRows = [...pastMatches].reverse().map(m =>
     `<div class="teaser-result">` +
     `<span class="teaser-opponent">${escapeHtml(m.opponent)}</span>` +
     `<span class="teaser-score">${escapeHtml(m.result)}</span>` +
