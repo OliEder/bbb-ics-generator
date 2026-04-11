@@ -290,6 +290,141 @@ const sampleMetadataWithMatches = [
   },
 ];
 
+test('Vergangenes Spiel hat opacity-Stil (gedimmt)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadataWithMatches));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    assert.ok(html.includes('opacity'), 'opacity-Stil für vergangene Spiele fehlt');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('Nächstes Spiel hat schedule-next Klasse', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadataWithMatches));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    assert.ok(html.includes('schedule-next'), 'schedule-next Klasse für nächstes Spiel fehlt');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('Heim-Tab enthält nur Heimspiele', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  const metaHomeAway = [
+    {
+      teamId: '167881',
+      teamName: 'Test Team',
+      ageGroup: 'U10',
+      lastUpdate: new Date().toISOString(),
+      matchCount: 2, homeMatchCount: 1, awayMatchCount: 1,
+      logoUrl: null,
+      matches: [
+        { date: '2025-10-12', time: '15:00', opponent: 'Heimgegner', isHome: true,  result: '60:50', competition: 'Kreisliga', isNext: false },
+        { date: '2025-10-19', time: '15:00', opponent: 'Auswärtsgegner', isHome: false, result: null, competition: 'Kreisliga', isNext: true },
+      ],
+    },
+  ];
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(metaHomeAway));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    // panel-167881-home must contain Heimgegner but NOT Auswärtsgegner
+    const homePanel = html.match(/id="panel-167881-home"[\s\S]*?(?=id="panel-167881-away")/)?.[0] || '';
+    assert.ok(homePanel.includes('Heimgegner'),     'Heimgegner fehlt im Heim-Panel');
+    assert.ok(!homePanel.includes('Auswärtsgegner'), 'Auswärtsgegner darf nicht im Heim-Panel sein');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('Auswärts-Tab enthält nur Auswärtsspiele', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  const metaHomeAway = [
+    {
+      teamId: '167881',
+      teamName: 'Test Team',
+      ageGroup: 'U10',
+      lastUpdate: new Date().toISOString(),
+      matchCount: 2, homeMatchCount: 1, awayMatchCount: 1,
+      logoUrl: null,
+      matches: [
+        { date: '2025-10-12', time: '15:00', opponent: 'Heimgegner',    isHome: true,  result: '60:50', competition: 'Kreisliga', isNext: false },
+        { date: '2025-10-19', time: '15:00', opponent: 'Auswärtsgegner', isHome: false, result: null,   competition: 'Kreisliga', isNext: true },
+      ],
+    },
+  ];
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(metaHomeAway));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    const awayPanel = html.match(/id="panel-167881-away"[\s\S]*?(?=<\/div>\s*<\/div>\s*<script)/)?.[0] || '';
+    assert.ok(awayPanel.includes('Auswärtsgegner'), 'Auswärtsgegner fehlt im Auswärts-Panel');
+    assert.ok(!awayPanel.includes('Heimgegner'),    'Heimgegner darf nicht im Auswärts-Panel sein');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('Pokal-Spiel nutzt cupColor im HTML', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  const metaCup = [
+    {
+      teamId: '167881',
+      teamName: 'Test Team',
+      ageGroup: 'U10',
+      lastUpdate: new Date().toISOString(),
+      matchCount: 1, homeMatchCount: 1, awayMatchCount: 0,
+      logoUrl: null,
+      matches: [
+        { date: '2025-10-22', time: '15:00', opponent: 'Pokalteam', isHome: true, result: null, competition: 'Bezirkspokal', isNext: true },
+      ],
+    },
+  ];
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(metaCup));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML({ primary: '#004174', accent: '#009ef3', logoUrl: null, cupColor: '#7c3aed' });
+    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    assert.ok(html.includes('#7c3aed'), 'cupColor fehlt im HTML für Pokal-Wettbewerb');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('Kein Spielplan wenn matches leer oder fehlt', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  const metaNoMatches = [
+    {
+      teamId: '167881',
+      teamName: 'Test Team',
+      ageGroup: 'U10',
+      lastUpdate: new Date().toISOString(),
+      matchCount: 0, homeMatchCount: 0, awayMatchCount: 0,
+      logoUrl: null,
+      matches: [],
+    },
+  ];
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(metaNoMatches));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    assert.ok(!html.includes('SPIELPLAN'), 'Spielplan-Sektion sollte fehlen wenn keine Matches');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
 test('Spielplan-Sektion erscheint wenn matches vorhanden', () => {
   const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
   try {
