@@ -162,7 +162,7 @@ function buildTeaserCard(team) {
   return `<div class="teaser-card">
   <div class="teaser-header">
     ${logoHtml}
-    <span class="teaser-team-name">${escapeHtml(team.teamName)}</span>
+    <span class="teaser-team-name">${team.ageGroup ? escapeHtml(team.ageGroup) : escapeHtml(team.teamName)}${team.ageGroup ? `<small> ${escapeHtml(team.teamName)}</small>` : ''}</span>
   </div>
   <div class="teaser-results">${resultRows}</div>
   ${nextHtml}
@@ -287,7 +287,8 @@ function buildSharedStyles(primary, accent, cupColor) {
     /* Team page */
     .team-page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
     .team-page-title { font-size: 1.3rem; font-weight: 700; color: var(--color-text); }
-    .team-page-meta { font-size: 0.75rem; color: var(--color-text); margin-top: 2px; }
+    .team-page-club { font-size: 0.78rem; color: var(--color-text-muted); margin-top: 1px; }
+    .team-page-meta { font-size: 0.75rem; color: var(--color-text-muted); margin-top: 2px; }
     .comp-section { margin-bottom: 24px; }
     .comp-heading { font-size: 0.9rem; font-weight: 700; color: var(--color-primary); border-left: 3px solid var(--color-primary); padding-left: 10px; margin-bottom: 10px; }
     .comp-heading--cup { color: var(--color-cup); border-left-color: var(--color-cup); }
@@ -448,7 +449,7 @@ function buildTeamPage(team, allTeams, theme) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${escapeHtml(team.teamName)} – Fibalon Baskets Neumarkt</title>
+  <title>${team.ageGroup ? escapeHtml(team.ageGroup) + ' – ' : ''}${escapeHtml(team.teamName)}</title>
   ${buildSharedStyles(primary, accent, cupColor)}
 </head>
 <body>
@@ -457,7 +458,8 @@ function buildTeamPage(team, allTeams, theme) {
     <div class="team-page-header">
       ${logoHtml}
       <div>
-        <h1 class="team-page-title">${escapeHtml(team.teamName)}</h1>
+        <h1 class="team-page-title">${team.ageGroup ? escapeHtml(team.ageGroup) : escapeHtml(team.teamName)}</h1>
+        ${team.ageGroup ? `<p class="team-page-club">${escapeHtml(team.teamName)}</p>` : ''}
         <p class="team-page-meta">Stand: ${lastUpdate}</p>
       </div>
     </div>
