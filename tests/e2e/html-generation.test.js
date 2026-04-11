@@ -97,8 +97,8 @@ test('Teamname ist escaped (kein raw <, >, &)', () => {
     const { genHTML } = requireGenHTML(dir);
     genHTML(DEFAULT_THEME);
     const html = readFileSync(join(dir, 'index.html'), 'utf8');
-    // The raw unescaped name should not appear
-    assert.ok(!html.includes('<script>'), 'Unescaped <script> gefunden');
+    // The raw unescaped team name should not appear as-is (team name contains <script>)
+    assert.ok(!html.includes('Test Team <script>'), 'Unescaped <script> im Teamnamen gefunden');
     assert.ok(html.includes('&lt;script&gt;'), 'HTML-Escaping fehlt für <script>');
     assert.ok(html.includes('&amp;'), 'HTML-Escaping fehlt für &');
   } finally {
@@ -196,6 +196,48 @@ test('Logo-URL aus teamId ist in Team-Card', () => {
     const html = readFileSync(join(dir, 'index.html'), 'utf8');
     assert.ok(html.includes('media/team/167881/logo'), 'Team-Logo-URL fehlt im HTML');
     assert.ok(html.includes('media/team/167882/logo'), 'Team-Logo-URL für zweites Team fehlt');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('Tab-Struktur mit role="tablist" ist vorhanden', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    assert.ok(html.includes('role="tablist"'), 'tablist role fehlt');
+    assert.ok(html.includes('role="tab"'), 'tab role fehlt');
+    assert.ok(html.includes('role="tabpanel"'), 'tabpanel role fehlt');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('Jede Team-Card hat drei Tab-Panels (all, home, away)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    const panels = html.match(/role="tabpanel"/g) || [];
+    assert.equal(panels.length, sampleMetadata.length * 3, 'Falsche Anzahl tab panels');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('Keyboard-Navigation JS ist eingebettet', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const html = readFileSync(join(dir, 'index.html'), 'utf8');
+    assert.ok(html.includes('ArrowRight') || html.includes('arrowright'), 'Keyboard-Navigation JS fehlt');
   } finally {
     rmSync(dir, { recursive: true });
   }

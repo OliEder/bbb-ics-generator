@@ -25,18 +25,72 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
+function sanitizeCssColor(value) {
+  if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value)) return value;
+  if (/^(rgb|rgba|hsl|hsla)\([^)]*\)$/.test(value)) return value;
+  if (/^[a-zA-Z]+$/.test(value)) return value;
+  return '#004174';
+}
+
 const ICON_APPLE = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>`;
 
 const ICON_ANDROID = `<svg width="14" height="17" viewBox="-147 -70 294 345" aria-hidden="true"><g fill="currentColor"><ellipse cy="41" rx="91" ry="84"/><rect rx="22" height="182" width="182" y="20" x="-91"/><rect rx="24" height="133" width="48" y="41" x="-143"/><rect rx="24" height="133" width="48" y="41" x="95"/><rect rx="6.5" transform="rotate(29)" height="86" width="13" y="-86" x="14"/><rect rx="6.5" transform="rotate(-29)" height="86" width="13" y="-86" x="-27"/></g><g fill="white"><circle cx="-42" cy="41" r="9"/><circle cx="42" cy="41" r="9"/></svg>`;
 
 const ICON_DOWNLOAD = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
 
-function sanitizeCssColor(value) {
-  // Accept only safe CSS color formats: hex, rgb(), rgba(), hsl(), hsla(), named colors
-  if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value)) return value;
-  if (/^(rgb|rgba|hsl|hsla)\([^)]*\)$/.test(value)) return value;
-  if (/^[a-zA-Z]+$/.test(value)) return value; // named colors like "red"
-  return '#004174'; // fallback to safe default
+function buildTabPanel(teamId, type, count, webcalLink, googleLink, httpsLink) {
+  const id = `panel-${teamId}-${type}`;
+  const tabId = `tab-${teamId}-${type}`;
+  const hidden = type !== 'all' ? ' hidden' : '';
+  return `
+    <div id="${id}" role="tabpanel" aria-labelledby="${tabId}" class="tab-panel"${hidden}>
+      <div class="btn-group">
+        <a href="${escapeHtml(webcalLink)}" class="btn">${ICON_APPLE} iOS / macOS Kalender</a>
+        <a href="${escapeHtml(googleLink)}" class="btn">${ICON_ANDROID} Google Calendar</a>
+        <a href="${escapeHtml(httpsLink)}" class="btn" download>${ICON_DOWNLOAD} ICS herunterladen</a>
+      </div>
+    </div>`;
+}
+
+function buildTeamCard(t) {
+  const logoHtml = t.logoUrl
+    ? `<img src="${escapeHtml(t.logoUrl)}" alt="" class="team-logo" aria-hidden="true">`
+    : `<div class="team-logo-placeholder" aria-hidden="true"></div>`;
+
+  const variants = [
+    { type: 'all',  count: Number(t.matchCount) },
+    { type: 'home', count: Number(t.homeMatchCount) },
+    { type: 'away', count: Number(t.awayMatchCount) },
+  ];
+
+  const tabs = variants.map(({ type, count }) => {
+    const label = type === 'all' ? `Alle (${count})` : type === 'home' ? `Heim (${count})` : `Auswärts (${count})`;
+    const selected = type === 'all' ? 'true' : 'false';
+    const tabindex = type === 'all' ? '0' : '-1';
+    return `<button id="tab-${t.teamId}-${type}" role="tab" aria-selected="${selected}" aria-controls="panel-${t.teamId}-${type}" tabindex="${tabindex}">${label}</button>`;
+  }).join('');
+
+  const panels = variants.map(({ type, count }) =>
+    buildTabPanel(
+      t.teamId, type, count,
+      makeWebcalLink(`${t.teamId}_${type}.ics`),
+      makeGoogleCalLink(`${t.teamId}_${type}.ics`),
+      makeHttpsLink(`${t.teamId}_${type}.ics`),
+    )
+  ).join('');
+
+  return `
+  <div class="team-card">
+    <div class="team-card-header">
+      ${logoHtml}
+      <span class="team-name">${escapeHtml(t.teamName)} <small>${escapeHtml(t.ageGroup)}</small></span>
+      <span class="team-badge">${Number(t.matchCount)} Sp. · ${Number(t.homeMatchCount)} H · ${Number(t.awayMatchCount)} A</span>
+    </div>
+    <div class="tab-bar" role="tablist" aria-label="Spielvariante für ${escapeHtml(t.teamName)}">
+      ${tabs}
+    </div>
+    ${panels}
+  </div>`;
 }
 
 function genHTML(theme = {}) {
@@ -48,7 +102,7 @@ function genHTML(theme = {}) {
   const metaPath = path.join(generatedDir, 'metadata.json');
   const teams = fs.existsSync(metaPath) ? JSON.parse(fs.readFileSync(metaPath, 'utf8')) : [];
 
-  const logoHtml = logoUrl
+  const headerLogoHtml = logoUrl
     ? `<img src="${escapeHtml(logoUrl)}" alt="Vereinslogo" class="club-logo">`
     : '';
 
@@ -74,6 +128,7 @@ function genHTML(theme = {}) {
       --color-info-border: color-mix(in srgb, var(--color-accent) 30%, white);
       --color-badge-bg: color-mix(in srgb, var(--color-accent) 15%, white);
       --color-badge-text: color-mix(in srgb, var(--color-primary) 90%, black);
+      --color-tab-active-bg: color-mix(in srgb, var(--color-primary) 8%, white);
     }
     @media (prefers-color-scheme: dark) {
       :root {
@@ -87,6 +142,7 @@ function genHTML(theme = {}) {
         --color-badge-text: color-mix(in srgb, var(--color-accent) 65%, white);
         --color-border: color-mix(in srgb, var(--color-primary) 50%, black);
         --color-accent-muted: color-mix(in srgb, var(--color-accent) 65%, white);
+        --color-tab-active-bg: color-mix(in srgb, var(--color-primary) 45%, black);
       }
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -99,101 +155,131 @@ function genHTML(theme = {}) {
     header {
       background: var(--color-primary);
       color: var(--color-on-primary);
-      padding: 20px 24px;
+      padding: 16px 20px;
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 14px;
     }
     .club-logo {
-      height: 52px;
-      width: 52px;
+      height: 48px;
+      width: 48px;
       object-fit: contain;
       background: white;
       border-radius: 8px;
       padding: 4px;
       flex-shrink: 0;
     }
-    .header-text h1 {
-      font-size: 1.2rem;
-      font-weight: 700;
-      line-height: 1.2;
-    }
-    .header-text p {
-      font-size: 0.8rem;
-      opacity: 0.8;
-      margin-top: 2px;
-    }
+    .header-text h1 { font-size: 1.1rem; font-weight: 700; line-height: 1.2; }
+    .header-text p { font-size: 0.78rem; opacity: 0.75; margin-top: 2px; }
     .update-bar {
       background: var(--color-info-bg);
       border-bottom: 1px solid var(--color-info-border);
-      padding: 6px 24px;
-      font-size: 0.75rem;
+      padding: 5px 20px;
+      font-size: 0.72rem;
       color: var(--color-text-muted);
     }
-    main {
-      max-width: 760px;
-      margin: 0 auto;
-      padding: 20px 16px;
-    }
+    main { max-width: 760px; margin: 0 auto; padding: 20px 16px; }
     .team-card {
-      background: var(--color-surface-card);
       border-radius: 10px;
-      border-left: 4px solid var(--color-accent);
-      padding: 16px;
+      border: 1px solid var(--color-border);
+      overflow: hidden;
       margin-bottom: 12px;
     }
-    .team-header {
+    .team-card-header {
+      background: var(--color-primary);
+      color: var(--color-on-primary);
+      padding: 11px 14px;
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      margin-bottom: 12px;
-      flex-wrap: wrap;
-      gap: 8px;
+      gap: 10px;
     }
-    .team-name {
-      font-weight: 700;
-      font-size: 1rem;
-      color: var(--color-text);
+    .team-logo {
+      width: 32px;
+      height: 32px;
+      object-fit: contain;
+      background: rgba(255,255,255,0.15);
+      border-radius: 6px;
+      padding: 3px;
+      flex-shrink: 0;
     }
+    .team-logo-placeholder {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.15);
+      flex-shrink: 0;
+    }
+    .team-name { font-weight: 700; font-size: 0.92rem; flex: 1; }
+    .team-name small { font-weight: 400; opacity: 0.75; }
     .team-badge {
-      background: var(--color-badge-bg);
-      color: var(--color-badge-text);
-      border-radius: 12px;
-      padding: 2px 10px;
-      font-size: 0.72rem;
+      background: rgba(255,255,255,0.2);
+      border-radius: 10px;
+      padding: 2px 9px;
+      font-size: 0.68rem;
       font-weight: 600;
       white-space: nowrap;
     }
-    .btn-group {
+    .tab-bar {
       display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
+      border-bottom: 1px solid var(--color-border);
+      background: var(--color-surface-card);
     }
+    .tab-bar button {
+      flex: 1;
+      padding: 9px 4px;
+      border: none;
+      background: transparent;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+    .tab-bar button[aria-selected="true"] {
+      color: var(--color-primary);
+      background: var(--color-tab-active-bg);
+      border-bottom-color: var(--color-primary);
+    }
+    .tab-bar button:focus-visible {
+      outline: 2px solid var(--color-accent);
+      outline-offset: -2px;
+    }
+    .tab-panel { padding: 12px 14px; }
+    .tab-panel[hidden] { display: none; }
+    .btn-group { display: flex; flex-direction: column; gap: 8px; }
     .btn {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       background: var(--color-surface);
       color: var(--color-primary);
-      border: 1.5px solid var(--color-primary);
-      padding: 7px 13px;
-      border-radius: 6px;
-      font-size: 0.78rem;
+      border: 1.5px solid var(--color-border);
+      padding: 9px 14px;
+      border-radius: 7px;
+      font-size: 0.82rem;
       font-weight: 600;
       text-decoration: none;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .btn:hover { background: var(--color-primary-light); border-color: var(--color-primary); }
+    .btn:focus-visible {
+      outline: 2px solid var(--color-accent);
+      outline-offset: 2px;
     }
     @media (prefers-color-scheme: dark) {
       .btn {
         background: transparent;
         color: var(--color-accent-muted);
-        border-color: var(--color-accent-muted);
+        border-color: var(--color-border);
       }
+      .btn:hover { background: var(--color-surface-card); }
     }
   </style>
 </head>
 <body>
   <header>
-    ${logoHtml}
+    ${headerLogoHtml}
     <div class="header-text">
       <h1>Basketball Spielplan</h1>
       <p>Spielplan-Kalender</p>
@@ -203,29 +289,42 @@ function genHTML(theme = {}) {
     Stand: ${new Date().toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })} · Automatisch alle 6h aktualisiert
   </div>
   <main>
-    ${teams.map(t => `
-    <div class="team-card">
-      <div class="team-header">
-        <span class="team-name">${escapeHtml(t.teamName)} <small style="font-weight:400;opacity:.7">${escapeHtml(t.ageGroup)}</small></span>
-        <span class="team-badge">${Number(t.matchCount)} Spiele · ${Number(t.homeMatchCount)} Heim · ${Number(t.awayMatchCount)} Auswärts</span>
-      </div>
-      <div class="btn-group">
-        <a href="${escapeHtml(makeWebcalLink(t.teamId + '_all.ics'))}" class="btn">${ICON_APPLE} iOS / Mac: Alle</a>
-        <a href="${escapeHtml(makeWebcalLink(t.teamId + '_home.ics'))}" class="btn">${ICON_APPLE} iOS / Mac: Heim</a>
-        <a href="${escapeHtml(makeWebcalLink(t.teamId + '_away.ics'))}" class="btn">${ICON_APPLE} iOS / Mac: Auswärts</a>
-      </div>
-      <div class="btn-group">
-        <a href="${escapeHtml(makeGoogleCalLink(t.teamId + '_all.ics'))}" class="btn">${ICON_ANDROID} Android: Alle</a>
-        <a href="${escapeHtml(makeGoogleCalLink(t.teamId + '_home.ics'))}" class="btn">${ICON_ANDROID} Android: Heim</a>
-        <a href="${escapeHtml(makeGoogleCalLink(t.teamId + '_away.ics'))}" class="btn">${ICON_ANDROID} Android: Auswärts</a>
-      </div>
-      <div class="btn-group">
-        <a href="${escapeHtml(makeHttpsLink(t.teamId + '_all.ics'))}" class="btn" download>${ICON_DOWNLOAD} ICS: Alle</a>
-        <a href="${escapeHtml(makeHttpsLink(t.teamId + '_home.ics'))}" class="btn" download>${ICON_DOWNLOAD} ICS: Heim</a>
-        <a href="${escapeHtml(makeHttpsLink(t.teamId + '_away.ics'))}" class="btn" download>${ICON_DOWNLOAD} ICS: Auswärts</a>
-      </div>
-    </div>`).join('')}
+    ${teams.map(buildTeamCard).join('')}
   </main>
+  <script>
+    document.querySelectorAll('[role="tablist"]').forEach(function(tablist) {
+      var tabs = Array.from(tablist.querySelectorAll('[role="tab"]'));
+      tablist.addEventListener('keydown', function(e) {
+        var idx = tabs.indexOf(document.activeElement);
+        if (idx === -1) return;
+        var next = -1;
+        if (e.key === 'ArrowRight') next = (idx + 1) % tabs.length;
+        if (e.key === 'ArrowLeft')  next = (idx - 1 + tabs.length) % tabs.length;
+        if (e.key === 'Home') next = 0;
+        if (e.key === 'End')  next = tabs.length - 1;
+        if (next !== -1) {
+          e.preventDefault();
+          activateTab(tabs[next]);
+        }
+      });
+      tabs.forEach(function(tab) {
+        tab.addEventListener('click', function() { activateTab(tab); });
+      });
+      function activateTab(tab) {
+        tabs.forEach(function(t) {
+          t.setAttribute('aria-selected', 'false');
+          t.setAttribute('tabindex', '-1');
+          var panel = document.getElementById(t.getAttribute('aria-controls'));
+          if (panel) panel.hidden = true;
+        });
+        tab.setAttribute('aria-selected', 'true');
+        tab.setAttribute('tabindex', '0');
+        tab.focus();
+        var panel = document.getElementById(tab.getAttribute('aria-controls'));
+        if (panel) panel.hidden = false;
+      }
+    });
+  </script>
 </body>
 </html>`;
 
