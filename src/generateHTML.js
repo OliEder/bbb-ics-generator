@@ -102,6 +102,114 @@ function buildTabPanel(teamId, type, webcalLink, googleLink, httpsLink, matches,
     </div>`;
 }
 
+function sortTeams(teams) {
+  function sortKey(t) {
+    const ag = String(t.ageGroup || '').trim().toUpperCase();
+    if (!ag || ag === 'HERREN' || (t.teamName || '').toLowerCase().includes('herren')) return 0;
+    const m = ag.match(/^U(\d+)$/);
+    return m ? 1000 - parseInt(m[1], 10) : 2000;
+  }
+  return [...teams].sort((a, b) => sortKey(a) - sortKey(b));
+}
+
+function buildNavigation(teams, activePage) {
+  const sorted = sortTeams(teams);
+  const homeActive = activePage === 'index';
+  const homeLink = `<a href="${homeActive ? '#' : '../index.html'}"${homeActive ? ' aria-current="page"' : ''}>Startseite</a>`;
+  const teamLinks = sorted.map(t => {
+    const active = activePage === t.teamId;
+    const href = homeActive
+      ? `teams/${escapeHtml(t.teamId)}.html`
+      : `${escapeHtml(t.teamId)}.html`;
+    return `<a href="${href}"${active ? ' aria-current="page"' : ''}>${escapeHtml(t.teamName)}</a>`;
+  }).join('');
+
+  return `<nav class="site-nav" aria-label="Seitennavigation">
+  <div class="nav-bar">
+    <a class="nav-logo" href="${homeActive ? '#' : '../index.html'}">Fibalon Baskets Neumarkt</a>
+    <button class="nav-toggle" aria-expanded="false" aria-controls="nav-drawer" aria-label="Menü öffnen">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+  <div id="nav-drawer" class="nav-drawer" hidden>
+    ${homeLink}
+    ${teamLinks}
+  </div>
+</nav>`;
+}
+
+function buildTeaserCard(team) {
+  const logoHtml = team.logoUrl
+    ? `<img src="${escapeHtml(team.logoUrl)}" alt="" class="team-logo" aria-hidden="true">`
+    : `<div class="team-logo-placeholder" aria-hidden="true"></div>`;
+
+  const allMatches = Array.isArray(team.matches) ? team.matches : [];
+  const pastMatches = allMatches.filter(m => m.result).slice(-3);
+  const nextMatch   = allMatches.find(m => m.isNext);
+
+  const resultRows = pastMatches.map(m =>
+    `<div class="teaser-result">` +
+    `<span class="teaser-opponent">${escapeHtml(m.opponent)}</span>` +
+    `<span class="teaser-score">${escapeHtml(m.result)}</span>` +
+    `</div>`
+  ).join('');
+
+  const nextHtml = nextMatch
+    ? `<div class="teaser-next">Nächstes: ${escapeHtml(nextMatch.date.slice(5).split('-').reverse().join('.'))} · ${escapeHtml(nextMatch.opponent)}</div>`
+    : '';
+
+  return `<div class="teaser-card">
+  <div class="teaser-header">
+    ${logoHtml}
+    <span class="teaser-team-name">${escapeHtml(team.teamName)}</span>
+  </div>
+  <div class="teaser-results">${resultRows}</div>
+  ${nextHtml}
+  <a class="teaser-link" href="teams/${escapeHtml(team.teamId)}.html">Zum Team →</a>
+</div>`;
+}
+
+function buildStandingsTable(comp) {
+  if (!comp.table) {
+    return `<p class="comp-unavailable">Tabelle noch nicht verfügbar.</p>`;
+  }
+  const rows = comp.table.map(row =>
+    `<tr${row.isOwn ? ' class="standings-own"' : ''}>` +
+    `<td>${escapeHtml(String(row.rank))}</td>` +
+    `<td>${escapeHtml(row.teamName)}</td>` +
+    `<td>${escapeHtml(String(row.played))}</td>` +
+    `<td>${escapeHtml(String(row.won))}</td>` +
+    `<td>${escapeHtml(String(row.lost))}</td>` +
+    `<td>${escapeHtml(row.points)}</td>` +
+    `</tr>`
+  ).join('');
+  return `<table class="standings-table" aria-label="${escapeHtml(comp.liganame)} Tabelle">` +
+    `<thead><tr><th>#</th><th>Team</th><th>Sp</th><th>S</th><th>N</th><th>Pkt.</th></tr></thead>` +
+    `<tbody>${rows}</tbody>` +
+    `</table>`;
+}
+
+function buildBracket(comp) {
+  if (!comp.bracket) {
+    return `<p class="comp-unavailable">Bracket noch nicht verfügbar.</p>`;
+  }
+  const rounds = comp.bracket.map(round => {
+    const matches = round.matches.map(m => {
+      const homeClass = m.homeWon ? ' bracket-winner' : (m.homeBye ? ' bracket-bye' : '');
+      const guestClass = m.homeWon === false ? ' bracket-winner' : (m.guestBye ? ' bracket-bye' : '');
+      return `<div class="bracket-match">` +
+        `<div class="bracket-team${homeClass}">${escapeHtml(m.home)}</div>` +
+        `<div class="bracket-team${guestClass}">${escapeHtml(m.guest)}</div>` +
+        `</div>`;
+    }).join('');
+    return `<div class="bracket-round">` +
+      `<div class="bracket-round-name">${escapeHtml(round.roundName)}</div>` +
+      matches +
+      `</div>`;
+  }).join('');
+  return `<div class="bracket" aria-label="${escapeHtml(comp.liganame)} Bracket">${rounds}</div>`;
+}
+
 function buildTeamCard(t, cupColor) {
   const logoHtml = t.logoUrl
     ? `<img src="${escapeHtml(t.logoUrl)}" alt="" class="team-logo" aria-hidden="true">`
@@ -405,6 +513,7 @@ function genHTML(theme = {}) {
 }
 
 module.exports = { genHTML };
+module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket };
 
 if (require.main === module) {
   const config = require('../config.json');

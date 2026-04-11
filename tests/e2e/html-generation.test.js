@@ -465,3 +465,169 @@ test('Auswärtsspiel hat badge--away im HTML', () => {
     rmSync(dir, { recursive: true });
   }
 });
+
+// --- sortTeams ---
+test('sortTeams: Herren first, then U-groups descending', () => {
+  const modPath = require.resolve('../../src/generateHTML.js');
+  delete require.cache[modPath];
+  const { _testExports } = require('../../src/generateHTML.js');
+  const { sortTeams } = _testExports;
+
+  const teams = [
+    { teamName: 'Fibalon U10', ageGroup: 'U10' },
+    { teamName: 'Fibalon Herren', ageGroup: '' },
+    { teamName: 'Fibalon U20', ageGroup: 'U20' },
+    { teamName: 'Fibalon U16', ageGroup: 'U16' },
+  ];
+  const sorted = sortTeams(teams);
+  assert.equal(sorted[0].ageGroup, '');
+  assert.equal(sorted[1].ageGroup, 'U20');
+  assert.equal(sorted[2].ageGroup, 'U16');
+  assert.equal(sorted[3].ageGroup, 'U10');
+});
+
+// --- buildNavigation ---
+test('buildNavigation: active page has aria-current, all teams linked', () => {
+  const modPath = require.resolve('../../src/generateHTML.js');
+  delete require.cache[modPath];
+  const { _testExports } = require('../../src/generateHTML.js');
+  const { buildNavigation } = _testExports;
+
+  const teams = [
+    { teamId: '100', teamName: 'Herren', ageGroup: '' },
+    { teamId: '200', teamName: 'U16', ageGroup: 'U16' },
+  ];
+  const html = buildNavigation(teams, 'index');
+  assert.ok(html.includes('aria-current="page"'), 'active page missing aria-current');
+  assert.ok(html.includes('teams/100.html'), 'Herren link missing');
+  assert.ok(html.includes('teams/200.html'), 'U16 link missing');
+});
+
+// --- buildTeaserCard ---
+test('buildTeaserCard: shows last 3 results, next match, and team link', () => {
+  const modPath = require.resolve('../../src/generateHTML.js');
+  delete require.cache[modPath];
+  const { _testExports } = require('../../src/generateHTML.js');
+  const { buildTeaserCard } = _testExports;
+
+  const team = {
+    teamId: '100',
+    teamName: 'Herren',
+    ageGroup: '',
+    logoUrl: 'https://example.com/logo.png',
+    matches: [
+      { date: '2025-03-01', opponent: 'Regensburg', result: '72:68', isHome: true, isNext: false, competition: 'Bayernliga' },
+      { date: '2025-03-08', opponent: 'Würzburg',   result: '55:61', isHome: false, isNext: false, competition: 'Bayernliga' },
+      { date: '2025-03-15', opponent: 'Nürnberg',   result: '80:74', isHome: true, isNext: false, competition: 'Bayernliga' },
+      { date: '2025-04-17', opponent: 'Freising',   result: null,    isHome: true, isNext: true,  competition: 'Bayernliga' },
+      { date: '2025-04-24', opponent: 'FC Bayern',  result: null,    isHome: false, isNext: false, competition: 'Bayernliga' },
+    ],
+  };
+  const html = buildTeaserCard(team);
+  assert.ok(html.includes('72:68'), 'first result missing');
+  assert.ok(html.includes('55:61'), 'second result missing');
+  assert.ok(html.includes('80:74'), 'third result missing');
+  assert.ok(html.includes('Freising'), 'next match missing');
+  assert.ok(html.includes('teaser-next'), 'next highlight class missing');
+  assert.ok(html.includes('teams/100.html'), 'team page link missing');
+  const safeTeam = { ...team, teamName: '<script>alert(1)</script>' };
+  const safeHtml = buildTeaserCard(safeTeam);
+  assert.ok(!safeHtml.includes('<script>'), 'XSS not escaped');
+});
+
+test('buildTeaserCard: fewer than 3 results — no empty rows', () => {
+  const modPath = require.resolve('../../src/generateHTML.js');
+  delete require.cache[modPath];
+  const { _testExports } = require('../../src/generateHTML.js');
+  const { buildTeaserCard } = _testExports;
+
+  const team = {
+    teamId: '200', teamName: 'U10', ageGroup: 'U10', logoUrl: null,
+    matches: [
+      { date: '2025-03-01', opponent: 'Roth', result: '24:18', isHome: true, isNext: false, competition: 'Kreisliga' },
+    ],
+  };
+  const html = buildTeaserCard(team);
+  assert.ok(html.includes('24:18'), 'result missing');
+  assert.ok(!html.includes('teaser-result-empty'), 'no empty row class expected');
+});
+
+test('buildTeaserCard: no next match — no teaser-next element', () => {
+  const modPath = require.resolve('../../src/generateHTML.js');
+  delete require.cache[modPath];
+  const { _testExports } = require('../../src/generateHTML.js');
+  const { buildTeaserCard } = _testExports;
+
+  const team = {
+    teamId: '300', teamName: 'U14', ageGroup: 'U14', logoUrl: null,
+    matches: [
+      { date: '2025-03-01', opponent: 'Roth', result: '24:18', isHome: true, isNext: false, competition: 'Kreisliga' },
+    ],
+  };
+  const html = buildTeaserCard(team);
+  assert.ok(!html.includes('teaser-next'), 'teaser-next should not appear when no next match');
+});
+
+// --- buildStandingsTable ---
+test('buildStandingsTable: own team row has highlight class', () => {
+  const modPath = require.resolve('../../src/generateHTML.js');
+  delete require.cache[modPath];
+  const { _testExports } = require('../../src/generateHTML.js');
+  const { buildStandingsTable } = _testExports;
+
+  const comp = {
+    liganame: 'Bayernliga',
+    table: [
+      { rank: 1, teamName: 'Regensburg', played: 16, won: 14, lost: 2, points: '28:4', isOwn: false },
+      { rank: 3, teamName: 'Fibalon',    played: 16, won: 10, lost: 6, points: '20:12', isOwn: true },
+    ],
+  };
+  const html = buildStandingsTable(comp);
+  assert.ok(html.includes('standings-own'), 'own team row missing highlight class');
+  assert.ok(html.includes('Regensburg'), 'other team missing');
+  assert.ok(html.includes('Fibalon'), 'own team missing');
+});
+
+test('buildStandingsTable: null table renders unavailable note', () => {
+  const modPath = require.resolve('../../src/generateHTML.js');
+  delete require.cache[modPath];
+  const { _testExports } = require('../../src/generateHTML.js');
+  const { buildStandingsTable } = _testExports;
+
+  const html = buildStandingsTable({ liganame: 'Liga X', table: null });
+  assert.ok(html.includes('nicht verfügbar'), 'missing unavailable note');
+});
+
+// --- buildBracket ---
+test('buildBracket: winner row has winner class, bye row has bye class', () => {
+  const modPath = require.resolve('../../src/generateHTML.js');
+  delete require.cache[modPath];
+  const { _testExports } = require('../../src/generateHTML.js');
+  const { buildBracket } = _testExports;
+
+  const comp = {
+    liganame: 'Final4',
+    bracket: [
+      {
+        roundName: 'Halbfinale',
+        matches: [
+          { home: 'Fibalon', guest: 'München', result: '72:68', homeWon: true, homeBye: false, guestBye: false },
+          { home: 'Freilos', guest: 'Augsburg', result: null, homeWon: null, homeBye: true, guestBye: false },
+        ],
+      },
+    ],
+  };
+  const html = buildBracket(comp);
+  assert.ok(html.includes('bracket-winner'), 'winner class missing');
+  assert.ok(html.includes('bracket-bye'), 'bye class missing');
+});
+
+test('buildBracket: null bracket renders unavailable note', () => {
+  const modPath = require.resolve('../../src/generateHTML.js');
+  delete require.cache[modPath];
+  const { _testExports } = require('../../src/generateHTML.js');
+  const { buildBracket } = _testExports;
+
+  const html = buildBracket({ liganame: 'Pokal', bracket: null });
+  assert.ok(html.includes('nicht verfügbar'), 'missing unavailable note');
+});
