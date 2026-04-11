@@ -17,6 +17,15 @@ function makeGoogleCalLink(filename) {
 
 // Returns an HTML span with a visible symbol and a screen-reader label.
 // The symbol alone is unreliably pronounced by screen readers.
+// Returns "Teamname [Altersklasse] ♂/♀/⚥" — Senioren/Herren ohne Altersklasse
+function teamLabel(teamName, ageGroup, gender) {
+  const ag = String(ageGroup || '').trim().toUpperCase();
+  const isSenioren = ag === 'SENIOREN' || ag === 'HERREN' || !ag;
+  const sym = genderSpan(gender);
+  const agPart = (!isSenioren && ageGroup) ? ` ${escapeHtml(ageGroup)}` : '';
+  return `${escapeHtml(teamName || '')}${agPart}${sym ? ` ${sym}` : ''}`;
+}
+
 function genderSpan(gender) {
   if (!gender) return '';
   const g = String(gender).toLowerCase().trim();
@@ -143,12 +152,7 @@ function buildNavigation(teams, activePage) {
     const href = homeActive
       ? `teams/${escapeHtml(t.teamId)}.html`
       : `${escapeHtml(t.teamId)}.html`;
-    const sym = genderSpan(t.gender);
-    const ag = String(t.ageGroup || '').trim().toUpperCase();
-    const isSenioren = ag === 'SENIOREN' || ag === 'HERREN';
-    const namePart = escapeHtml(t.teamName || '');
-    const agePart = (!isSenioren && t.ageGroup) ? ` <span class="nav-age">${escapeHtml(t.ageGroup)}</span>` : '';
-    const label = namePart + agePart + (sym ? ` ${sym}` : '');
+    const label = teamLabel(t.teamName, t.ageGroup, t.gender);
     return `<a href="${href}"${active ? ' aria-current="page"' : ''}>${label}</a>`;
   }).join('');
 
@@ -227,7 +231,7 @@ function buildTeaserCard(team) {
   return `<div class="teaser-card">
   <div class="teaser-header">
     ${logoHtml}
-    <span class="teaser-team-name">${team.ageGroup ? escapeHtml(team.ageGroup) : escapeHtml(team.teamName)}${genderSpan(team.gender) ? ` ${genderSpan(team.gender)}` : ''}${team.ageGroup ? `<small> ${escapeHtml(team.teamName)}</small>` : ''}</span>
+    <span class="teaser-team-name">${teamLabel(team.teamName, team.ageGroup, team.gender)}</span>
   </div>
   ${streakText ? `<div class="teaser-streak-info"><span class="teaser-streak-label">Serie:</span> ${escapeHtml(streakText)}</div>` : ''}
   <div class="teaser-results">${resultRows}</div>
@@ -391,7 +395,6 @@ function buildSharedStyles(primary, accent, cupColor) {
     .nav-toggle span { display: block; width: 22px; height: 2px; background: var(--color-on-primary); border-radius: 1px; }
     .nav-drawer { background: var(--color-surface-card); border-bottom: 1px solid var(--color-border); padding: 8px 0; }
     .nav-drawer a { display: block; padding: 10px 16px; color: var(--color-text); text-decoration: none; font-weight: 500; font-size: 0.9rem; text-align: right; }
-    .nav-age { opacity: 0.65; font-weight: 400; }
     .nav-drawer a[aria-current="page"] { background: var(--color-tab-active-bg); color: var(--color-primary); font-weight: 700; }
     .nav-drawer a:hover { background: var(--color-primary-light); }
     /* Header */
@@ -419,7 +422,6 @@ function buildSharedStyles(primary, accent, cupColor) {
     /* Team page */
     .team-page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
     .team-page-title { font-size: 1.3rem; font-weight: 700; color: var(--color-text); }
-    .team-page-club { font-size: 0.78rem; color: var(--color-text); margin-top: 1px; }
     .team-page-meta { font-size: 0.75rem; color: var(--color-text); margin-top: 2px; }
     .comp-section { margin-bottom: 24px; }
     .comp-heading { font-size: 0.9rem; font-weight: 700; color: var(--color-primary); border-left: 3px solid var(--color-primary); padding-left: 10px; margin-bottom: 10px; }
@@ -611,7 +613,7 @@ function buildTeamPage(team, allTeams, theme) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${team.ageGroup ? escapeHtml(team.ageGroup) + ' – ' : ''}${escapeHtml(team.teamName)}</title>
+  <title>${escapeHtml(team.teamName)}${team.ageGroup && !/^(senioren|herren)$/i.test(team.ageGroup) ? ' ' + escapeHtml(team.ageGroup) : ''}</title>
   ${buildSharedStyles(primary, accent, cupColor)}
 </head>
 <body>
@@ -620,8 +622,7 @@ function buildTeamPage(team, allTeams, theme) {
     <div class="team-page-header">
       ${logoHtml}
       <div>
-        <h1 class="team-page-title">${team.ageGroup ? escapeHtml(team.ageGroup) : escapeHtml(team.teamName)}${genderSpan(team.gender) ? ` ${genderSpan(team.gender)}` : ''}</h1>
-        ${team.ageGroup ? `<p class="team-page-club">${escapeHtml(team.teamName)}</p>` : ''}
+        <h1 class="team-page-title">${teamLabel(team.teamName, team.ageGroup, team.gender)}</h1>
         <p class="team-page-meta">Stand: ${lastUpdate}</p>
       </div>
     </div>
