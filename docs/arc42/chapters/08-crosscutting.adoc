@@ -146,6 +146,54 @@ Das System verwendet ausschließlich `console.log`, `console.warn` und `console.
 
 Ein strukturiertes Logging-Framework (Winston, Pino) ist nicht vorhanden. Bei Bedarf wäre die Einführung eines solchen Frameworks eine sinnvolle Verbesserung, da GitHub Actions-Logs per se keine Log-Level-Filterung unterstützen.
 
+=== Barrierefreiheit (WCAG 2.1 AA)
+
+Die generierte `index.html` erfüllt die technischen Kriterien der WCAG 2.1 Level AA. Die Einhaltung wird durch automatisierte Playwright-Tests mit `@axe-core/playwright` sichergestellt.
+
+==== ARIA-Tab-Pattern
+
+Jede Team-Card verwendet das standardisierte ARIA-Tab-Pattern:
+
+* `role="tablist"` mit `aria-label` am Tab-Container
+* `role="tab"` mit `aria-selected`, `aria-controls` und `tabindex` an den Tabs
+* `role="tabpanel"` mit `aria-labelledby` an den Panel-Containern
+* Inaktive Panels tragen das `hidden`-Attribut
+
+==== Tastaturnavigation
+
+Der eingebettete JavaScript-Block implementiert die ARIA Authoring Practices Guide Navigation für Tablisten:
+
+[cols="2,4", options="header"]
+|===
+| Taste | Wirkung
+
+| `ArrowRight` / `ArrowLeft`
+| Wechselt zum nächsten / vorherigen Tab (Wrapping am Ende)
+
+| `Home` / `End`
+| Springt zum ersten / letzten Tab
+
+| `Tab`
+| Verlässt die Tablist, springt zum nächsten fokussierbaren Element
+|===
+
+Alle interaktiven Elemente (Tabs, Buttons, Links) erhalten sichtbare `:focus-visible`-Outline.
+
+==== Farbkontrast
+
+Alle Texte erfüllen das Kontrastverhältnis 4,5:1 (normaler Text). Die Farben werden über CSS Custom Properties aus den konfigurierten Theme-Werten (`primary`, `accent`) berechnet. `sanitizeCssColor()` verhindert CSS-Injection bei der Theme-Interpolation.
+
+==== Dekorative Bilder
+
+Team-Logos und Club-Logo sind mit `alt=""` und `aria-hidden="true"` als dekorativ markiert, da der Teamname bereits als sichtbarer Text vorhanden ist.
+
+==== Automatisierte Tests
+
+Die WCAG-Konformität wird durch `tests/accessibility/wcag.spec.js` (Playwright + axe-core) geprüft:
+
+* 3 vollständige axe-core-Scans (ohne Logo, mit Logo, leere Teamliste)
+* 8 strukturelle Einzelprüfungen (Seitentitel, `lang`-Attribut, Landmarks, `<h1>`, `aria-controls`-Integrität, Tablist-Label, Tastaturnavigation, `alt`-Attribute)
+
 === Zeitzonenbehandlung
 
 Alle Spieltermine werden in der deutschen Lokalzeit (Europe/Berlin) gespeichert. Die ICS-Dateien verwenden `DTSTART` und `DTEND` ohne UTC-Konvertierung, kombiniert mit:

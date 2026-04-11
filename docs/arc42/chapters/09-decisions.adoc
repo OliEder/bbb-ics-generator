@@ -154,6 +154,68 @@ a|
 * Negative: Das Zeitfenster ist für alle Spiele gleich — Überstunden (Verlängerung, Overtime) werden nicht dynamisch erfasst. Die Kickoff-Zeit stammt aus der API; Zeitplanänderungen kurzfristig vor dem Spiel werden erst beim nächsten Update-Zyklus reflektiert.
 |===
 
+=== ADR-007: Tab-basierte UI statt Flat-Button-Liste
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-04-11
+
+| *Kontext*
+| Die Übersichtsseite zeigte pro Team 9 Buttons (3 Plattformen × 3 Varianten: Alle / Heim / Auswärts). Das ist für Nutzer unübersichtlich und die Seite war nicht mit der Tastatur bedienbar.
+
+| *Entscheidung*
+| Verwendung des ARIA-Tab-Patterns: 3 Tabs pro Team-Card (Alle / Heim / Auswärts), jeweils mit 3 Plattform-Buttons im aktiven Tab-Panel. Immer nur 3 Buttons gleichzeitig sichtbar.
+
+| *Begründung*
+a|
+* Reduziert die kognitive Last: 3 Aktionen statt 9 auf einmal.
+* ARIA-Tab-Pattern ist der vom W3C empfohlene Mechanismus für diese Art der Inhaltsauswahl.
+* Vollständige Tastaturnavigation (ArrowLeft/Right/Home/End) ohne zusätzliche Libraries.
+* Erfüllt WCAG 2.1 AA automatisch prüfbar (axe-core).
+
+| *Konsequenzen*
+a|
+* Positive: Übersichtlicher, tastaturzugänglich, WCAG-konform, dark-mode-fähig.
+* Negative: Etwas mehr JavaScript im generierten HTML (~30 Zeilen eingebetteter Inline-Code). Nutzer müssen bei Bedarf zwischen Tabs wechseln statt alle Links auf einen Blick zu sehen.
+|===
+
+=== ADR-008: Logo-URL-Konstruktion aus teamPermanentId statt API-Aufruf
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-04-11
+
+| *Kontext*
+| Die Übersichtsseite sollte Vereins- und Team-Logos anzeigen. Ursprünglich war `fetchClubInfo()` vorgesehen, das den Club-Endpunkt abfragen sollte. Der Endpunkt (`/rest/club/id/{clubId}/actualmatches`) liefert jedoch kein Logo-URL-Feld.
+
+| *Entscheidung*
+| Logos werden nicht per API-Call abgerufen, sondern die URL direkt aus der bereits bekannten `teamPermanentId` konstruiert: `https://www.basketball-bund.net/media/team/{teamPermanentId}/logo`. `fetchClubInfo()` wurde vollständig entfernt.
+
+| *Begründung*
+a|
+* Das Basketball-Bund-Medien-Endpoint liefert unter dieser URL zuverlässig das Logo.
+* Alle Teams eines Vereins teilen dasselbe Club-Logo — jede `teamPermanentId` desselben Vereins zeigt auf dasselbe Bild.
+* Kein zusätzlicher API-Call erforderlich: die `teamPermanentId` ist bereits durch `fetchClubTeams()` bekannt.
+* Einfacher und ausfallsicherer: kein Logo-Fetch kann fehlschlagen (Bild wird lazy durch den Browser geladen).
+
+| *Konsequenzen*
+a|
+* Positive: Kein zusätzlicher API-Aufruf, keine zusätzliche Fehlerbehandlung, `apiClient.js` schlanker.
+* Negative: Wenn basketball-bund.net die Media-URL-Struktur ändert, müssen alle Logo-URLs angepasst werden. Das Logo-Bild wird vom Browser beim Öffnen der Seite geladen (kann scheitern, falls URL nicht erreichbar — `<img>` zeigt dann keinen Broken-Image-Indikator da `alt=""`).
+|===
+
 === ADR-006: X-ALT-DESC für HTML-Beschreibungen (aktuell deaktiviert)
 
 [cols="2,5", options="header"]

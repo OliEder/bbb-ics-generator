@@ -46,8 +46,8 @@ sequenceDiagram
 . `createEvents()` der ics-Bibliothek erzeugt RFC-5545-konforme VEVENT-Blöcke.
 . Post-Processing: VCALENDAR-Header wird mit X-WR-CALNAME, X-WR-TIMEZONE etc. angereichert.
 . `saveICS(teamId, type, ics)` schreibt die Datei nach `generated/{teamId}_{type}.ics`.
-. Nach allen Teams: `metadata.json` wird mit Update-Zeitstempel und Spielzahlen geschrieben.
-. GitHub Actions führt danach `npm run generate-html` aus, das `index.html` aus `metadata.json` erzeugt.
+. Nach allen Teams: `metadata.json` wird mit Update-Zeitstempel, Spielzahlen und `logoUrl` je Team geschrieben. Die `logoUrl` wird direkt konstruiert: `https://www.basketball-bund.net/media/team/{teamPermanentId}/logo` — kein zusätzlicher API-Aufruf.
+. GitHub Actions führt danach `npm run generate-html` aus, das `index.html` aus `metadata.json` erzeugt (Tab-UI mit Logos, ARIA-Tab-Pattern, eingebettetem Keyboard-Nav-JS).
 . Das `generated/`-Verzeichnis wird als GitHub Pages Artefakt hochgeladen und deployed.
 
 === Szenario 2: Update-Zyklus mit Cache-MISS (erster Start oder Cache abgelaufen)

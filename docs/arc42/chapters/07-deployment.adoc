@@ -86,6 +86,54 @@ concurrency:
 
 Verhindert parallele Deployments: Ein laufendes Deployment wird nicht abgebrochen, wenn ein neues getriggert wird. Das neue Deployment wartet, bis das aktuelle abgeschlossen ist.
 
+=== GitHub Actions Workflow: Test-Pipeline
+
+Neben dem Deploy-Workflow existiert `.github/workflows/test.yml`, der die automatisierten Tests ausführt.
+
+==== Trigger mit Paths-Filter
+
+Der Workflow läuft *nur* bei Code-Änderungen — nicht bei Calendar-Update-Commits (die ausschließlich `generated/` berühren):
+
+[source,yaml]
+----
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'playwright.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/test.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'playwright.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+----
+
+==== Jobs
+
+Der Workflow hat zwei parallele Jobs:
+
+[cols="2,4", options="header"]
+|===
+| Job | Beschreibung
+
+| `unit-and-e2e`
+| Führt `node --test tests/e2e/*.test.js` aus — alle Unit- und E2E-Tests mit Node.js built-in test runner.
+
+| `accessibility`
+| Installiert Playwright + Chromium, führt `npx playwright test` aus (WCAG 2.1 AA Tests via axe-core). Lädt den Playwright HTML Report als Artifact hoch (30 Tage aufbewahrt, abrufbar unter Actions → Run → Artifacts).
+|===
+
+==== Playwright Report Artifact
+
+Nach jedem Accessibility-Job-Lauf (auch bei Fehlern, `if: always()`) wird `playwright-report/` als Artifact `playwright-report` hochgeladen. Das ermöglicht das Betrachten der detaillierten Testergebnisse direkt in der GitHub Actions Web-UI.
+
 === Verzeichnisstruktur nach erfolgreichem Build
 
 ....
