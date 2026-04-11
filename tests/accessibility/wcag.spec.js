@@ -50,6 +50,24 @@ const sampleMetadata = [
   },
 ];
 
+const teamMetadata = [
+  {
+    teamId: '167881',
+    teamName: 'Fibalon Baskets U10',
+    ageGroup: 'U10',
+    lastUpdate: new Date().toISOString(),
+    matchCount: 2,
+    homeMatchCount: 1,
+    awayMatchCount: 1,
+    logoUrl: 'https://www.basketball-bund.net/media/team/167881/logo',
+    matches: [
+      { date: '2025-03-01', opponent: 'Roth', result: '24:18', isHome: true, isNext: false, competition: 'Kreisliga' },
+      { date: '2025-04-17', opponent: 'Ansbach', result: null, isHome: false, isNext: true, competition: 'Kreisliga' },
+    ],
+    competitions: [],
+  },
+];
+
 const DEFAULT_THEME = { primary: '#004174', accent: '#009ef3', cupColor: '#7c3aed', logoUrl: null };
 const WITH_LOGO_THEME = {
   primary: '#004174',
@@ -180,7 +198,7 @@ test.describe('WCAG 2.1 AA — strukturelle Prüfungen', () => {
   });
 
   test('4.1.2 aria-controls auf Tabs zeigt auf existierende Panels', async ({ page }) => {
-    const { dir, htmlPath } = generateIndexHtml(DEFAULT_THEME, sampleMetadata);
+    const { dir, htmlPath } = generateTeamHtml(DEFAULT_THEME, teamMetadata);
     try {
       await page.goto('file://' + htmlPath);
       const tabs = page.locator('[role="tab"]');
@@ -200,7 +218,7 @@ test.describe('WCAG 2.1 AA — strukturelle Prüfungen', () => {
   });
 
   test('4.1.2 Tablist hat aria-label', async ({ page }) => {
-    const { dir, htmlPath } = generateIndexHtml(DEFAULT_THEME, sampleMetadata);
+    const { dir, htmlPath } = generateTeamHtml(DEFAULT_THEME, teamMetadata);
     try {
       await page.goto('file://' + htmlPath);
       const tablists = page.locator('[role="tablist"]');
@@ -217,7 +235,7 @@ test.describe('WCAG 2.1 AA — strukturelle Prüfungen', () => {
   });
 
   test('2.1.1 Tastaturnavigation: ArrowRight wechselt Tab', async ({ page }) => {
-    const { dir, htmlPath } = generateIndexHtml(DEFAULT_THEME, sampleMetadata);
+    const { dir, htmlPath } = generateTeamHtml(DEFAULT_THEME, teamMetadata);
     try {
       await page.goto('file://' + htmlPath);
       const firstTab = page.locator('[role="tab"]').first();
