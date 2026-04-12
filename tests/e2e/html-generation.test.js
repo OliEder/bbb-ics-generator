@@ -892,3 +892,70 @@ test('buildTeamPage enthält next-game section wenn isNext vorhanden', () => {
   assert.ok(html.includes('leaflet'), 'Leaflet CDN fehlt');
   assert.ok(html.includes('Nächstes Spiel'), 'Heading fehlt');
 });
+
+test('buildSpotlightBlock: rendert Spiele aller Teams chronologisch', () => {
+  const { buildSpotlightBlock } = require('../../src/generateHTML.js')._testExports;
+  const teams = [
+    {
+      teamId: 'T1', teamName: 'NM U16', ageGroup: 'U16', gender: 'männlich',
+      spotlightMatches: [
+        { date: '2026-04-20', time: '18:00', isHome: true,  opponent: 'TV Amberg', opponentShort: 'TV AS', ownShort: 'NM', result: null,    competition: 'Bezirksliga', isNext: true },
+      ],
+    },
+    {
+      teamId: 'T2', teamName: 'NM Senioren', ageGroup: 'Senioren', gender: 'männlich',
+      spotlightMatches: [
+        { date: '2026-04-18', time: '15:00', isHome: false, opponent: 'Roth',      opponentShort: 'ROT',   ownShort: 'NM', result: '80:70', competition: 'Oberliga',    isNext: false },
+      ],
+    },
+  ];
+  const html = buildSpotlightBlock(teams, '#7c3aed');
+  assert.ok(html.includes('spotlight'), 'spotlight section fehlt');
+  assert.ok(html.includes('Nächste Spiele'), 'Titel fehlt');
+  // Roth-Spiel (18. April) muss vor TV Amberg (20. April) stehen
+  const rothIdx = html.indexOf('ROT');
+  const ambergIdx = html.indexOf('TV AS');
+  assert.ok(rothIdx < ambergIdx, 'Chronologische Sortierung fehlt');
+});
+
+test('buildSpotlightBlock: Heim-Tab enthält nur Heimspiele', () => {
+  const { buildSpotlightBlock } = require('../../src/generateHTML.js')._testExports;
+  const teams = [
+    {
+      teamId: 'T1', teamName: 'NM U16', ageGroup: 'U16', gender: 'männlich',
+      spotlightMatches: [
+        { date: '2026-04-18', time: '18:00', isHome: true,  opponent: 'Roth', opponentShort: 'ROT', ownShort: 'NM', result: null, competition: 'Liga', isNext: true },
+        { date: '2026-04-25', time: '15:00', isHome: false, opponent: 'Ansbach', opponentShort: 'ANS', ownShort: 'NM', result: null, competition: 'Liga', isNext: false },
+      ],
+    },
+  ];
+  const html = buildSpotlightBlock(teams, '#7c3aed');
+  // spotlight-home panel muss ROT enthalten aber nicht ANS
+  const homePanel = html.match(/id="spotlight-home"[\s\S]*?(?=<div id="spotlight-away")/)?.[0] || '';
+  assert.ok(homePanel.includes('ROT'), 'Heimspiel fehlt in Heim-Tab');
+  assert.ok(!homePanel.includes('ANS'), 'Auswärtsspiel darf nicht in Heim-Tab');
+});
+
+test('buildSpotlightBlock: leere Nachricht wenn keine Spiele', () => {
+  const { buildSpotlightBlock } = require('../../src/generateHTML.js')._testExports;
+  const teams = [
+    { teamId: 'T1', teamName: 'NM', ageGroup: 'U10', gender: '', spotlightMatches: [] },
+  ];
+  const html = buildSpotlightBlock(teams, '#7c3aed');
+  assert.ok(html.includes('spotlight-empty') || html.includes('keine Spiele'), 'Empty-State fehlt');
+});
+
+test('buildSpotlightBlock: Ergebnis-Spiel zeigt Score statt Datum', () => {
+  const { buildSpotlightBlock } = require('../../src/generateHTML.js')._testExports;
+  const teams = [
+    {
+      teamId: 'T1', teamName: 'NM', ageGroup: 'U16', gender: '',
+      spotlightMatches: [
+        { date: '2026-04-10', time: '18:00', isHome: true, opponent: 'Roth', opponentShort: 'ROT', ownShort: 'NM', result: '80:70', competition: 'Liga', isNext: false },
+      ],
+    },
+  ];
+  const html = buildSpotlightBlock(teams, '#7c3aed');
+  assert.ok(html.includes('80'), 'Score fehlt');
+  assert.ok(html.includes('70'), 'Score fehlt');
+});

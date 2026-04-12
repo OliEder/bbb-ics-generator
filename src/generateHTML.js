@@ -723,6 +723,72 @@ function buildNextGameTeaser(team) {
 </section>`;
 }
 
+function buildSpotlightBlock(teams, cupColor) {
+  // Collect all spotlight matches with team reference, filter by tab
+  const allEntries = teams.flatMap(team =>
+    (Array.isArray(team.spotlightMatches) ? team.spotlightMatches : []).map(m => ({ m, team }))
+  ).sort((a, b) => {
+    const da = (a.m.date || '') + (a.m.time || '');
+    const db = (b.m.date || '') + (b.m.time || '');
+    return da < db ? -1 : da > db ? 1 : 0;
+  });
+
+  const homeEntries = allEntries.filter(e => e.m.isHome);
+  const awayEntries = allEntries.filter(e => !e.m.isHome);
+
+  const renderRow = ({ m, team }) => {
+    const cup = !isLiga(m.competition);
+    const badgeClass = cup ? 'badge badge--cup' : (m.isHome ? 'badge badge--home' : 'badge badge--away');
+    const badgeLabel = m.isHome ? 'H' : 'A';
+    const duel = (m.ownShort && m.opponentShort)
+      ? `${escapeHtml(m.ownShort)} – ${escapeHtml(m.opponentShort)}`
+      : escapeHtml(m.opponent);
+    const teamLbl = escapeHtml(teamLabel(team.teamName, team.ageGroup, team.gender));
+
+    let scoreOrDate;
+    if (m.result) {
+      const parts = m.result.split(':');
+      if (parts.length === 2) {
+        const ownIdx = m.isHome ? 0 : 1;
+        const oppIdx = m.isHome ? 1 : 0;
+        scoreOrDate = `<span class="spotlight-result"><strong>${escapeHtml(parts[ownIdx].trim())}</strong>:${escapeHtml(parts[oppIdx].trim())}</span>`;
+      } else {
+        scoreOrDate = `<span class="spotlight-result">${escapeHtml(m.result)}</span>`;
+      }
+    } else {
+      const dateStr = escapeHtml(String(m.date || '').slice(5).split('-').reverse().join('.'));
+      const timeStr = m.time ? ` ${escapeHtml(m.time)}` : '';
+      scoreOrDate = `<span class="spotlight-date">${dateStr}${timeStr}</span>`;
+    }
+
+    return `<div class="spotlight-row">` +
+      `<span class="${badgeClass}">${badgeLabel}</span>` +
+      `<span class="spotlight-team">${teamLbl}</span>` +
+      `<span class="spotlight-opponent">${duel}</span>` +
+      scoreOrDate +
+      `</div>`;
+  };
+
+  const renderPanel = (id, entries, hidden) => {
+    const content = entries.length
+      ? entries.map(renderRow).join('')
+      : `<p class="spotlight-empty">Aktuell keine Spiele geplant.</p>`;
+    return `<div id="${id}" role="tabpanel" class="spotlight-panel"${hidden ? ' hidden' : ''}>${content}</div>`;
+  };
+
+  return `<section class="spotlight">
+  <h2 class="spotlight-title">Nächste Spiele</h2>
+  <div class="spotlight-tab-bar" role="tablist" aria-label="Spielfilter">
+    <button role="tab" aria-selected="true"  aria-controls="spotlight-all"  class="spotlight-tab spotlight-tab--active" tabindex="0">Alle</button>
+    <button role="tab" aria-selected="false" aria-controls="spotlight-home" class="spotlight-tab" tabindex="-1">Heim</button>
+    <button role="tab" aria-selected="false" aria-controls="spotlight-away" class="spotlight-tab" tabindex="-1">Auswärts</button>
+  </div>
+  ${renderPanel('spotlight-all',  allEntries,  false)}
+  ${renderPanel('spotlight-home', homeEntries, true)}
+  ${renderPanel('spotlight-away', awayEntries, true)}
+</section>`;
+}
+
 function buildTeamPage(team, allTeams, theme) {
   const { primary, accent, cupColor } = theme;
 
@@ -877,7 +943,7 @@ function genHTML(theme = {}) {
 }
 
 module.exports = { genHTML };
-module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket, buildNavScript, buildSharedStyles, buildTabScript, buildTeamPage, buildIndexPage, buildNextGameTeaser };
+module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket, buildNavScript, buildSharedStyles, buildTabScript, buildTeamPage, buildIndexPage, buildNextGameTeaser, buildSpotlightBlock };
 
 if (require.main === module) {
   const config = require('../config.json');
