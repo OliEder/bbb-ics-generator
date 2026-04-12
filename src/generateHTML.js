@@ -614,7 +614,7 @@ function buildNextGameTeaser(team) {
   <div id="next-game-map-${escapeHtml(team.teamId)}" class="next-game-map" data-address="${escapeHtml(nextMatch.venueAddress)}" data-venue="${escapeHtml(nextMatch.venueName || '')}"></div>
   <script>
   (function() {
-    var el = document.getElementById('next-game-map-${escapeHtml(team.teamId)}');
+    var el = document.currentScript.previousElementSibling;
     if (!el) return;
     var addr = el.getAttribute('data-address');
     var venue = el.getAttribute('data-venue') || addr;
