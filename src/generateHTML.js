@@ -567,7 +567,7 @@ function buildSharedStyles(primary, accent, cupColor) {
     .spotlight-line3 { font-size: 0.72rem; color: var(--color-text); margin-top: 1px; }
     .spotlight-time { white-space: nowrap; color: var(--color-text); min-width: 36px; }
     .spotlight-team { font-weight: 700; color: var(--color-text); white-space: nowrap; }
-    .spotlight-result { font-weight: 700; white-space: nowrap; color: var(--color-text); min-width: 44px; }
+    .spotlight-result { display: flex; align-items: center; align-self: stretch; font-weight: 700; white-space: nowrap; color: var(--color-text); font-size: 0.92rem; padding-left: 8px; flex-shrink: 0; }
     .spotlight-vs { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .spotlight-empty { font-size: 0.85rem; color: var(--color-text-muted); padding: 8px 0; }
   </style>`;
@@ -790,15 +790,15 @@ function buildSpotlightBlock(teams, cupColor) {
         ? `<span class="spotlight-time">${escapeHtml(m.time)}</span>`
         : '';
 
-      let resultHtml = '';
+      let resultInner = '';
       if (m.result) {
         const parts = m.result.split(':');
         if (parts.length === 2) {
           const ownIdx = m.isHome ? 0 : 1;
           const oppIdx = m.isHome ? 1 : 0;
-          resultHtml = `<span class="spotlight-result"><strong>${escapeHtml(parts[ownIdx].trim())}</strong>:${escapeHtml(parts[oppIdx].trim())}</span>`;
+          resultInner = `<strong>${escapeHtml(parts[ownIdx].trim())}</strong>:${escapeHtml(parts[oppIdx].trim())}`;
         } else {
-          resultHtml = `<span class="spotlight-result">${escapeHtml(m.result)}</span>`;
+          resultInner = escapeHtml(m.result);
         }
       }
 
@@ -816,10 +816,10 @@ function buildSpotlightBlock(teams, cupColor) {
             `</div>` +
             `<div class="spotlight-line2">` +
               `<span class="spotlight-vs">${vsPrefix}&nbsp;${opponent}</span>` +
-              resultHtml +
             `</div>` +
             line3 +
           `</div>` +
+          (resultInner ? `<div class="spotlight-result">${resultInner}</div>` : '') +
         `</div>`
       );
     }
