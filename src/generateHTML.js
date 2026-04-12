@@ -925,6 +925,7 @@ function buildIndexPage(teams, theme) {
       ${teasers}
     </div>
   </main>
+  ${buildTabScript()}
   ${buildNavScript()}
 </body>
 </html>`;

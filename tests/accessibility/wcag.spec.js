@@ -33,20 +33,21 @@ const sampleMetadata = [
     teamName: 'Fibalon Baskets U10',
     ageGroup: 'U10',
     lastUpdate: new Date().toISOString(),
-    matchCount: 2,
-    homeMatchCount: 1,
-    awayMatchCount: 1,
+    matchCount: 2, homeMatchCount: 1, awayMatchCount: 1,
     logoUrl: 'https://www.basketball-bund.net/media/team/167881/logo',
+    spotlightMatches: [
+      { date: '2026-04-20', time: '18:00', isHome: true,  opponent: 'TV Amberg', opponentShort: 'TV AS', ownShort: 'NM', result: null,    competition: 'Kreisliga', isNext: true },
+      { date: '2026-04-12', time: '15:00', isHome: false, opponent: 'Roth',      opponentShort: 'ROT',   ownShort: 'NM', result: '72:68', competition: 'Kreisliga', isNext: false },
+    ],
   },
   {
     teamId: '167882',
     teamName: 'Test Team',
     ageGroup: 'U12',
     lastUpdate: new Date().toISOString(),
-    matchCount: 1,
-    homeMatchCount: 1,
-    awayMatchCount: 0,
+    matchCount: 1, homeMatchCount: 1, awayMatchCount: 0,
     logoUrl: 'https://www.basketball-bund.net/media/team/167882/logo',
+    spotlightMatches: [],
   },
 ];
 
@@ -370,6 +371,91 @@ test.describe('Next-Game-Teaser — Venue & Karte', () => {
 
   test('keine WCAG-Violations auf Team-Seite mit Venue', async ({ page }) => {
     const { dir, htmlPath } = generateTeamHtml(DEFAULT_THEME, teamMetadataWithVenue);
+    try {
+      await page.goto('file://' + htmlPath);
+      const results = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .analyze();
+      expect(results.violations).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+});
+
+test.describe('Spotlight Block — Startseite', () => {
+  test('Spotlight-Block vorhanden mit Titel', async ({ page }) => {
+    const { dir, htmlPath } = generateIndexHtml(DEFAULT_THEME, sampleMetadata);
+    try {
+      await page.goto('file://' + htmlPath);
+      await expect(page.locator('.spotlight')).toBeAttached();
+      await expect(page.locator('.spotlight-title')).toContainText('Nächste Spiele');
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  test('Drei Tabs vorhanden mit korrekten Labels', async ({ page }) => {
+    const { dir, htmlPath } = generateIndexHtml(DEFAULT_THEME, sampleMetadata);
+    try {
+      await page.goto('file://' + htmlPath);
+      const tabs = page.locator('.spotlight [role="tab"]');
+      await expect(tabs).toHaveCount(3);
+      await expect(tabs.nth(0)).toContainText('Alle');
+      await expect(tabs.nth(1)).toContainText('Heim');
+      await expect(tabs.nth(2)).toContainText('Auswärts');
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  test('Alle-Tab ist standardmäßig aktiv', async ({ page }) => {
+    const { dir, htmlPath } = generateIndexHtml(DEFAULT_THEME, sampleMetadata);
+    try {
+      await page.goto('file://' + htmlPath);
+      const alleTab = page.locator('.spotlight [role="tab"]').first();
+      await expect(alleTab).toHaveAttribute('aria-selected', 'true');
+      const allPanel = page.locator('#spotlight-all');
+      await expect(allPanel).toBeVisible();
+      const homePanel = page.locator('#spotlight-home');
+      await expect(homePanel).toBeHidden();
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  test('Klick auf Heim-Tab zeigt nur Heimspiele', async ({ page }) => {
+    const { dir, htmlPath } = generateIndexHtml(DEFAULT_THEME, sampleMetadata);
+    try {
+      await page.goto('file://' + htmlPath);
+      await page.locator('.spotlight [role="tab"]').nth(1).click();
+      const homePanel = page.locator('#spotlight-home');
+      await expect(homePanel).toBeVisible();
+      const allPanel = page.locator('#spotlight-all');
+      await expect(allPanel).toBeHidden();
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  test('Spotlight steht vor dem Teaser-Grid im DOM', async ({ page }) => {
+    const { dir, htmlPath } = generateIndexHtml(DEFAULT_THEME, sampleMetadata);
+    try {
+      await page.goto('file://' + htmlPath);
+      const isBeforeGrid = await page.evaluate(() => {
+        const spotlight = document.querySelector('.spotlight');
+        const grid = document.querySelector('.teaser-grid');
+        if (!spotlight || !grid) return false;
+        return spotlight.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING;
+      });
+      expect(isBeforeGrid).toBeTruthy();
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  test('keine WCAG-Violations auf Startseite mit Spotlight', async ({ page }) => {
+    const { dir, htmlPath } = generateIndexHtml(DEFAULT_THEME, sampleMetadata);
     try {
       await page.goto('file://' + htmlPath);
       const results = await new AxeBuilder({ page })
