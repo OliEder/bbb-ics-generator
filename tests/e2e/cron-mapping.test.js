@@ -171,28 +171,25 @@ test('computeSpotlight: nur isNext (kein vorheriges Ergebnis) → 1 Spiel', () =
   assert.equal(result[0].isNext, true);
 });
 
-test('computeSpotlight: alle gespielt → letzte 2', () => {
+test('computeSpotlight: alle gespielt → letztes Ergebnis (1 Spiel)', () => {
   const matches = [
     { date: '2026-02-01', result: '60:50', isNext: false, isHome: true,  opponent: 'A', competition: 'Liga', opponentShort: 'A', ownShort: 'B', time: '18:00', venueName: '', venueAddress: '', opponentLogoUrl: '' },
     { date: '2026-03-01', result: '70:60', isNext: false, isHome: false, opponent: 'B', competition: 'Liga', opponentShort: 'B', ownShort: 'A', time: '15:00', venueName: '', venueAddress: '', opponentLogoUrl: '' },
     { date: '2026-04-01', result: '80:70', isNext: false, isHome: true,  opponent: 'C', competition: 'Liga', opponentShort: 'C', ownShort: 'A', time: '18:00', venueName: '', venueAddress: '', opponentLogoUrl: '' },
   ];
   const result = computeSpotlight(matches);
-  assert.equal(result.length, 2);
-  assert.equal(result[0].opponent, 'B');
-  assert.equal(result[1].opponent, 'C');
+  assert.equal(result.length, 1);
+  assert.equal(result[0].opponent, 'C');
 });
 
-test('computeSpotlight: alle zukünftig → erste 2', () => {
+test('computeSpotlight: alle zukünftig → nächstes Spiel (1 Spiel)', () => {
   const matches = [
     { date: '2026-05-01', result: null, isNext: false, isHome: true,  opponent: 'A', competition: 'Liga', opponentShort: 'A', ownShort: 'B', time: '18:00', venueName: '', venueAddress: '', opponentLogoUrl: '' },
     { date: '2026-06-01', result: null, isNext: false, isHome: false, opponent: 'B', competition: 'Liga', opponentShort: 'B', ownShort: 'A', time: '15:00', venueName: '', venueAddress: '', opponentLogoUrl: '' },
-    { date: '2026-07-01', result: null, isNext: false, isHome: true,  opponent: 'C', competition: 'Liga', opponentShort: 'C', ownShort: 'A', time: '18:00', venueName: '', venueAddress: '', opponentLogoUrl: '' },
   ];
   const result = computeSpotlight(matches);
-  assert.equal(result.length, 2);
+  assert.equal(result.length, 1);
   assert.equal(result[0].opponent, 'A');
-  assert.equal(result[1].opponent, 'B');
 });
 
 test('computeSpotlight: leere Liste → leeres Array', () => {

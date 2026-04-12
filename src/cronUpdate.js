@@ -85,12 +85,15 @@ function computeSpotlight(mappedMatches) {
   if (!mappedMatches.length) return [];
   const isNextIdx = mappedMatches.findIndex(m => m.isNext);
   if (isNextIdx !== -1) {
+    // Show last result (if any) + next upcoming match
     const prev = isNextIdx > 0 ? [mappedMatches[isNextIdx - 1]] : [];
     return [...prev, mappedMatches[isNextIdx]];
   }
+  // No upcoming matches — show only the most recent result
   const played = mappedMatches.filter(m => m.result);
-  if (played.length > 0) return played.slice(-2);
-  return mappedMatches.slice(0, 2);
+  if (played.length > 0) return [played[played.length - 1]];
+  // All future, no results — show next upcoming
+  return [mappedMatches[0]];
 }
 
 async function updateAll() {

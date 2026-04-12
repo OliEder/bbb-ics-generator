@@ -912,10 +912,13 @@ test('buildSpotlightBlock: rendert Spiele aller Teams chronologisch', () => {
   const html = buildSpotlightBlock(teams, '#7c3aed');
   assert.ok(html.includes('spotlight'), 'spotlight section fehlt');
   assert.ok(html.includes('Nächste Spiele'), 'Titel fehlt');
-  // Senioren-Spiel (18. April) muss vor U16-Spiel (20. April) stehen
-  const seniIdx = html.indexOf('NM Senioren');
-  const u16Idx  = html.indexOf('NM U16');
-  assert.ok(seniIdx < u16Idx, 'Chronologische Sortierung fehlt');
+  // Senioren-Spiel (18. April) muss vor U16-Spiel (20. April) stehen — anhand Datum-Heading
+  const date18Idx = html.indexOf('18.04.');
+  const date20Idx = html.indexOf('20.04.');
+  assert.ok(date18Idx < date20Idx, 'Chronologische Sortierung fehlt');
+  // Gegner muss sichtbar sein
+  assert.ok(html.includes('TV Amberg'), 'Gegner fehlt');
+  assert.ok(html.includes('Roth'), 'Gegner fehlt');
 });
 
 test('buildSpotlightBlock: Heim-Tab enthält nur Heimspiele', () => {

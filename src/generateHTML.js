@@ -553,19 +553,22 @@ function buildSharedStyles(primary, accent, cupColor) {
     .next-game-no-games { font-size: 0.85rem; color: var(--color-text-muted); padding: 0 0 4px; }
     /* Spotlight block */
     .spotlight { margin-bottom: 24px; border: 1px solid var(--color-border); border-radius: 10px; overflow: hidden; }
-    .spotlight-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-primary); padding: 12px 16px 0; margin: 0; }
-    .spotlight-tab-bar { display: flex; gap: 4px; padding: 8px 16px 0; }
-    .spotlight-tab { background: var(--color-surface-card); border: 1px solid var(--color-border); border-radius: 6px; padding: 5px 14px; font-size: 0.8rem; font-weight: 500; color: var(--color-text); cursor: pointer; }
-    .spotlight-tab--active { background: var(--color-primary); color: var(--color-on-primary); border-color: var(--color-primary); font-weight: 700; }
-    .spotlight-panel { padding: 8px 16px 12px; }
+    .spotlight-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-primary); padding: 12px 16px 6px; margin: 0; }
+    .spotlight .tab-bar { border-radius: 0; }
+    .spotlight-panel { padding: 4px 16px 12px; }
     .spotlight-panel[hidden] { display: none; }
-    .spotlight-date-heading { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-muted); padding: 8px 0 3px; }
-    .spotlight-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--color-border); font-size: 0.85rem; }
+    .spotlight-date-heading { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-muted); padding: 8px 0 2px; }
+    .spotlight-row { display: flex; align-items: flex-start; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--color-border); }
     .spotlight-row:last-child { border-bottom: none; }
-    .spotlight-time { font-size: 0.78rem; color: var(--color-text-muted); white-space: nowrap; min-width: 38px; }
-    .spotlight-team { font-weight: 600; color: var(--color-text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .spotlight-comp { font-size: 0.75rem; color: var(--color-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px; }
-    .spotlight-result { font-weight: 700; white-space: nowrap; color: var(--color-text); min-width: 44px; text-align: right; }
+    .spotlight-row .badge { margin-top: 2px; flex-shrink: 0; }
+    .spotlight-info { flex: 1; min-width: 0; }
+    .spotlight-line1 { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; }
+    .spotlight-line2 { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--color-text); margin-top: 1px; }
+    .spotlight-time { white-space: nowrap; color: var(--color-text); min-width: 36px; }
+    .spotlight-team { font-weight: 700; color: var(--color-text); white-space: nowrap; }
+    .spotlight-result { font-weight: 700; white-space: nowrap; color: var(--color-text); min-width: 44px; }
+    .spotlight-vs { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .spotlight-comp { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; }
     .spotlight-empty { font-size: 0.85rem; color: var(--color-text-muted); padding: 8px 0; }
   </style>`;
 }
@@ -739,8 +742,18 @@ function buildNextGameTeaser(team) {
 </section>`;
 }
 
+// Short label for a team in the spotlight: age group only, with suffix for duplicates.
+// E.g. "U16", "U16 2" when two U16 teams exist.
+function spotlightTeamLabel(team, allTeams) {
+  const ag = String(team.ageGroup || '').trim() || 'Senioren';
+  const sameAg = allTeams.filter(t => String(t.ageGroup || '').trim() === ag);
+  if (sameAg.length <= 1) return ag;
+  // Number them by their order in the sorted list
+  const idx = sameAg.findIndex(t => t.teamId === team.teamId);
+  return `${ag} ${idx + 1}`;
+}
+
 function buildSpotlightBlock(teams, cupColor) {
-  // Collect all spotlight matches with team reference, filter by tab
   const allEntries = teams.flatMap(team =>
     (Array.isArray(team.spotlightMatches) ? team.spotlightMatches : []).map(m => ({ m, team }))
   ).sort((a, b) => {
@@ -760,15 +773,16 @@ function buildSpotlightBlock(teams, cupColor) {
       const badgeClass = cup ? 'badge badge--cup' : (m.isHome ? 'badge badge--home' : 'badge badge--away');
       const badgeLabel = m.isHome ? 'H' : 'A';
 
-      // Date heading when date changes
+      // Date separator heading
       const dateKey = m.date || '';
       if (dateKey !== lastDate) {
         lastDate = dateKey;
-        const [y, mo, d] = dateKey.split('-');
+        const [, mo, d] = dateKey.split('-');
         const heading = (d && mo) ? `${d}.${mo}.` : escapeHtml(dateKey);
         rows.push(`<div class="spotlight-date-heading">${heading}</div>`);
       }
 
+      // Score or time
       let scoreOrTime;
       if (m.result) {
         const parts = m.result.split(':');
@@ -785,16 +799,26 @@ function buildSpotlightBlock(teams, cupColor) {
           : `<span class="spotlight-time">–</span>`;
       }
 
+      const shortLabel = escapeHtml(spotlightTeamLabel(team, teams));
+      const genderHtml = genderSpan(team.gender);
+      const opponent = escapeHtml(m.opponent || (m.opponentShort || ''));
       const compHtml = m.competition
         ? `<span class="spotlight-comp">${escapeHtml(m.competition)}</span>`
         : '';
 
       rows.push(
         `<div class="spotlight-row">` +
-        `<span class="${badgeClass}">${badgeLabel}</span>` +
-        scoreOrTime +
-        `<span class="spotlight-team">${teamLabel(team.teamName, team.ageGroup, team.gender)}</span>` +
-        compHtml +
+          `<span class="${badgeClass}">${badgeLabel}</span>` +
+          `<div class="spotlight-info">` +
+            `<div class="spotlight-line1">` +
+              scoreOrTime +
+              `<span class="spotlight-team">${shortLabel}${genderHtml ? ` ${genderHtml}` : ''}</span>` +
+            `</div>` +
+            `<div class="spotlight-line2">` +
+              `<span class="spotlight-vs">vs.&nbsp;${opponent}</span>` +
+              compHtml +
+            `</div>` +
+          `</div>` +
         `</div>`
       );
     }
@@ -810,10 +834,10 @@ function buildSpotlightBlock(teams, cupColor) {
 
   return `<section class="spotlight">
   <h2 class="spotlight-title">Nächste Spiele</h2>
-  <div class="spotlight-tab-bar" role="tablist" aria-label="Spielfilter">
-    <button role="tab" aria-selected="true"  aria-controls="spotlight-all"  class="spotlight-tab spotlight-tab--active" tabindex="0">Alle</button>
-    <button role="tab" aria-selected="false" aria-controls="spotlight-home" class="spotlight-tab" tabindex="-1">Heim</button>
-    <button role="tab" aria-selected="false" aria-controls="spotlight-away" class="spotlight-tab" tabindex="-1">Auswärts</button>
+  <div class="tab-bar" role="tablist" aria-label="Spielfilter">
+    <button role="tab" aria-selected="true"  aria-controls="spotlight-all"  tabindex="0">Alle</button>
+    <button role="tab" aria-selected="false" aria-controls="spotlight-home" tabindex="-1">Heim</button>
+    <button role="tab" aria-selected="false" aria-controls="spotlight-away" tabindex="-1">Auswärts</button>
   </div>
   ${renderPanel('spotlight-all',  allEntries,  false)}
   ${renderPanel('spotlight-home', homeEntries, true)}
@@ -979,7 +1003,7 @@ function genHTML(theme = {}) {
 }
 
 module.exports = { genHTML };
-module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket, buildNavScript, buildSharedStyles, buildTabScript, buildTeamPage, buildIndexPage, buildNextGameTeaser, buildSpotlightBlock };
+module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket, buildNavScript, buildSharedStyles, buildTabScript, buildTeamPage, buildIndexPage, buildNextGameTeaser, buildSpotlightBlock, spotlightTeamLabel };
 
 if (require.main === module) {
   const config = require('../config.json');
