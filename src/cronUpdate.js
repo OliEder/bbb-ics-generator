@@ -122,8 +122,9 @@ async function updateAll() {
         if (isNext) {
           const feld = details[m.matchId]?.feld || {};
           venueName = feld.bezeichnung || '';
+          const plzOrt = [feld.plz, feld.ort].filter(Boolean).join(' ');
           venueAddress = (feld.strasse && feld.ort)
-            ? `${feld.strasse}, ${feld.plz || ''} ${feld.ort}`.trim()
+            ? `${feld.strasse}, ${plzOrt}`
             : '';
         }
         return {
