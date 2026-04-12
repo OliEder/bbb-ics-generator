@@ -912,10 +912,10 @@ test('buildSpotlightBlock: rendert Spiele aller Teams chronologisch', () => {
   const html = buildSpotlightBlock(teams, '#7c3aed');
   assert.ok(html.includes('spotlight'), 'spotlight section fehlt');
   assert.ok(html.includes('Nächste Spiele'), 'Titel fehlt');
-  // Roth-Spiel (18. April) muss vor TV Amberg (20. April) stehen
-  const rothIdx = html.indexOf('ROT');
-  const ambergIdx = html.indexOf('TV AS');
-  assert.ok(rothIdx < ambergIdx, 'Chronologische Sortierung fehlt');
+  // Senioren-Spiel (18. April) muss vor U16-Spiel (20. April) stehen
+  const seniIdx = html.indexOf('NM Senioren');
+  const u16Idx  = html.indexOf('NM U16');
+  assert.ok(seniIdx < u16Idx, 'Chronologische Sortierung fehlt');
 });
 
 test('buildSpotlightBlock: Heim-Tab enthält nur Heimspiele', () => {
@@ -930,10 +930,10 @@ test('buildSpotlightBlock: Heim-Tab enthält nur Heimspiele', () => {
     },
   ];
   const html = buildSpotlightBlock(teams, '#7c3aed');
-  // spotlight-home panel muss ROT enthalten aber nicht ANS
+  // spotlight-home panel: Heimspiel (badge--home) vorhanden, Auswärtsspiel (badge--away) nicht
   const homePanel = html.match(/id="spotlight-home"[\s\S]*?(?=<div id="spotlight-away")/)?.[0] || '';
-  assert.ok(homePanel.includes('ROT'), 'Heimspiel fehlt in Heim-Tab');
-  assert.ok(!homePanel.includes('ANS'), 'Auswärtsspiel darf nicht in Heim-Tab');
+  assert.ok(homePanel.includes('badge--home'), 'Heimspiel fehlt in Heim-Tab');
+  assert.ok(!homePanel.includes('badge--away'), 'Auswärtsspiel darf nicht in Heim-Tab');
 });
 
 test('buildSpotlightBlock: leere Nachricht wenn keine Spiele', () => {

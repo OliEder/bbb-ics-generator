@@ -29,12 +29,12 @@ function teamLabel(teamName, ageGroup, gender) {
 function genderSpan(gender) {
   if (!gender) return '';
   const g = String(gender).toLowerCase().trim();
-  let sym, label;
-  if (g === 'männlich' || g === 'male' || g === 'm')          { sym = '♂'; label = 'männlich'; }
-  else if (g === 'weiblich' || g === 'female' || g === 'w' || g === 'f') { sym = '♀'; label = 'weiblich'; }
-  else if (g === 'mix' || g === 'mixed')                      { sym = '⚥'; label = 'gemischt'; }
+  let icon, label;
+  if (g === 'männlich' || g === 'male' || g === 'm')                      { icon = 'fa-mars';        label = 'männlich'; }
+  else if (g === 'weiblich' || g === 'female' || g === 'w' || g === 'f') { icon = 'fa-venus';       label = 'weiblich'; }
+  else if (g === 'mix' || g === 'mixed')                                  { icon = 'fa-venus-mars';  label = 'gemischt'; }
   else return '';
-  return `<span class="gender-sym" aria-label="${label}">${sym}</span>`;
+  return `<i class="fa-solid ${icon} gender-sym" aria-label="${label}" title="${label}"></i>`;
 }
 
 function escapeHtml(str) {
@@ -434,7 +434,7 @@ function buildSharedStyles(primary, accent, cupColor) {
     .teaser-card { border: 1px solid var(--color-border); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
     .teaser-header { background: var(--color-primary); color: var(--color-on-primary); padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
     .teaser-team-name { font-weight: 700; font-size: 0.92rem; flex: 1; }
-    .gender-sym { opacity: 0.75; }
+    .gender-sym { font-size: 0.78em; opacity: 0.8; }
     .teaser-team-name .gender-sym, .team-page-title .gender-sym { font-size: 0.8em; }
     .teaser-streak-info { font-size: 0.82rem; color: var(--color-text); padding: 6px 14px 0; }
     .teaser-streak-label { font-weight: 700; }
@@ -559,12 +559,13 @@ function buildSharedStyles(primary, accent, cupColor) {
     .spotlight-tab--active { background: var(--color-primary); color: var(--color-on-primary); border-color: var(--color-primary); font-weight: 700; }
     .spotlight-panel { padding: 8px 16px 12px; }
     .spotlight-panel[hidden] { display: none; }
-    .spotlight-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--color-border); font-size: 0.85rem; }
+    .spotlight-date-heading { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-muted); padding: 8px 0 3px; }
+    .spotlight-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--color-border); font-size: 0.85rem; }
     .spotlight-row:last-child { border-bottom: none; }
-    .spotlight-team { font-weight: 600; color: var(--color-text); white-space: nowrap; }
-    .spotlight-opponent { flex: 1; color: var(--color-text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .spotlight-time { font-size: 0.78rem; color: var(--color-text-muted); white-space: nowrap; min-width: 38px; }
+    .spotlight-team { font-weight: 600; color: var(--color-text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .spotlight-comp { font-size: 0.75rem; color: var(--color-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px; }
     .spotlight-result { font-weight: 700; white-space: nowrap; color: var(--color-text); min-width: 44px; text-align: right; }
-    .spotlight-date { color: var(--color-text-muted); white-space: nowrap; font-size: 0.8rem; min-width: 60px; text-align: right; }
     .spotlight-empty { font-size: 0.85rem; color: var(--color-text-muted); padding: 8px 0; }
   </style>`;
 }
@@ -751,42 +752,58 @@ function buildSpotlightBlock(teams, cupColor) {
   const homeEntries = allEntries.filter(e => e.m.isHome);
   const awayEntries = allEntries.filter(e => !e.m.isHome);
 
-  const renderRow = ({ m, team }) => {
-    const cup = !isLiga(m.competition);
-    const badgeClass = cup ? 'badge badge--cup' : (m.isHome ? 'badge badge--home' : 'badge badge--away');
-    const badgeLabel = m.isHome ? 'H' : 'A';
-    const duel = (m.ownShort && m.opponentShort)
-      ? `${escapeHtml(m.ownShort)} – ${escapeHtml(m.opponentShort)}`
-      : escapeHtml(m.opponent);
-    const teamLbl = escapeHtml(teamLabel(team.teamName, team.ageGroup, team.gender));
+  const renderRows = (entries) => {
+    let lastDate = null;
+    const rows = [];
+    for (const { m, team } of entries) {
+      const cup = !isLiga(m.competition);
+      const badgeClass = cup ? 'badge badge--cup' : (m.isHome ? 'badge badge--home' : 'badge badge--away');
+      const badgeLabel = m.isHome ? 'H' : 'A';
 
-    let scoreOrDate;
-    if (m.result) {
-      const parts = m.result.split(':');
-      if (parts.length === 2) {
-        const ownIdx = m.isHome ? 0 : 1;
-        const oppIdx = m.isHome ? 1 : 0;
-        scoreOrDate = `<span class="spotlight-result"><strong>${escapeHtml(parts[ownIdx].trim())}</strong>:${escapeHtml(parts[oppIdx].trim())}</span>`;
-      } else {
-        scoreOrDate = `<span class="spotlight-result">${escapeHtml(m.result)}</span>`;
+      // Date heading when date changes
+      const dateKey = m.date || '';
+      if (dateKey !== lastDate) {
+        lastDate = dateKey;
+        const [y, mo, d] = dateKey.split('-');
+        const heading = (d && mo) ? `${d}.${mo}.` : escapeHtml(dateKey);
+        rows.push(`<div class="spotlight-date-heading">${heading}</div>`);
       }
-    } else {
-      const dateStr = escapeHtml(String(m.date || '').slice(5).split('-').reverse().join('.'));
-      const timeStr = m.time ? ` ${escapeHtml(m.time)}` : '';
-      scoreOrDate = `<span class="spotlight-date">${dateStr}${timeStr}</span>`;
-    }
 
-    return `<div class="spotlight-row">` +
-      `<span class="${badgeClass}">${badgeLabel}</span>` +
-      `<span class="spotlight-team">${teamLbl}</span>` +
-      `<span class="spotlight-opponent">${duel}</span>` +
-      scoreOrDate +
-      `</div>`;
+      let scoreOrTime;
+      if (m.result) {
+        const parts = m.result.split(':');
+        if (parts.length === 2) {
+          const ownIdx = m.isHome ? 0 : 1;
+          const oppIdx = m.isHome ? 1 : 0;
+          scoreOrTime = `<span class="spotlight-result"><strong>${escapeHtml(parts[ownIdx].trim())}</strong>:${escapeHtml(parts[oppIdx].trim())}</span>`;
+        } else {
+          scoreOrTime = `<span class="spotlight-result">${escapeHtml(m.result)}</span>`;
+        }
+      } else {
+        scoreOrTime = m.time
+          ? `<span class="spotlight-time">${escapeHtml(m.time)}</span>`
+          : `<span class="spotlight-time">–</span>`;
+      }
+
+      const compHtml = m.competition
+        ? `<span class="spotlight-comp">${escapeHtml(m.competition)}</span>`
+        : '';
+
+      rows.push(
+        `<div class="spotlight-row">` +
+        `<span class="${badgeClass}">${badgeLabel}</span>` +
+        scoreOrTime +
+        `<span class="spotlight-team">${teamLabel(team.teamName, team.ageGroup, team.gender)}</span>` +
+        compHtml +
+        `</div>`
+      );
+    }
+    return rows.join('');
   };
 
   const renderPanel = (id, entries, hidden) => {
     const content = entries.length
-      ? entries.map(renderRow).join('')
+      ? renderRows(entries)
       : `<p class="spotlight-empty">Aktuell keine Spiele geplant.</p>`;
     return `<div id="${id}" role="tabpanel" class="spotlight-panel"${hidden ? ' hidden' : ''}>${content}</div>`;
   };
@@ -859,6 +876,7 @@ function buildTeamPage(team, allTeams, theme) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(team.teamName)}${team.ageGroup && !/^(senioren|herren)$/i.test(team.ageGroup) ? ' ' + escapeHtml(team.ageGroup) : ''}</title>
   ${buildSharedStyles(primary, accent, cupColor)}
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 </head>
 <body>
@@ -909,6 +927,7 @@ function buildIndexPage(teams, theme) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Fibalon Baskets Neumarkt – Spielplan</title>
   ${buildSharedStyles(primary, accent, cupColor)}
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous">
 </head>
 <body>
   ${nav}
