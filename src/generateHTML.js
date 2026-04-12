@@ -217,15 +217,18 @@ function buildTeaserCard(team) {
       const oppIdx = m.isHome ? 1 : 0;
       scoreHtml = `<strong>${escapeHtml(parts[ownIdx].trim())}</strong>:${escapeHtml(parts[oppIdx].trim())}`;
     }
+    const duel = (m.ownShort && m.opponentShort)
+      ? `${escapeHtml(m.ownShort)} – ${escapeHtml(m.opponentShort)}`
+      : escapeHtml(m.opponent);
     return `<div class="teaser-result">` +
       `<span class="${badgeClass}">${badgeLabel}</span>` +
-      `<span class="teaser-opponent">${escapeHtml(m.opponent)}</span>` +
+      `<span class="teaser-opponent">${duel}</span>` +
       `<span class="teaser-score">${scoreHtml}</span>` +
       `</div>`;
   }).join('');
 
   const nextHtml = nextMatch
-    ? `<div class="teaser-next">Nächstes: ${escapeHtml(String(nextMatch.date || '').slice(5).split('-').reverse().join('.'))} · ${escapeHtml(nextMatch.opponent)}</div>`
+    ? `<div class="teaser-next">Nächstes: ${escapeHtml(String(nextMatch.date || '').slice(5).split('-').reverse().join('.'))} · <span class="teaser-next-venue">${nextMatch.isHome ? 'Heim' : 'Auswärts'}</span> · ${escapeHtml(nextMatch.opponent)}</div>`
     : '';
 
   return `<div class="teaser-card">
@@ -418,6 +421,7 @@ function buildSharedStyles(primary, accent, cupColor) {
     .teaser-result { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--color-border); font-size: 0.82rem; }
     .teaser-score { font-weight: 600; }
     .teaser-next { background: var(--color-next-bg); border: 1px solid var(--color-next-border); border-radius: 6px; margin: 6px 14px; padding: 6px 10px; font-size: 0.78rem; font-weight: 600; color: var(--color-text); }
+    .teaser-next-venue { opacity: 0.7; font-weight: 400; }
     .teaser-link { display: block; text-align: right; padding: 8px 14px; color: var(--color-primary); font-size: 0.82rem; font-weight: 600; text-decoration: none; }
     /* Team page */
     .team-page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
@@ -494,6 +498,21 @@ function buildSharedStyles(primary, accent, cupColor) {
     }
     .schedule-legend { margin-top: 8px; padding: 10px 14px; font-size: 0.75rem; color: var(--color-text); display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
     .schedule-legend span { display: flex; align-items: center; gap: 5px; }
+    /* Next game teaser */
+    .next-game { background: var(--color-card-bg); border: 1px solid var(--color-border); border-radius: 10px; margin-bottom: 20px; overflow: hidden; }
+    .next-game-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 0; }
+    .next-game-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-primary); margin: 0; }
+    .next-game-details { padding: 8px 16px 12px; }
+    .next-game-datetime { font-size: 0.82rem; color: var(--color-text-muted); margin-bottom: 4px; }
+    .next-game-duel { font-size: 1.1rem; font-weight: 700; margin-bottom: 2px; }
+    .next-game-competition { font-size: 0.78rem; color: var(--color-text-muted); }
+    .next-game-venue { display: flex; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--color-border); font-size: 0.82rem; }
+    .next-game-venue-icon { font-size: 1rem; flex-shrink: 0; margin-top: 2px; }
+    .next-game-venue-info { display: flex; flex-direction: column; gap: 4px; }
+    .next-game-nav-links { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+    .next-game-nav-btn { display: inline-block; padding: 4px 10px; background: var(--color-primary); color: #fff; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-decoration: none; }
+    .next-game-nav-btn:hover { opacity: 0.85; }
+    .next-game-map { height: 220px; border-top: 1px solid var(--color-border); }
   </style>`;
 }
 
@@ -560,6 +579,75 @@ function buildNavScript() {
   </script>`;
 }
 
+function buildNextGameTeaser(team) {
+  const nextMatch = (team.matches || []).find(m => m.isNext);
+  if (!nextMatch) return '';
+
+  const badgeClass = isLiga(nextMatch.competition)
+    ? (nextMatch.isHome ? 'badge badge--home' : 'badge badge--away')
+    : 'badge badge--cup';
+  const badgeLabel = nextMatch.isHome ? 'Heim' : 'Auswärts';
+
+  const dateStr = nextMatch.date
+    ? nextMatch.date.slice(5).split('-').reverse().join('.')
+    : '';
+  const timeStr = nextMatch.time ? ` · ${escapeHtml(nextMatch.time)} Uhr` : '';
+  const duel = (nextMatch.ownShort && nextMatch.opponentShort)
+    ? `${escapeHtml(nextMatch.ownShort)} vs. ${escapeHtml(nextMatch.opponentShort)}`
+    : escapeHtml(nextMatch.opponent);
+
+  const hasVenue = !!(nextMatch.venueAddress && nextMatch.venueAddress.trim());
+  const encodedAddr = hasVenue ? encodeURIComponent(nextMatch.venueAddress) : '';
+
+  const venueHtml = hasVenue ? `
+  <div class="next-game-venue">
+    <span class="next-game-venue-icon" aria-hidden="true">📍</span>
+    <div class="next-game-venue-info">
+      ${nextMatch.venueName ? `<strong>${escapeHtml(nextMatch.venueName)}</strong><br>` : ''}
+      <span>${escapeHtml(nextMatch.venueAddress)}</span>
+      <div class="next-game-nav-links">
+        <a href="https://www.google.com/maps/dir/?api=1&destination=${encodedAddr}" target="_blank" rel="noopener" class="next-game-nav-btn">Google Maps ↗</a>
+        <a href="https://maps.apple.com/?daddr=${encodedAddr}" target="_blank" rel="noopener" class="next-game-nav-btn">Apple Maps ↗</a>
+      </div>
+    </div>
+  </div>
+  <div id="next-game-map-${escapeHtml(team.teamId)}" class="next-game-map" data-address="${escapeHtml(nextMatch.venueAddress)}" data-venue="${escapeHtml(nextMatch.venueName || '')}"></div>
+  <script>
+  (function() {
+    var el = document.getElementById('next-game-map-${escapeHtml(team.teamId)}');
+    if (!el) return;
+    var addr = el.getAttribute('data-address');
+    var venue = el.getAttribute('data-venue') || addr;
+    fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(addr), {
+      headers: { 'Accept-Language': 'de', 'User-Agent': 'bbb-ics-generator/1.0' }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data || !data[0]) { el.style.display = 'none'; return; }
+      var lat = parseFloat(data[0].lat), lon = parseFloat(data[0].lon);
+      var map = L.map(el).setView([lat, lon], 15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      }).addTo(map);
+      L.marker([lat, lon]).addTo(map).bindPopup(venue).openPopup();
+    })
+    .catch(function() { el.style.display = 'none'; });
+  })();
+  </script>` : '';
+
+  return `<section class="next-game">
+  <div class="next-game-header">
+    <h2 class="next-game-title">Nächstes Spiel</h2>
+    <span class="${badgeClass}">${badgeLabel}</span>
+  </div>
+  <div class="next-game-details">
+    <div class="next-game-datetime">${escapeHtml(dateStr)}${timeStr}</div>
+    <div class="next-game-duel">${duel}</div>
+    <div class="next-game-competition">${escapeHtml(nextMatch.competition)}</div>
+  </div>${venueHtml}
+</section>`;
+}
+
 function buildTeamPage(team, allTeams, theme) {
   const { primary, accent, cupColor } = theme;
 
@@ -615,6 +703,8 @@ function buildTeamPage(team, allTeams, theme) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(team.teamName)}${team.ageGroup && !/^(senioren|herren)$/i.test(team.ageGroup) ? ' ' + escapeHtml(team.ageGroup) : ''}</title>
   ${buildSharedStyles(primary, accent, cupColor)}
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WPeM=" crossorigin=""></script>
 </head>
 <body>
   ${nav}
@@ -626,6 +716,7 @@ function buildTeamPage(team, allTeams, theme) {
         <p class="team-page-meta">Stand: ${lastUpdate}</p>
       </div>
     </div>
+    ${buildNextGameTeaser(team)}
     ${compBlocks}
     <section class="schedule-section">
       <div class="tab-bar" role="tablist" aria-label="Spielvariante für ${escapeHtml(team.teamName)}">
@@ -711,7 +802,7 @@ function genHTML(theme = {}) {
 }
 
 module.exports = { genHTML };
-module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket, buildNavScript, buildSharedStyles, buildTabScript, buildTeamPage, buildIndexPage };
+module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket, buildNavScript, buildSharedStyles, buildTabScript, buildTeamPage, buildIndexPage, buildNextGameTeaser };
 
 if (require.main === module) {
   const config = require('../config.json');
