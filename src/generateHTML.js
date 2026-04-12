@@ -214,7 +214,7 @@ function buildTeaserCard(team) {
       : 'badge badge--cup';
     const badgeLabel = m.isHome ? 'H' : 'A';
     const prefix = m.isHome ? 'vs.' : '@';
-    const oppName = escapeHtml(m.opponentShort || m.opponent || '');
+    const oppName = escapeHtml(m.opponent || '');
     const duel = `${prefix} ${oppName}`;
     if (m.result) {
       const parts = m.result.split(':');
@@ -440,6 +440,7 @@ function buildSharedStyles(primary, accent, cupColor) {
     .teaser-streak-label { font-weight: 700; }
     .teaser-results { flex: 1; padding: 8px 14px; }
     .teaser-result { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--color-border); font-size: 0.82rem; }
+    .teaser-opponent { flex: 1; text-align: left; }
     .teaser-score { font-weight: 600; }
     .teaser-date { font-size: 0.78rem; color: var(--color-text-muted); }
     .teaser-result--upcoming { opacity: 0.75; }
