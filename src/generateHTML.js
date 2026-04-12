@@ -272,7 +272,7 @@ function buildStandingsTable(comp) {
   const leader = table[0];
 
   const officialRows = table.map(row => {
-    const diff = row.korbdiff > 0 ? `+${row.korbdiff}` : String(row.korbdiff);
+    const diff = (row.korbdiff ?? 0) > 0 ? `+${row.korbdiff}` : String(row.korbdiff ?? 0);
     return `<tr${row.isOwn ? ' class="standings-own"' : ''}>` +
       `<td class="standings-rank">${escapeHtml(String(row.rank))}</td>` +
       `<td>${escapeHtml(row.teamName)}</td>` +
@@ -294,7 +294,7 @@ function buildStandingsTable(comp) {
     })
     .sort((a, b) => (a.gb ?? -1) - (b.gb ?? -1))
     .map((row, i) => {
-      const diff = row.korbdiff > 0 ? `+${row.korbdiff}` : String(row.korbdiff);
+      const diff = (row.korbdiff ?? 0) > 0 ? `+${row.korbdiff}` : String(row.korbdiff ?? 0);
       const gbCell = row.gb === null ? '–' : (Number.isInteger(row.gb) ? String(row.gb) : row.gb.toFixed(1));
       return `<tr${row.isOwn ? ' class="standings-own"' : ''}>` +
         `<td class="standings-rank">${i + 1}</td>` +
@@ -467,7 +467,7 @@ function buildSharedStyles(primary, accent, cupColor) {
     .standings-table td { padding: 4px 8px; border-bottom: 1px solid var(--color-border); }
     .standings-num { text-align: right; }
     .standings-rank { text-align: center; font-weight: 600; }
-    .standings-diff { color: var(--color-text); opacity: 0.7; }
+    .standings-diff { color: var(--color-text); }
     .standings-gb { font-weight: 700; }
     .standings-own { background: var(--color-badge-home-bg); font-weight: 600; }
     /* Bracket */
