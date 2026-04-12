@@ -649,9 +649,12 @@ function buildNextGameTeaser(team) {
   // Use full team names for team page teaser
   const ownName  = escapeHtml(nextMatch.isHome ? team.teamName : nextMatch.opponent);
   const oppName  = escapeHtml(nextMatch.isHome ? nextMatch.opponent : team.teamName);
-  const ownLogo  = team.logoUrl ? `<img src="${escapeHtml(team.logoUrl)}" alt="${ownName}" class="next-game-team-logo">` : `<div class="next-game-team-logo-placeholder"></div>`;
-  // Opponent logo: BBB media endpoint uses same pattern but we only have team.logoUrl for own team
-  const oppLogo  = `<div class="next-game-team-logo-placeholder next-game-team-logo-placeholder--opp"></div>`;
+  const ownLogo = team.logoUrl
+    ? `<img src="${escapeHtml(team.logoUrl)}" alt="${ownName}" class="next-game-team-logo">`
+    : `<div class="next-game-team-logo-placeholder"></div>`;
+  const oppLogo = nextMatch.opponentLogoUrl
+    ? `<img src="${escapeHtml(nextMatch.opponentLogoUrl)}" alt="${oppName}" class="next-game-team-logo">`
+    : `<div class="next-game-team-logo-placeholder"></div>`;
 
   const hasVenue = !!(nextMatch.venueAddress && nextMatch.venueAddress.trim());
   const encodedAddr = hasVenue ? encodeURIComponent(nextMatch.venueAddress) : '';

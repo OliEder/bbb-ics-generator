@@ -119,6 +119,7 @@ async function updateAll() {
         const isNext = !nextMarked && !result ? (nextMarked = true, true) : false;
         let venueName = '';
         let venueAddress = '';
+        let opponentLogoUrl = '';
         if (isNext) {
           const feld = details[m.matchId]?.feld || {};
           venueName = feld.bezeichnung || '';
@@ -126,6 +127,10 @@ async function updateAll() {
           venueAddress = (feld.strasse && feld.ort)
             ? `${feld.strasse}, ${plzOrt}`
             : '';
+          const oppId = isHome
+            ? m.guestTeam?.teamPermanentId
+            : m.homeTeam?.teamPermanentId;
+          if (oppId) opponentLogoUrl = `${BBB_MEDIA_BASE}/${oppId}/logo`;
         }
         return {
           date:          m.kickoffDate  || '',
@@ -139,6 +144,7 @@ async function updateAll() {
           isNext,
           venueName,
           venueAddress,
+          opponentLogoUrl,
         };
       });
 

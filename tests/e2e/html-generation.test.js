@@ -808,6 +808,7 @@ test('isNext match enthält venueName und venueAddress', () => {
         isHome: true, result: null, competition: 'Bayerische Oberliga', isNext: true,
         venueName: 'Sporthalle Nordmühle',
         venueAddress: 'Mühlenstr. 12, 12345 Neumarkt',
+        opponentLogoUrl: 'https://www.basketball-bund.net/media/team/9999/logo',
       },
     ],
     competitions: [],
@@ -823,6 +824,8 @@ test('isNext match enthält venueName und venueAddress', () => {
   assert.ok(html.includes('VfB Dragons'), 'Gegner-Vollname fehlt im Teaser');
   assert.ok(html.includes('next-game-matchup'), 'Matchup-Layout fehlt');
   assert.ok(html.includes('next-game-team-name'), 'team-name Element fehlt');
+  // Opponent logo from BBB API
+  assert.ok(html.includes('basketball-bund.net/media/team/9999/logo'), 'Gegner-Logo fehlt');
 });
 
 test('buildNextGameTeaser: kein Venue → kein Kartenblock', () => {
