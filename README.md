@@ -79,6 +79,15 @@ Jedes Spiel wird als ICS-Event angelegt mit:
 - **Alarm:** 30 min vorher bei Heimspielen, 60 min bei Auswärtsspielen
 - **Ort:** Adresse der Halle
 
+### Next-Game Teaser (Teamseiten)
+
+Jede Teamseite zeigt oben einen Teaser mit dem nächsten Spiel, inkl. Hallenadresse und einer interaktiven Karte.
+
+- **Kartendienst:** [Leaflet.js](https://leafletjs.com/) + [OpenStreetMap](https://www.openstreetmap.org/) (kein API-Key nötig)
+- **Geocoding:** [Nominatim](https://nominatim.openstreetmap.org/) (OSM, kostenlos, kein API-Key) — wird clientseitig beim Laden der Seite aufgerufen
+- **Hinweis:** Nominatim darf nicht für Massen-Geocoding verwendet werden. Hier wird pro Seitenaufruf genau eine Anfrage gestellt.
+- **Navigation:** Links zu Google Maps und Apple Maps mit vorausgefüllter Zieladresse
+
 ## Automatische Aktualisierung
 
 GitHub Actions führt den Workflow aus bei:
