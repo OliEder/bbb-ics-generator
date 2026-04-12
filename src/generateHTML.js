@@ -646,14 +646,16 @@ function buildNextGameTeaser(team) {
     : '';
   const timeStr = nextMatch.time ? `${escapeHtml(nextMatch.time)} Uhr` : '';
 
-  // Use full team names for team page teaser
-  const ownName  = escapeHtml(nextMatch.isHome ? team.teamName : nextMatch.opponent);
-  const oppName  = escapeHtml(nextMatch.isHome ? nextMatch.opponent : team.teamName);
-  const ownLogo = team.logoUrl
-    ? `<img src="${escapeHtml(team.logoUrl)}" alt="${ownName}" class="next-game-team-logo">`
+  // Home team left, guest team right — regardless of which is "own"
+  const homeName = escapeHtml(nextMatch.isHome ? team.teamName : nextMatch.opponent);
+  const guestName = escapeHtml(nextMatch.isHome ? nextMatch.opponent : team.teamName);
+  const homeLogoUrl = nextMatch.isHome ? team.logoUrl : nextMatch.opponentLogoUrl;
+  const guestLogoUrl = nextMatch.isHome ? nextMatch.opponentLogoUrl : team.logoUrl;
+  const homeLogo = homeLogoUrl
+    ? `<img src="${escapeHtml(homeLogoUrl)}" alt="${homeName}" class="next-game-team-logo">`
     : `<div class="next-game-team-logo-placeholder"></div>`;
-  const oppLogo = nextMatch.opponentLogoUrl
-    ? `<img src="${escapeHtml(nextMatch.opponentLogoUrl)}" alt="${oppName}" class="next-game-team-logo">`
+  const guestLogo = guestLogoUrl
+    ? `<img src="${escapeHtml(guestLogoUrl)}" alt="${guestName}" class="next-game-team-logo">`
     : `<div class="next-game-team-logo-placeholder"></div>`;
 
   const hasVenue = !!(nextMatch.venueAddress && nextMatch.venueAddress.trim());
@@ -704,8 +706,8 @@ function buildNextGameTeaser(team) {
   </div>
   <div class="next-game-matchup">
     <div class="next-game-team">
-      ${ownLogo}
-      <span class="next-game-team-name">${ownName}</span>
+      ${homeLogo}
+      <span class="next-game-team-name">${homeName}</span>
     </div>
     <div class="next-game-vs">
       <span class="next-game-vs-label">vs.</span>
@@ -713,8 +715,8 @@ function buildNextGameTeaser(team) {
       ${timeStr ? `<div class="next-game-kickoff-time">${timeStr}</div>` : ''}
     </div>
     <div class="next-game-team next-game-team--opp">
-      ${oppLogo}
-      <span class="next-game-team-name">${oppName}</span>
+      ${guestLogo}
+      <span class="next-game-team-name">${guestName}</span>
     </div>
   </div>
   <div class="next-game-competition-row">${escapeHtml(nextMatch.competition)}</div>${venueHtml}
