@@ -337,8 +337,8 @@ test.describe('Next-Game-Teaser — Venue & Karte', () => {
     const { dir, htmlPath } = generateTeamHtml(DEFAULT_THEME, teamMetadataWithVenue);
     try {
       await page.goto('file://' + htmlPath);
-      await expect(page.getByText('Woffenbacher Str. 38, 92318 Neumarkt')).toBeVisible();
-      await expect(page.getByText('Sporthalle West')).toBeVisible();
+      await expect(page.locator('.next-game-venue').getByText('Woffenbacher Str. 38, 92318 Neumarkt')).toBeVisible();
+      await expect(page.locator('.next-game-venue').getByText('Sporthalle West')).toBeVisible();
     } finally {
       rmSync(dir, { recursive: true });
     }
