@@ -2,7 +2,7 @@
 
 === Whitebox-Gesamtsystem
 
-Das System besteht aus sechs aktiven Modulen und einem ungenutzten Modul. Die Module sind lose gekoppelt und kommunizieren ausschließlich über Funktionsaufrufe (CommonJS `require`).
+Das System besteht aus fünf aktiven Modulen. Die Module sind lose gekoppelt und kommunizieren ausschließlich über Funktionsaufrufe (CommonJS `require`).
 
 [source,mermaid]
 ----
@@ -10,10 +10,9 @@ graph LR
     CU["cronUpdate.js\nOrchestrator"] --> AC["apiClient.js\nAPI-Facade"]
     CU --> IG["icsGenerator.js\nRFC 5545 Renderer"]
     CU --> ST["storage.js\nPersistenz"]
-    CU --> GH["generateHTML.js\nHTML-Generator"]
+    CU --> GH["generateHTML.js\nPortal-Generator"]
     GH --> ST
     SV["server.js\nDev-Server"] -.->|nur lokal| ST
-    GEO["geocode.js\nnicht genutzt"]
 ----
 
 === Modul: cronUpdate.js (Orchestrator)
@@ -142,26 +141,34 @@ a|
 | `fs`, `path` (Node.js Stdlib)
 |===
 
-=== Modul: generateHTML.js (HTML-Generator)
+=== Modul: generateHTML.js (Portal-Generator)
 
 [cols="2,5", options="header"]
 |===
 | Aspekt | Beschreibung
 
 | *Verantwortlichkeit*
-| Erzeugt die statische HTML-Übersichtsseite `generated/index.html` mit Subscription-Links für alle Teams.
+| Erzeugt die komplette statische Website aus `metadata.json`: Startseite (`index.html`) mit adaptiven Team-Teasern und Navigationsmenü sowie individuelle Team-Seiten (`teams/{teamId}.html`) mit Next-Game-Teaser, Ligatabellen, Turnierbäumen, Spielplan-Tabs und Kalender-Abo-Links.
 
 | *Eingang*
-| `generated/metadata.json` (erzeugt von `cronUpdate.js`) mit Teamname, Altersgruppe, Spielanzahlen und Timestamp.
+| `generated/metadata.json` mit vollständigen Team-Metadaten: Spielplan (mit `isNext`, `ownShort`, `opponentShort`, `venueName`, `venueAddress`), Ligatabellen (`competitions[].table`), Turnierbäume (`competitions[].bracket`), Geschlecht, Altersgruppe, Logo-URL.
 
 | *Ausgang*
-| `generated/index.html` mit drei Link-Gruppen pro Team: webcal:// (iOS/macOS), Google Calendar Render-URL (Android), direkte HTTPS-URL (Download).
+| `generated/index.html` (Startseite) und `generated/teams/{teamId}.html` (eine Datei pro Team). Alle HTML-Dateien sind vollständig eigenständig (inline CSS + JS, keine externen Assets außer Leaflet CDN und BBB-Logo-URL).
 
-| *Wichtige Logik*
-| HTML-Escaping aller aus `metadata.json` gelesenen Strings via `escapeHtml()`. Hartcodierte Base-URL `https://olieder.github.io/bbb-ics-generator/` (bekannte technische Schuld, siehe Kapitel 11).
+| *Wichtige interne Funktionen*
+a|
+* `buildTeaserCard(team)` — adaptiver Teaser mit bis zu 3 vergangenen Ergebnissen + bis zu 4−n zukünftigen Terminen
+* `buildNextGameTeaser(team)` — detaillierter Next-Game-Block mit Leaflet-Karte (clientseitig per Nominatim geocodiert)
+* `buildStandingsTable(comp)` — zwei Tabs: offizielle Tabelle + Games-Behind-Ranking
+* `buildBracket(comp, ownTeamName)` — Turnierbaum mit Highlight des eigenen Teams und TBD-Platzhaltern für zukünftige Runden
+* `buildTeamPage(team, allTeams, theme)` — vollständige Team-Seite
+* `buildIndexPage(teams, theme)` — Startseite
+* `teamLabel(teamName, ageGroup, gender)` — einheitliche Teambezeichnung mit Geschlechtssymbol
+* `sortTeams(teams)` — Senioren zuerst, dann aufsteigend nach Altersgruppe
 
 | *Abhängigkeiten*
-| `fs`, `path` (Node.js Stdlib)
+| `fs`, `path` (Node.js Stdlib); Leaflet 1.9.4 (CDN, nur in Team-Seiten)
 |===
 
 === Modul: server.js (Lokaler Entwicklungsserver)
@@ -180,30 +187,11 @@ a|
 | `express`
 |===
 
-=== Modul: geocode.js (OSM Geocoding — aktuell nicht genutzt)
-
-[cols="2,5", options="header"]
-|===
-| Aspekt | Beschreibung
-
-| *Verantwortlichkeit*
-| War als Integration für OpenStreetMap Nominatim Geocoding vorgesehen, um Hallenadressen in GPS-Koordinaten umzuwandeln.
-
-| *Status*
-| Das Modul ist im Repository vorhanden, wird aber von keinem anderen Modul importiert oder aufgerufen. Es ist aktuell funktionslos (Dead Code).
-
-| *Geplante Verwendung*
-| Zukünftige Integration: LOCATION-Eigenschaft in VEVENT-Events mit GPS-Koordinaten anreichern, damit Kalender-Apps direkt zur Sporthalle navigieren können.
-
-| *Abhängigkeiten*
-| Unbekannt (nicht in Verwendung); vermutlich `axios` für HTTP-Anfragen an Nominatim.
-|===
-
 === Abhängigkeitsmatrix
 
-[cols="2,1,1,1,1,1,1,1", options="header"]
+[cols="2,1,1,1,1,1,1", options="header"]
 |===
-| Modul | cronUpdate | apiClient | icsGenerator | storage | generateHTML | server | geocode
+| Modul | cronUpdate | apiClient | icsGenerator | storage | generateHTML | server
 
 | *cronUpdate.js*
 | —
@@ -212,10 +200,8 @@ a|
 | nutzt
 | —
 | —
-| —
 
 | *apiClient.js*
-| —
 | —
 | —
 | —
@@ -230,10 +216,8 @@ a|
 | —
 | —
 | —
-| —
 
 | *storage.js*
-| —
 | —
 | —
 | —
@@ -248,19 +232,8 @@ a|
 | liest FS direkt
 | —
 | —
-| —
 
 | *server.js*
-| —
-| —
-| —
-| —
-| —
-| —
-| —
-
-| *geocode.js*
-| —
 | —
 | —
 | —

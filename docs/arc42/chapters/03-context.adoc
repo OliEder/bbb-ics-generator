@@ -2,17 +2,18 @@
 
 === Systemkontextdiagramm
 
-Das folgende Diagramm zeigt den BBB ICS Generator im Kontext seiner Kommunikationspartner:
+Das folgende Diagramm zeigt das BBB Vereinsportal im Kontext seiner Kommunikationspartner:
 
 [source,mermaid]
 ----
 flowchart TD
     GHA["⚙️ GitHub Actions\nCron: alle 6h / Push: main"] -->|npm run update| SYS
-    SYS["🔧 BBB ICS Generator\ncronUpdate.js · apiClient.js\nicsGenerator.js · storage.js\ngenerateHTML.js"] -->|HTTP GET| BBBAPI["🏀 Basketball-Bund\nREST-API"]
-    SYS -->|upload artifact| GHPAGES["📄 GitHub Pages\nolieder.github.io/\nbbb-ics-generator/"]
+    SYS["🔧 BBB Vereinsportal\ncronUpdate.js · apiClient.js\nicsGenerator.js · storage.js\ngenerateHTML.js"] -->|HTTP GET| BBBAPI["🏀 Basketball-Bund\nREST-API\n/matches · /matchInfo · /table · /spielplan"]
+    SYS -->|upload artifact| GHPAGES["📄 GitHub Pages\nolieder.github.io/\nbbb-ics-generator/\nindex.html + teams/*.html + *.ics"]
     GHPAGES -->|webcal://| IOS["🍎 iOS / macOS\nKalender.app"]
     GHPAGES -->|Google Calendar URL| AND["🤖 Android\nGoogle Calendar"]
     GHPAGES -->|HTTPS Download| OTHER["💻 Outlook\nThunderbird"]
+    GHPAGES -->|Leaflet + Nominatim| OSM["🗺️ OpenStreetMap\nNominatim Geocoding\n(clientseitig)"]
 ----
 
 === Fachlicher Kontext
@@ -22,15 +23,27 @@ flowchart TD
 | Kommunikationspartner | Richtung | Beschreibung der Schnittstelle
 
 | *Basketball-Bund REST-API*
-| BBB ICS Generator ← API (HTTP GET)
+| BBB Vereinsportal ← API (HTTP GET)
 | Das System ruft drei Endpunkte ab: (1) Club-Teams über `/rest/club/id/{clubId}/actualmatches`, (2) Team-Spielplan über `/rest/team/id/{teamId}/matches`, (3) Match-Details über `/rest/match/id/{matchId}/matchInfo`. Alle Endpunkte liefern JSON. Keine Authentifizierung erforderlich.
 
+| *Basketball-Bund REST-API — Tabelle*
+| BBB Vereinsportal ← API (HTTP GET)
+| Endpunkt: `/rest/competition/table/id/{ligaId}`. Liefert die Ligatabelle mit Rang, Teamname, Siege, Niederlagen, Punkte, Körbe, Korbdifferenz.
+
+| *Basketball-Bund REST-API — Spielplan/Turnierplan*
+| BBB Vereinsportal ← API (HTTP GET)
+| Endpunkte: `/rest/competition/spielplan/id/{ligaId}` und `/rest/competition/id/{ligaId}/matchday/{day}`. Liefert Pokal-Turnierstrukturen (Runden, Paarungen, Ergebnisse).
+
+| *Nominatim (OpenStreetMap)*
+| Browser → Nominatim (HTTP GET, clientseitig)
+| Geocoding für den Next-Game-Teaser: `https://nominatim.openstreetmap.org/search?format=json&q=<adresse>`. Wird im Browser des Nutzers aufgerufen (1 Anfrage pro Seitenaufruf). Kein API-Key erforderlich.
+
 | *GitHub Actions*
-| GitHub Actions → BBB ICS Generator (triggert Build)
+| GitHub Actions → BBB Vereinsportal (triggert Build)
 | Führt den Node.js-Prozess (`npm run update` und `npm run generate-html`) in einer Ubuntu-Runner-Umgebung aus. Trigger: Cron alle 6 Stunden, Push auf `main`, manueller `workflow_dispatch`.
 
 | *GitHub Pages*
-| BBB ICS Generator → GitHub Pages (HTTP Upload via Actions)
+| BBB Vereinsportal → GitHub Pages (HTTP Upload via Actions)
 | Das `generated/`-Verzeichnis wird als Pages-Artefakt hochgeladen und über `https://olieder.github.io/bbb-ics-generator/` bereitgestellt.
 
 | *Kalender-Clients (Abonnenten)*
@@ -52,9 +65,9 @@ flowchart TD
 | Dateisystem (Node.js `fs`)
 | Schreibt `{teamId}_{type}.ics` und `metadata.json` via `fs.writeFileSync`; Verzeichnis `generated/` wird bei Bedarf angelegt
 
-| generateHTML.js → generated/index.html
+| generateHTML.js → generated/index.html + teams/*.html
 | Dateisystem (Node.js `fs`)
-| Liest `generated/metadata.json`; schreibt `generated/index.html` mit hartcodierten Links zur GitHub-Pages-URL `https://olieder.github.io/bbb-ics-generator/`
+| Liest `generated/metadata.json`; schreibt `generated/index.html` und `generated/teams/{teamId}.html` mit hartcodierten Links zur GitHub-Pages-URL `https://olieder.github.io/bbb-ics-generator/`
 
 | GitHub Actions → GitHub Pages
 | GitHub Actions API / HTTP Upload
@@ -82,4 +95,16 @@ flowchart TD
 | `/rest/match/id/{matchId}/matchInfo`
 | GET
 | Liefert Detailinfos zu einem einzelnen Spiel: vollständige Teamnamen, Spielfeld (`spielfeld`) mit Hallen-Bezeichnung, Straße, PLZ, Ort, und erweiterte Liga-Metadaten.
+
+| `/rest/competition/table/id/{ligaId}`
+| GET
+| Liefert die Ligatabelle. Enthält `tabelle.entries[]` mit: `rang`, `team.teamname`, `team.teamPermanentId`, `anzspiele`, `s` (Siege), `n` (Niederlagen), `anzGewinnpunkte`, `koerbe`, `gegenKoerbe`, `korbdiff`.
+
+| `/rest/competition/spielplan/id/{ligaId}`
+| GET
+| Liefert den Turnierplan eines Pokalwettbewerbs. Enthält entweder `spieltage[]` (Verweise auf Spieltage) oder direkt `matches[]` mit `matchDay`-Gruppierung (z.B. Bayernpokal).
+
+| `/rest/competition/id/{ligaId}/matchday/{day}`
+| GET
+| Liefert die Spiele eines einzelnen Spieltags eines Pokalwettbewerbs. Wird für jeden Eintrag in `spieltage[]` aufgerufen.
 |===

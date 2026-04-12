@@ -2,19 +2,16 @@
 
 === Aufgabenstellung
 
-Der *BBB ICS Generator* ist ein automatisierter Kalender-Feed-Dienst für die *Fibalon Baskets Neumarkt*.
-Er ruft Spieltermine für alle Teams des Vereins über die öffentliche REST-API des Deutschen Basketball-Bundes (DBB) ab und stellt diese als abonnierbare ICS-Feeds bereit.
+Das *BBB Vereinsportal* ist eine automatisch generierte statische Website für die *Fibalon Baskets Neumarkt*.
+Es ruft alle 6 Stunden Spielplandaten für alle Teams des Vereins über die öffentliche REST-API des Deutschen Basketball-Bundes (DBB) ab und veröffentlicht ein vollständiges Vereinsportal auf GitHub Pages.
 
-Die Feeds können von Fans, Spielern und Betreuern direkt in ihre Kalenderanwendungen (iOS Calendar, Google Calendar, Outlook, Thunderbird u. a.) abonniert werden.
-Nach einmaliger Einrichtung erhalten Abonnenten automatisch alle neuen und geänderten Spieltermine, ohne manuelles Eingreifen.
+Das Portal umfasst:
 
-Die Kernfunktionalität umfasst:
-
-* Automatischer Abruf aller aktiven Teams des Vereins über die `clubId`
-* Abruf der Spielplandaten (Gegner, Datum, Uhrzeit, Liga, Spielfeld) pro Team
-* Erzeugung valider ICS-Dateien nach RFC 5545 in drei Varianten: alle Spiele, nur Heimspiele, nur Auswärtsspiele
-* Bereitstellung als statische Dateien über GitHub Pages mit webcal://, HTTPS- und Google-Calendar-Links
-* Automatische Aktualisierung alle sechs Stunden über GitHub Actions
+* *Startseite* mit adaptiven Team-Teasern: zeigt zukünftige Termine am Saisonbeginn, Ergebnisse + Nächstes-Spiel im laufenden Betrieb, Saisonende-Hinweis am Ende
+* *Individuelle Team-Seiten* mit Next-Game-Teaser (inkl. interaktiver Leaflet-Karte, Google Maps- und Apple Maps-Links), Ligatabellen (offizielle Tabelle + Games-Behind-Variante), Turnierbäumen für Pokalwettbewerbe und Spielplan mit Heim/Auswärts-Filterung
+* *Abonnierbare ICS-Kalender-Feeds* pro Team in drei Varianten: alle Spiele, nur Heimspiele, nur Auswärtsspiele — kompatibel mit iOS Calendar, Google Calendar, Outlook, Thunderbird
+* *Automatische Team-Erkennung* über die `clubId` — keine manuelle Pflege nötig
+* *Theming* über `config.json` (Vereinsfarben, Logo)
 
 === Qualitätsziele
 
@@ -35,6 +32,10 @@ Die folgende Tabelle listet die drei wichtigsten Qualitätsziele in absteigender
 | 3
 | *Wartbarkeit*
 | Neue Teams werden automatisch über die `clubId` erkannt — keine manuelle Pflege einer Teamliste. Die gesamte Konfiguration beschränkt sich auf eine einzige Datei (`config.json`) mit einer einzigen Variable (`clubId`). Das Hinzufügen weiterer Vereine erfordert lediglich eine weitere Instanz des Systems.
+
+| 4
+| *Barrierefreiheit*
+| Die generierte Website muss WCAG 2.1 AA-konform sein. ARIA-Roles für Tab-Panels, semantisches HTML, ausreichende Farbkontraste und korrekte alt-Attribute sind verpflichtend. Automatisch prüfbar über axe-core (Playwright-Integration).
 |===
 
 === Stakeholder

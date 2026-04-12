@@ -248,6 +248,99 @@ a|
 * Negative: `CURRENT_SEASON` muss jährlich aktualisiert werden. `metadata.json` wächst durch das `matches`-Array (bei typisch 14–20 Spielen pro Team vernachlässigbar). Liga-Heuristik ("liga" im Namen) kann bei ungewöhnlichen Wettbewerbsnamen fehlschlagen.
 |===
 
+=== ADR-010: Statische Multi-Page-Site statt Single-Page-Application
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-04-11
+
+| *Kontext*
+| Das Projekt wuchs über ICS-Generierung hinaus. Team-spezifische Seiten mit Tabellen und Turnierbäumen wurden benötigt. Es musste entschieden werden, ob eine SPA (z.B. mit React) oder mehrere statische HTML-Seiten gebaut werden.
+
+| *Entscheidung*
+| Weiterhin vollständig statische HTML-Seiten — eine `index.html` und pro Team eine `teams/{teamId}.html`. Kein JavaScript-Framework, kein Build-Step.
+
+| *Begründung*
+a|
+* GitHub Pages hostet statische Dateien ohne Server-Logik — eine SPA würde entweder Client-Side-Routing oder Server-Side-Rendering erfordern.
+* Kein Build-Tooling (kein Webpack/Vite/Rollup) — geringere Wartungslast, keine Dependency-Konflikte.
+* Jede Seite ist vollständig eigenständig (inline CSS + JS) — kein Caching-Problem bei Updates.
+* Die Datenmenge ist überschaubar (< 20 Teams) — statische Generierung ist performant genug.
+
+| *Konsequenzen*
+a|
+* Positive: Zero-Dependency-Frontend, schnelle Ladezeiten, kein JS-Framework-Upgrade-Risiko.
+* Negative: Code-Duplikation im generierten HTML (CSS wird pro Seite wiederholt). Bei > 50 Teams würde die Generierung spürbar langsamer.
+|===
+
+=== ADR-011: Leaflet + OpenStreetMap für clientseitige Kartenintegration
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-04-12
+
+| *Kontext*
+| Der Next-Game-Teaser auf Team-Seiten soll die Spielhalle auf einer Karte anzeigen. Dafür wird ein Kartendienst und ein Geocoding-Service benötigt.
+
+| *Entscheidung*
+| Leaflet.js (v1.9.4, CDN mit SRI-Hash) als Karten-Library, OpenStreetMap als Tile-Provider, Nominatim als Geocoding-Service. Alles clientseitig — kein Server-seitiges Geocoding.
+
+| *Begründung*
+a|
+* Leaflet + OSM ist kostenlos, kein API-Key erforderlich.
+* Nominatim ist der offizielle Geocoding-Service von OSM — ebenfalls kostenlos und ohne Registrierung.
+* Clientseitiges Geocoding vermeidet Koordinaten-Speicherung in `metadata.json` und hält die Generierungszeit kurz.
+* SRI-Hash auf CDN-Ressourcen schützt vor Supply-Chain-Angriffen.
+* Graceful Degradation: Bei Nominatim-Fehler wird der Karten-Div ausgeblendet — restlicher Teaser bleibt vollständig funktional.
+
+| *Konsequenzen*
+a|
+* Positive: Keine API-Kosten, keine Registrierung, kein API-Key-Rotation-Risiko.
+* Negative: Karte lädt nur mit Internetverbindung. Nominatim-Nutzungsrichtlinien (max. 1 Request/s, kein Bulk-Geocoding) müssen eingehalten werden — hier: 1 Request pro Seitenaufruf. CDN-Ausfall (unpkg.com) deaktiviert die Karte. `document.currentScript.previousElementSibling` funktioniert nicht in deferred/async-Script-Kontexten.
+|===
+
+=== ADR-012: Games-Behind als alternatives Tabellenranking
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-04-12
+
+| *Kontext*
+| Die offizielle BBB-Ligatabelle sortiert nach Gewinnpunkten. Im Basketball (und generell im nordamerikanischen Sport) ist das "Games Behind"-Konzept (GB) aus der NBA bekannt und gibt intuitiv an, wie weit ein Team hinter dem Spitzenreiter liegt.
+
+| *Entscheidung*
+| Zusätzlich zur offiziellen Tabelle wird ein zweiter Tab "Ranking nach GB" angezeigt. GB wird berechnet als: `GB = ((führerSiege − teamSiege) + (teamNiederlagen − führerNiederlagen)) / 2`. Der Spitzenreiter hat GB = 0 ("—" angezeigt).
+
+| *Begründung*
+a|
+* Bietet Nutzern, die NBA-Basketball kennen, eine vertraute Perspektive.
+* Die Formel ist eindeutig und aus den bereits vorhandenen API-Feldern (`s`, `n`) berechenbar.
+* Der zweite Tab ist optional — Nutzer können bei der offiziellen Tabelle bleiben.
+
+| *Konsequenzen*
+a|
+* Positive: Reichhaltigere Darstellung ohne zusätzliche API-Aufrufe.
+* Negative: GB macht wenig Sinn bei sehr ungleicher Spielanzahl (unterschiedlich viele Spiele absolviert). Bei Gleichstand (GB = 0.5) wird `.toFixed(1)` angezeigt — leicht ungewohnt für deutsche Nutzer.
+|===
+
 === ADR-006: X-ALT-DESC für HTML-Beschreibungen (aktuell deaktiviert)
 
 [cols="2,5", options="header"]
