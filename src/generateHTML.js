@@ -310,9 +310,9 @@ function buildStandingsTable(comp) {
 
   const tableId = `standings-${escapeHtml(String(comp.ligaId || comp.liganame))}`;
   return `<div class="standings-tabs">` +
-    `<div class="standings-tab-bar">` +
-    `<button class="standings-tab-btn standings-tab-btn--active" data-target="${tableId}-official" aria-selected="true">Offizielle Tabelle</button>` +
-    `<button class="standings-tab-btn" data-target="${tableId}-gb" aria-selected="false">Ranking nach GB</button>` +
+    `<div class="standings-tab-bar" role="tablist">` +
+    `<button class="standings-tab-btn standings-tab-btn--active" role="tab" data-target="${tableId}-official" aria-selected="true">Offizielle Tabelle</button>` +
+    `<button class="standings-tab-btn" role="tab" data-target="${tableId}-gb" aria-selected="false">Ranking nach GB</button>` +
     `</div>` +
     `<div id="${tableId}-official" class="standings-panel">` +
     `<table class="standings-table" aria-label="${escapeHtml(comp.liganame)} Tabelle">` +
