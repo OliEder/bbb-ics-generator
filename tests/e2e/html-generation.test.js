@@ -818,3 +818,56 @@ test('isNext match enthält venueName und venueAddress', () => {
   assert.ok(html.includes('maps.apple.com'), 'Apple Maps Link fehlt');
   assert.ok(html.includes('next-game-map'), 'Leaflet map div fehlt');
 });
+
+test('buildNextGameTeaser: kein Venue → kein Kartenblock', () => {
+  const { buildNextGameTeaser } = require('../../src/generateHTML.js')._testExports;
+  const team = {
+    teamId: 'T2', teamName: 'Test Team', ageGroup: 'U16', gender: '',
+    matches: [
+      {
+        date: '2026-04-19', time: '18:00', opponent: 'VfB Dragons',
+        opponentShort: 'VfB', ownShort: 'NM',
+        isHome: false, result: null, competition: 'Kreisliga', isNext: true,
+        venueName: '', venueAddress: '',
+      },
+    ],
+    competitions: [],
+  };
+  const html = buildNextGameTeaser(team);
+  assert.ok(html.includes('19.04'), 'Datum fehlt');
+  assert.ok(html.includes('Auswärts'), 'Badge fehlt');
+  assert.ok(!html.includes('next-game-map'), 'Kartenblock sollte nicht erscheinen');
+  assert.ok(!html.includes('maps.apple.com'), 'Apple Maps Link sollte nicht erscheinen');
+});
+
+test('buildNextGameTeaser: kein nächstes Spiel → leerer String', () => {
+  const { buildNextGameTeaser } = require('../../src/generateHTML.js')._testExports;
+  const team = {
+    teamId: 'T3', teamName: 'Test Team', ageGroup: 'U14', gender: '',
+    matches: [
+      { date: '2026-03-01', opponent: 'X', isHome: true, result: '70:60', competition: 'Liga', isNext: false, venueName: '', venueAddress: '' },
+    ],
+    competitions: [],
+  };
+  const html = buildNextGameTeaser(team);
+  assert.strictEqual(html, '', 'Sollte leerer String sein wenn kein isNext');
+});
+
+test('buildTeamPage enthält next-game section wenn isNext vorhanden', () => {
+  const { buildTeamPage } = require('../../src/generateHTML.js')._testExports;
+  const team = {
+    teamId: 'T4', teamName: 'NM Baskets', ageGroup: 'Senioren', gender: 'männlich',
+    lastUpdate: new Date().toISOString(),
+    matchCount: 2, homeMatchCount: 1, awayMatchCount: 1,
+    logoUrl: null,
+    matches: [
+      { date: '2026-04-19', time: '18:00', opponent: 'VfB Dragons', opponentShort: 'VfB', ownShort: 'NM', isHome: true, result: null, competition: 'Bayerische Oberliga', isNext: true, venueName: 'Sporthalle', venueAddress: 'Mühlenstr. 1, 92318 Neumarkt' },
+      { date: '2026-04-26', time: '15:00', opponent: 'FC Bayern', opponentShort: 'FCB', ownShort: 'NM', isHome: false, result: null, competition: 'Bayerische Oberliga', isNext: false, venueName: '', venueAddress: '' },
+    ],
+    competitions: [],
+  };
+  const html = buildTeamPage(team, [team], { primary: '#004174', accent: '#009ef3', cupColor: '#7c3aed' });
+  assert.ok(html.includes('next-game'), 'next-game section fehlt');
+  assert.ok(html.includes('leaflet'), 'Leaflet CDN fehlt');
+  assert.ok(html.includes('Nächstes Spiel'), 'Heading fehlt');
+});
