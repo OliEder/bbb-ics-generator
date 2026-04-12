@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 
 const CURRENT_SEASON = 2025; // Saison 2025/26
+const BBB_MEDIA_BASE = 'https://www.basketball-bund.net/media/team';
 
 function isLiga(liganame) {
   return String(liganame || '').toLowerCase().includes('liga');
@@ -33,11 +34,57 @@ async function getTeams() {
   return [];
 }
 
+function mapMatches(seasonMatches, teamId, details) {
+  let nextMarked = false;
+  return seasonMatches.map(m => {
+    const isHome = Number(m.homeTeam?.teamPermanentId) === Number(teamId);
+    const opponent = isHome
+      ? (m.guestTeam?.teamname || '')
+      : (m.homeTeam?.teamname  || '');
+    const opponentShort = isHome
+      ? (m.guestTeam?.teamnameSmall || '')
+      : (m.homeTeam?.teamnameSmall  || '');
+    const ownShort = isHome
+      ? (m.homeTeam?.teamnameSmall || '')
+      : (m.guestTeam?.teamnameSmall || '');
+    const result = m.result || null;
+    const isNext = !nextMarked && !result ? (nextMarked = true, true) : false;
+    let venueName = '';
+    let venueAddress = '';
+    let opponentLogoUrl = '';
+    if (isNext) {
+      const feld = details[m.matchId]?.matchInfo?.spielfeld || details[m.matchId]?.feld || {};
+      venueName = feld.bezeichnung || '';
+      const plzOrt = [feld.plz, feld.ort].filter(Boolean).join(' ');
+      venueAddress = (feld.strasse && feld.ort)
+        ? `${feld.strasse}, ${plzOrt}`
+        : '';
+      const oppId = isHome
+        ? m.guestTeam?.teamPermanentId
+        : m.homeTeam?.teamPermanentId;
+      if (oppId) opponentLogoUrl = `${BBB_MEDIA_BASE}/${oppId}/logo`;
+    }
+    return {
+      date:         m.kickoffDate  || '',
+      time:         m.kickoffTime  || '',
+      opponent,
+      opponentShort,
+      ownShort,
+      isHome,
+      result,
+      competition:  m.ligaData?.liganame || '',
+      isNext,
+      venueName,
+      venueAddress,
+      opponentLogoUrl,
+    };
+  });
+}
+
 async function updateAll() {
   const meta = [];
   const teams = await getTeams();
 
-  const BBB_MEDIA_BASE = 'https://www.basketball-bund.net/media/team';
   // All teamPermanentIds for this club share the same club logo at this endpoint.
   // Using teams[0] is safe; any team ID resolves to the club crest.
   const firstTeamLogoUrl = teams.length > 0
@@ -102,51 +149,7 @@ async function updateAll() {
           return da < db ? -1 : da > db ? 1 : 0;
         });
 
-      // isNext: erstes Spiel ohne Ergebnis
-      let nextMarked = false;
-      const mappedMatches = seasonMatches.map(m => {
-        const isHome = Number(m.homeTeam?.teamPermanentId) === Number(t.id);
-        const opponent = isHome
-          ? (m.guestTeam?.teamname || '')
-          : (m.homeTeam?.teamname  || '');
-        const opponentShort = isHome
-          ? (m.guestTeam?.teamnameSmall || '')
-          : (m.homeTeam?.teamnameSmall  || '');
-        const ownShort = isHome
-          ? (m.homeTeam?.teamnameSmall || '')
-          : (m.guestTeam?.teamnameSmall || '');
-        const result = m.result || null;
-        const isNext = !nextMarked && !result ? (nextMarked = true, true) : false;
-        let venueName = '';
-        let venueAddress = '';
-        let opponentLogoUrl = '';
-        if (isNext) {
-          const feld = details[m.matchId]?.matchInfo?.spielfeld || details[m.matchId]?.feld || {};
-          venueName = feld.bezeichnung || '';
-          const plzOrt = [feld.plz, feld.ort].filter(Boolean).join(' ');
-          venueAddress = (feld.strasse && feld.ort)
-            ? `${feld.strasse}, ${plzOrt}`
-            : '';
-          const oppId = isHome
-            ? m.guestTeam?.teamPermanentId
-            : m.homeTeam?.teamPermanentId;
-          if (oppId) opponentLogoUrl = `${BBB_MEDIA_BASE}/${oppId}/logo`;
-        }
-        return {
-          date:          m.kickoffDate  || '',
-          time:          m.kickoffTime  || '',
-          opponent,
-          opponentShort,
-          ownShort,
-          isHome,
-          result,
-          competition:   m.ligaData?.liganame || '',
-          isNext,
-          venueName,
-          venueAddress,
-          opponentLogoUrl,
-        };
-      });
+      const mappedMatches = mapMatches(seasonMatches, t.id, details);
 
       // Collect unique competitions from this season's matches
       const compMap = new Map();
@@ -196,7 +199,7 @@ async function updateAll() {
   genHTML(theme);
 }
 
-module.exports = { getTeams, updateAll };
+module.exports = { getTeams, updateAll, mapMatches };
 
 if (require.main === module) {
   updateAll();
