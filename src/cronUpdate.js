@@ -81,6 +81,18 @@ function mapMatches(seasonMatches, teamId, details) {
   });
 }
 
+function computeSpotlight(mappedMatches) {
+  if (!mappedMatches.length) return [];
+  const isNextIdx = mappedMatches.findIndex(m => m.isNext);
+  if (isNextIdx !== -1) {
+    const prev = isNextIdx > 0 ? [mappedMatches[isNextIdx - 1]] : [];
+    return [...prev, mappedMatches[isNextIdx]];
+  }
+  const played = mappedMatches.filter(m => m.result);
+  if (played.length > 0) return played.slice(-2);
+  return mappedMatches.slice(0, 2);
+}
+
 async function updateAll() {
   const meta = [];
   const teams = await getTeams();
@@ -186,7 +198,8 @@ async function updateAll() {
         homeMatchCount: homeMatches.length,
         awayMatchCount: awayMatches.length,
         logoUrl:        `${BBB_MEDIA_BASE}/${t.id}/logo`,
-        matches:        mappedMatches,
+        matches:          mappedMatches,
+        spotlightMatches: computeSpotlight(mappedMatches),
         competitions,
       });
     } catch (e) {
@@ -199,7 +212,7 @@ async function updateAll() {
   genHTML(theme);
 }
 
-module.exports = { getTeams, updateAll, mapMatches };
+module.exports = { getTeams, updateAll, mapMatches, computeSpotlight };
 
 if (require.main === module) {
   updateAll();

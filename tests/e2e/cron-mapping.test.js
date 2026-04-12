@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { mapMatches } = require('../../src/cronUpdate');
+const { mapMatches, computeSpotlight } = require('../../src/cronUpdate');
 
 // Minimal match factory
 function makeMatch({ matchId = 1, teamId = 100, isHome = true, result = null, date = '2026-05-01', time = '18:00', liganame = 'Bezirksliga', oppId = 999 } = {}) {
@@ -148,4 +148,63 @@ test('mapMatches: competition aus ligaData.liganame', () => {
   const m = makeMatch({ liganame: 'U16 männlich Bezirksoberliga' });
   const [result] = mapMatches([m], 100, {});
   assert.equal(result.competition, 'U16 männlich Bezirksoberliga');
+});
+
+test('computeSpotlight: isNext + vorheriges Ergebnis → 2 Spiele', () => {
+  const matches = [
+    { date: '2026-03-01', result: '80:70', isNext: false, isHome: true, opponent: 'A', competition: 'Liga', opponentShort: 'A', ownShort: 'B', time: '18:00', venueName: '', venueAddress: '', opponentLogoUrl: '' },
+    { date: '2026-04-10', result: null,    isNext: true,  isHome: false, opponent: 'B', competition: 'Liga', opponentShort: 'B', ownShort: 'A', time: '15:00', venueName: '', venueAddress: '', opponentLogoUrl: '' },
+    { date: '2026-05-01', result: null,    isNext: false, isHome: true,  opponent: 'C', competition: 'Liga', opponentShort: 'C', ownShort: 'A', time: '18:00', venueName: '', venueAddress: '', opponentLogoUrl: '' },
+  ];
+  const result = computeSpotlight(matches);
+  assert.equal(result.length, 2);
+  assert.equal(result[0].result, '80:70');
+  assert.equal(result[1].isNext, true);
+});
+
+test('computeSpotlight: nur isNext (kein vorheriges Ergebnis) → 1 Spiel', () => {
+  const matches = [
+    { date: '2026-04-10', result: null, isNext: true, isHome: true, opponent: 'A', competition: 'Liga', opponentShort: 'A', ownShort: 'B', time: '18:00', venueName: '', venueAddress: '', opponentLogoUrl: '' },
+  ];
+  const result = computeSpotlight(matches);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].isNext, true);
+});
+
+test('computeSpotlight: alle gespielt → letzte 2', () => {
+  const matches = [
+    { date: '2026-02-01', result: '60:50', isNext: false, isHome: true,  opponent: 'A', competition: 'Liga', opponentShort: 'A', ownShort: 'B', time: '18:00', venueName: '', venueAddress: '', opponentLogoUrl: '' },
+    { date: '2026-03-01', result: '70:60', isNext: false, isHome: false, opponent: 'B', competition: 'Liga', opponentShort: 'B', ownShort: 'A', time: '15:00', venueName: '', venueAddress: '', opponentLogoUrl: '' },
+    { date: '2026-04-01', result: '80:70', isNext: false, isHome: true,  opponent: 'C', competition: 'Liga', opponentShort: 'C', ownShort: 'A', time: '18:00', venueName: '', venueAddress: '', opponentLogoUrl: '' },
+  ];
+  const result = computeSpotlight(matches);
+  assert.equal(result.length, 2);
+  assert.equal(result[0].opponent, 'B');
+  assert.equal(result[1].opponent, 'C');
+});
+
+test('computeSpotlight: alle zukünftig → erste 2', () => {
+  const matches = [
+    { date: '2026-05-01', result: null, isNext: false, isHome: true,  opponent: 'A', competition: 'Liga', opponentShort: 'A', ownShort: 'B', time: '18:00', venueName: '', venueAddress: '', opponentLogoUrl: '' },
+    { date: '2026-06-01', result: null, isNext: false, isHome: false, opponent: 'B', competition: 'Liga', opponentShort: 'B', ownShort: 'A', time: '15:00', venueName: '', venueAddress: '', opponentLogoUrl: '' },
+    { date: '2026-07-01', result: null, isNext: false, isHome: true,  opponent: 'C', competition: 'Liga', opponentShort: 'C', ownShort: 'A', time: '18:00', venueName: '', venueAddress: '', opponentLogoUrl: '' },
+  ];
+  const result = computeSpotlight(matches);
+  assert.equal(result.length, 2);
+  assert.equal(result[0].opponent, 'A');
+  assert.equal(result[1].opponent, 'B');
+});
+
+test('computeSpotlight: leere Liste → leeres Array', () => {
+  const result = computeSpotlight([]);
+  assert.deepEqual(result, []);
+});
+
+test('computeSpotlight: nur ein Spiel mit Ergebnis → 1 Spiel', () => {
+  const matches = [
+    { date: '2026-03-01', result: '80:70', isNext: false, isHome: true, opponent: 'A', competition: 'Liga', opponentShort: 'A', ownShort: 'B', time: '18:00', venueName: '', venueAddress: '', opponentLogoUrl: '' },
+  ];
+  const result = computeSpotlight(matches);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].result, '80:70');
 });
