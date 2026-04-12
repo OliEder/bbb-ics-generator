@@ -15,19 +15,16 @@
 
 === Aufgabenstellung
 
-Der *BBB ICS Generator* ist ein automatisierter Kalender-Feed-Dienst für die *Fibalon Baskets Neumarkt*.
-Er ruft Spieltermine für alle Teams des Vereins über die öffentliche REST-API des Deutschen Basketball-Bundes (DBB) ab und stellt diese als abonnierbare ICS-Feeds bereit.
+Das *BBB Vereinsportal* ist eine automatisch generierte statische Website für die *Fibalon Baskets Neumarkt*.
+Es ruft alle 6 Stunden Spielplandaten für alle Teams des Vereins über die öffentliche REST-API des Deutschen Basketball-Bundes (DBB) ab und veröffentlicht ein vollständiges Vereinsportal auf GitHub Pages.
 
-Die Feeds können von Fans, Spielern und Betreuern direkt in ihre Kalenderanwendungen (iOS Calendar, Google Calendar, Outlook, Thunderbird u. a.) abonniert werden.
-Nach einmaliger Einrichtung erhalten Abonnenten automatisch alle neuen und geänderten Spieltermine, ohne manuelles Eingreifen.
+Das Portal umfasst:
 
-Die Kernfunktionalität umfasst:
-
-* Automatischer Abruf aller aktiven Teams des Vereins über die `clubId`
-* Abruf der Spielplandaten (Gegner, Datum, Uhrzeit, Liga, Spielfeld) pro Team
-* Erzeugung valider ICS-Dateien nach RFC 5545 in drei Varianten: alle Spiele, nur Heimspiele, nur Auswärtsspiele
-* Bereitstellung als statische Dateien über GitHub Pages mit webcal://, HTTPS- und Google-Calendar-Links
-* Automatische Aktualisierung alle sechs Stunden über GitHub Actions
+* *Startseite* mit adaptiven Team-Teasern: zeigt zukünftige Termine am Saisonbeginn, Ergebnisse + Nächstes-Spiel im laufenden Betrieb, Saisonende-Hinweis am Ende
+* *Individuelle Team-Seiten* mit Next-Game-Teaser (inkl. interaktiver Leaflet-Karte, Google Maps- und Apple Maps-Links), Ligatabellen (offizielle Tabelle + Games-Behind-Variante), Turnierbäumen für Pokalwettbewerbe und Spielplan mit Heim/Auswärts-Filterung
+* *Abonnierbare ICS-Kalender-Feeds* pro Team in drei Varianten: alle Spiele, nur Heimspiele, nur Auswärtsspiele — kompatibel mit iOS Calendar, Google Calendar, Outlook, Thunderbird
+* *Automatische Team-Erkennung* über die `clubId` — keine manuelle Pflege nötig
+* *Theming* über `config.json` (Vereinsfarben, Logo)
 
 === Qualitätsziele
 
@@ -48,6 +45,10 @@ Die folgende Tabelle listet die drei wichtigsten Qualitätsziele in absteigender
 | 3
 | *Wartbarkeit*
 | Neue Teams werden automatisch über die `clubId` erkannt — keine manuelle Pflege einer Teamliste. Die gesamte Konfiguration beschränkt sich auf eine einzige Datei (`config.json`) mit einer einzigen Variable (`clubId`). Das Hinzufügen weiterer Vereine erfordert lediglich eine weitere Instanz des Systems.
+
+| 4
+| *Barrierefreiheit*
+| Die generierte Website muss WCAG 2.1 AA-konform sein. ARIA-Roles für Tab-Panels, semantisches HTML, ausreichende Farbkontraste und korrekte alt-Attribute sind verpflichtend. Automatisch prüfbar über axe-core (Playwright-Integration).
 |===
 
 === Stakeholder
@@ -149,17 +150,18 @@ Die folgende Tabelle listet die drei wichtigsten Qualitätsziele in absteigender
 
 === Systemkontextdiagramm
 
-Das folgende Diagramm zeigt den BBB ICS Generator im Kontext seiner Kommunikationspartner:
+Das folgende Diagramm zeigt das BBB Vereinsportal im Kontext seiner Kommunikationspartner:
 
 [source,mermaid]
 ----
 flowchart TD
     GHA["⚙️ GitHub Actions\nCron: alle 6h / Push: main"] -->|npm run update| SYS
-    SYS["🔧 BBB ICS Generator\ncronUpdate.js · apiClient.js\nicsGenerator.js · storage.js\ngenerateHTML.js"] -->|HTTP GET| BBBAPI["🏀 Basketball-Bund\nREST-API"]
-    SYS -->|upload artifact| GHPAGES["📄 GitHub Pages\nolieder.github.io/\nbbb-ics-generator/"]
+    SYS["🔧 BBB Vereinsportal\ncronUpdate.js · apiClient.js\nicsGenerator.js · storage.js\ngenerateHTML.js"] -->|HTTP GET| BBBAPI["🏀 Basketball-Bund\nREST-API\n/matches · /matchInfo · /table · /spielplan"]
+    SYS -->|upload artifact| GHPAGES["📄 GitHub Pages\nolieder.github.io/\nbbb-ics-generator/\nindex.html + teams/*.html + *.ics"]
     GHPAGES -->|webcal://| IOS["🍎 iOS / macOS\nKalender.app"]
     GHPAGES -->|Google Calendar URL| AND["🤖 Android\nGoogle Calendar"]
     GHPAGES -->|HTTPS Download| OTHER["💻 Outlook\nThunderbird"]
+    GHPAGES -->|Leaflet + Nominatim| OSM["🗺️ OpenStreetMap\nNominatim Geocoding\n(clientseitig)"]
 ----
 
 === Fachlicher Kontext
@@ -169,15 +171,27 @@ flowchart TD
 | Kommunikationspartner | Richtung | Beschreibung der Schnittstelle
 
 | *Basketball-Bund REST-API*
-| BBB ICS Generator ← API (HTTP GET)
+| BBB Vereinsportal ← API (HTTP GET)
 | Das System ruft drei Endpunkte ab: (1) Club-Teams über `/rest/club/id/{clubId}/actualmatches`, (2) Team-Spielplan über `/rest/team/id/{teamId}/matches`, (3) Match-Details über `/rest/match/id/{matchId}/matchInfo`. Alle Endpunkte liefern JSON. Keine Authentifizierung erforderlich.
 
+| *Basketball-Bund REST-API — Tabelle*
+| BBB Vereinsportal ← API (HTTP GET)
+| Endpunkt: `/rest/competition/table/id/{ligaId}`. Liefert die Ligatabelle mit Rang, Teamname, Siege, Niederlagen, Punkte, Körbe, Korbdifferenz.
+
+| *Basketball-Bund REST-API — Spielplan/Turnierplan*
+| BBB Vereinsportal ← API (HTTP GET)
+| Endpunkte: `/rest/competition/spielplan/id/{ligaId}` und `/rest/competition/id/{ligaId}/matchday/{day}`. Liefert Pokal-Turnierstrukturen (Runden, Paarungen, Ergebnisse).
+
+| *Nominatim (OpenStreetMap)*
+| Browser → Nominatim (HTTP GET, clientseitig)
+| Geocoding für den Next-Game-Teaser: `https://nominatim.openstreetmap.org/search?format=json&q=<adresse>`. Wird im Browser des Nutzers aufgerufen (1 Anfrage pro Seitenaufruf). Kein API-Key erforderlich.
+
 | *GitHub Actions*
-| GitHub Actions → BBB ICS Generator (triggert Build)
+| GitHub Actions → BBB Vereinsportal (triggert Build)
 | Führt den Node.js-Prozess (`npm run update` und `npm run generate-html`) in einer Ubuntu-Runner-Umgebung aus. Trigger: Cron alle 6 Stunden, Push auf `main`, manueller `workflow_dispatch`.
 
 | *GitHub Pages*
-| BBB ICS Generator → GitHub Pages (HTTP Upload via Actions)
+| BBB Vereinsportal → GitHub Pages (HTTP Upload via Actions)
 | Das `generated/`-Verzeichnis wird als Pages-Artefakt hochgeladen und über `https://olieder.github.io/bbb-ics-generator/` bereitgestellt.
 
 | *Kalender-Clients (Abonnenten)*
@@ -199,9 +213,9 @@ flowchart TD
 | Dateisystem (Node.js `fs`)
 | Schreibt `{teamId}_{type}.ics` und `metadata.json` via `fs.writeFileSync`; Verzeichnis `generated/` wird bei Bedarf angelegt
 
-| generateHTML.js → generated/index.html
+| generateHTML.js → generated/index.html + teams/*.html
 | Dateisystem (Node.js `fs`)
-| Liest `generated/metadata.json`; schreibt `generated/index.html` mit hartcodierten Links zur GitHub-Pages-URL `https://olieder.github.io/bbb-ics-generator/`
+| Liest `generated/metadata.json`; schreibt `generated/index.html` und `generated/teams/{teamId}.html` mit hartcodierten Links zur GitHub-Pages-URL `https://olieder.github.io/bbb-ics-generator/`
 
 | GitHub Actions → GitHub Pages
 | GitHub Actions API / HTTP Upload
@@ -229,6 +243,18 @@ flowchart TD
 | `/rest/match/id/{matchId}/matchInfo`
 | GET
 | Liefert Detailinfos zu einem einzelnen Spiel: vollständige Teamnamen, Spielfeld (`spielfeld`) mit Hallen-Bezeichnung, Straße, PLZ, Ort, und erweiterte Liga-Metadaten.
+
+| `/rest/competition/table/id/{ligaId}`
+| GET
+| Liefert die Ligatabelle. Enthält `tabelle.entries[]` mit: `rang`, `team.teamname`, `team.teamPermanentId`, `anzspiele`, `s` (Siege), `n` (Niederlagen), `anzGewinnpunkte`, `koerbe`, `gegenKoerbe`, `korbdiff`.
+
+| `/rest/competition/spielplan/id/{ligaId}`
+| GET
+| Liefert den Turnierplan eines Pokalwettbewerbs. Enthält entweder `spieltage[]` (Verweise auf Spieltage) oder direkt `matches[]` mit `matchDay`-Gruppierung (z.B. Bayernpokal).
+
+| `/rest/competition/id/{ligaId}/matchday/{day}`
+| GET
+| Liefert die Spiele eines einzelnen Spieltags eines Pokalwettbewerbs. Wird für jeden Eintrag in `spieltage[]` aufgerufen.
 |===
 
 == Lösungsstrategie
@@ -319,7 +345,7 @@ Das System ist als Single-Verein-Lösung konzipiert. Die gesamte Konfiguration b
 
 === Whitebox-Gesamtsystem
 
-Das System besteht aus sechs aktiven Modulen und einem ungenutzten Modul. Die Module sind lose gekoppelt und kommunizieren ausschließlich über Funktionsaufrufe (CommonJS `require`).
+Das System besteht aus fünf aktiven Modulen. Die Module sind lose gekoppelt und kommunizieren ausschließlich über Funktionsaufrufe (CommonJS `require`).
 
 [source,mermaid]
 ----
@@ -327,10 +353,9 @@ graph LR
     CU["cronUpdate.js\nOrchestrator"] --> AC["apiClient.js\nAPI-Facade"]
     CU --> IG["icsGenerator.js\nRFC 5545 Renderer"]
     CU --> ST["storage.js\nPersistenz"]
-    CU --> GH["generateHTML.js\nHTML-Generator"]
+    CU --> GH["generateHTML.js\nPortal-Generator"]
     GH --> ST
     SV["server.js\nDev-Server"] -.->|nur lokal| ST
-    GEO["geocode.js\nnicht genutzt"]
 ----
 
 === Modul: cronUpdate.js (Orchestrator)
@@ -459,26 +484,34 @@ a|
 | `fs`, `path` (Node.js Stdlib)
 |===
 
-=== Modul: generateHTML.js (HTML-Generator)
+=== Modul: generateHTML.js (Portal-Generator)
 
 [cols="2,5", options="header"]
 |===
 | Aspekt | Beschreibung
 
 | *Verantwortlichkeit*
-| Erzeugt die statische HTML-Übersichtsseite `generated/index.html` mit Subscription-Links für alle Teams.
+| Erzeugt die komplette statische Website aus `metadata.json`: Startseite (`index.html`) mit adaptiven Team-Teasern und Navigationsmenü sowie individuelle Team-Seiten (`teams/{teamId}.html`) mit Next-Game-Teaser, Ligatabellen, Turnierbäumen, Spielplan-Tabs und Kalender-Abo-Links.
 
 | *Eingang*
-| `generated/metadata.json` (erzeugt von `cronUpdate.js`) mit Teamname, Altersgruppe, Spielanzahlen und Timestamp.
+| `generated/metadata.json` mit vollständigen Team-Metadaten: Spielplan (mit `isNext`, `ownShort`, `opponentShort`, `venueName`, `venueAddress`), Ligatabellen (`competitions[].table`), Turnierbäume (`competitions[].bracket`), Geschlecht, Altersgruppe, Logo-URL.
 
 | *Ausgang*
-| `generated/index.html` mit drei Link-Gruppen pro Team: webcal:// (iOS/macOS), Google Calendar Render-URL (Android), direkte HTTPS-URL (Download).
+| `generated/index.html` (Startseite) und `generated/teams/{teamId}.html` (eine Datei pro Team). Alle HTML-Dateien sind vollständig eigenständig (inline CSS + JS, keine externen Assets außer Leaflet CDN und BBB-Logo-URL).
 
-| *Wichtige Logik*
-| HTML-Escaping aller aus `metadata.json` gelesenen Strings via `escapeHtml()`. Hartcodierte Base-URL `https://olieder.github.io/bbb-ics-generator/` (bekannte technische Schuld, siehe Kapitel 11).
+| *Wichtige interne Funktionen*
+a|
+* `buildTeaserCard(team)` — adaptiver Teaser mit bis zu 3 vergangenen Ergebnissen + bis zu 4−n zukünftigen Terminen
+* `buildNextGameTeaser(team)` — detaillierter Next-Game-Block mit Leaflet-Karte (clientseitig per Nominatim geocodiert)
+* `buildStandingsTable(comp)` — zwei Tabs: offizielle Tabelle + Games-Behind-Ranking
+* `buildBracket(comp, ownTeamName)` — Turnierbaum mit Highlight des eigenen Teams und TBD-Platzhaltern für zukünftige Runden
+* `buildTeamPage(team, allTeams, theme)` — vollständige Team-Seite
+* `buildIndexPage(teams, theme)` — Startseite
+* `teamLabel(teamName, ageGroup, gender)` — einheitliche Teambezeichnung mit Geschlechtssymbol
+* `sortTeams(teams)` — Senioren zuerst, dann aufsteigend nach Altersgruppe
 
 | *Abhängigkeiten*
-| `fs`, `path` (Node.js Stdlib)
+| `fs`, `path` (Node.js Stdlib); Leaflet 1.9.4 (CDN, nur in Team-Seiten)
 |===
 
 === Modul: server.js (Lokaler Entwicklungsserver)
@@ -497,30 +530,11 @@ a|
 | `express`
 |===
 
-=== Modul: geocode.js (OSM Geocoding — aktuell nicht genutzt)
-
-[cols="2,5", options="header"]
-|===
-| Aspekt | Beschreibung
-
-| *Verantwortlichkeit*
-| War als Integration für OpenStreetMap Nominatim Geocoding vorgesehen, um Hallenadressen in GPS-Koordinaten umzuwandeln.
-
-| *Status*
-| Das Modul ist im Repository vorhanden, wird aber von keinem anderen Modul importiert oder aufgerufen. Es ist aktuell funktionslos (Dead Code).
-
-| *Geplante Verwendung*
-| Zukünftige Integration: LOCATION-Eigenschaft in VEVENT-Events mit GPS-Koordinaten anreichern, damit Kalender-Apps direkt zur Sporthalle navigieren können.
-
-| *Abhängigkeiten*
-| Unbekannt (nicht in Verwendung); vermutlich `axios` für HTTP-Anfragen an Nominatim.
-|===
-
 === Abhängigkeitsmatrix
 
-[cols="2,1,1,1,1,1,1,1", options="header"]
+[cols="2,1,1,1,1,1,1", options="header"]
 |===
-| Modul | cronUpdate | apiClient | icsGenerator | storage | generateHTML | server | geocode
+| Modul | cronUpdate | apiClient | icsGenerator | storage | generateHTML | server
 
 | *cronUpdate.js*
 | —
@@ -529,10 +543,8 @@ a|
 | nutzt
 | —
 | —
-| —
 
 | *apiClient.js*
-| —
 | —
 | —
 | —
@@ -547,10 +559,8 @@ a|
 | —
 | —
 | —
-| —
 
 | *storage.js*
-| —
 | —
 | —
 | —
@@ -565,19 +575,8 @@ a|
 | liest FS direkt
 | —
 | —
-| —
 
 | *server.js*
-| —
-| —
-| —
-| —
-| —
-| —
-| —
-
-| *geocode.js*
-| —
 | —
 | —
 | —
@@ -1303,6 +1302,99 @@ a|
 a|
 * Positive: Spielplan ohne zusätzliche API-Calls, Tab-Filterung (Alle/Heim/Auswärts) konsistent mit Kalender-Abo-Struktur, WCAG-konform (axe-core-geprüft).
 * Negative: `CURRENT_SEASON` muss jährlich aktualisiert werden. `metadata.json` wächst durch das `matches`-Array (bei typisch 14–20 Spielen pro Team vernachlässigbar). Liga-Heuristik ("liga" im Namen) kann bei ungewöhnlichen Wettbewerbsnamen fehlschlagen.
+|===
+
+=== ADR-010: Statische Multi-Page-Site statt Single-Page-Application
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-04-11
+
+| *Kontext*
+| Das Projekt wuchs über ICS-Generierung hinaus. Team-spezifische Seiten mit Tabellen und Turnierbäumen wurden benötigt. Es musste entschieden werden, ob eine SPA (z.B. mit React) oder mehrere statische HTML-Seiten gebaut werden.
+
+| *Entscheidung*
+| Weiterhin vollständig statische HTML-Seiten — eine `index.html` und pro Team eine `teams/{teamId}.html`. Kein JavaScript-Framework, kein Build-Step.
+
+| *Begründung*
+a|
+* GitHub Pages hostet statische Dateien ohne Server-Logik — eine SPA würde entweder Client-Side-Routing oder Server-Side-Rendering erfordern.
+* Kein Build-Tooling (kein Webpack/Vite/Rollup) — geringere Wartungslast, keine Dependency-Konflikte.
+* Jede Seite ist vollständig eigenständig (inline CSS + JS) — kein Caching-Problem bei Updates.
+* Die Datenmenge ist überschaubar (< 20 Teams) — statische Generierung ist performant genug.
+
+| *Konsequenzen*
+a|
+* Positive: Zero-Dependency-Frontend, schnelle Ladezeiten, kein JS-Framework-Upgrade-Risiko.
+* Negative: Code-Duplikation im generierten HTML (CSS wird pro Seite wiederholt). Bei > 50 Teams würde die Generierung spürbar langsamer.
+|===
+
+=== ADR-011: Leaflet + OpenStreetMap für clientseitige Kartenintegration
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-04-12
+
+| *Kontext*
+| Der Next-Game-Teaser auf Team-Seiten soll die Spielhalle auf einer Karte anzeigen. Dafür wird ein Kartendienst und ein Geocoding-Service benötigt.
+
+| *Entscheidung*
+| Leaflet.js (v1.9.4, CDN mit SRI-Hash) als Karten-Library, OpenStreetMap als Tile-Provider, Nominatim als Geocoding-Service. Alles clientseitig — kein Server-seitiges Geocoding.
+
+| *Begründung*
+a|
+* Leaflet + OSM ist kostenlos, kein API-Key erforderlich.
+* Nominatim ist der offizielle Geocoding-Service von OSM — ebenfalls kostenlos und ohne Registrierung.
+* Clientseitiges Geocoding vermeidet Koordinaten-Speicherung in `metadata.json` und hält die Generierungszeit kurz.
+* SRI-Hash auf CDN-Ressourcen schützt vor Supply-Chain-Angriffen.
+* Graceful Degradation: Bei Nominatim-Fehler wird der Karten-Div ausgeblendet — restlicher Teaser bleibt vollständig funktional.
+
+| *Konsequenzen*
+a|
+* Positive: Keine API-Kosten, keine Registrierung, kein API-Key-Rotation-Risiko.
+* Negative: Karte lädt nur mit Internetverbindung. Nominatim-Nutzungsrichtlinien (max. 1 Request/s, kein Bulk-Geocoding) müssen eingehalten werden — hier: 1 Request pro Seitenaufruf. CDN-Ausfall (unpkg.com) deaktiviert die Karte. `document.currentScript.previousElementSibling` funktioniert nicht in deferred/async-Script-Kontexten.
+|===
+
+=== ADR-012: Games-Behind als alternatives Tabellenranking
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-04-12
+
+| *Kontext*
+| Die offizielle BBB-Ligatabelle sortiert nach Gewinnpunkten. Im Basketball (und generell im nordamerikanischen Sport) ist das "Games Behind"-Konzept (GB) aus der NBA bekannt und gibt intuitiv an, wie weit ein Team hinter dem Spitzenreiter liegt.
+
+| *Entscheidung*
+| Zusätzlich zur offiziellen Tabelle wird ein zweiter Tab "Ranking nach GB" angezeigt. GB wird berechnet als: `GB = ((führerSiege − teamSiege) + (teamNiederlagen − führerNiederlagen)) / 2`. Der Spitzenreiter hat GB = 0 ("—" angezeigt).
+
+| *Begründung*
+a|
+* Bietet Nutzern, die NBA-Basketball kennen, eine vertraute Perspektive.
+* Die Formel ist eindeutig und aus den bereits vorhandenen API-Feldern (`s`, `n`) berechenbar.
+* Der zweite Tab ist optional — Nutzer können bei der offiziellen Tabelle bleiben.
+
+| *Konsequenzen*
+a|
+* Positive: Reichhaltigere Darstellung ohne zusätzliche API-Aufrufe.
+* Negative: GB macht wenig Sinn bei sehr ungleicher Spielanzahl (unterschiedlich viele Spiele absolviert). Bei Gleichstand (GB = 0.5) wird `.toFixed(1)` angezeigt — leicht ungewohnt für deutsche Nutzer.
 |===
 
 === ADR-006: X-ALT-DESC für HTML-Beschreibungen (aktuell deaktiviert)
