@@ -109,16 +109,35 @@ async function updateAll() {
         const opponent = isHome
           ? (m.guestTeam?.teamname || '')
           : (m.homeTeam?.teamname  || '');
+        const opponentShort = isHome
+          ? (m.guestTeam?.teamnameSmall || '')
+          : (m.homeTeam?.teamnameSmall  || '');
+        const ownShort = isHome
+          ? (m.homeTeam?.teamnameSmall || '')
+          : (m.guestTeam?.teamnameSmall || '');
         const result = m.result || null;
         const isNext = !nextMarked && !result ? (nextMarked = true, true) : false;
+        let venueName = '';
+        let venueAddress = '';
+        if (isNext) {
+          const feld = details[m.matchId]?.feld || {};
+          venueName = feld.bezeichnung || '';
+          venueAddress = (feld.strasse && feld.ort)
+            ? `${feld.strasse}, ${feld.plz || ''} ${feld.ort}`.trim()
+            : '';
+        }
         return {
-          date:        m.kickoffDate  || '',
-          time:        m.kickoffTime  || '',
+          date:          m.kickoffDate  || '',
+          time:          m.kickoffTime  || '',
           opponent,
+          opponentShort,
+          ownShort,
           isHome,
           result,
-          competition: m.ligaData?.liganame || '',
+          competition:   m.ligaData?.liganame || '',
           isNext,
+          venueName,
+          venueAddress,
         };
       });
 

@@ -793,3 +793,28 @@ test('team page with null table shows unavailable note', () => {
     rmSync(dir, { recursive: true });
   }
 });
+
+test('isNext match enthält venueName und venueAddress', () => {
+  const { buildNextGameTeaser } = require('../../src/generateHTML.js')._testExports;
+  const team = {
+    teamId: 'T1', teamName: 'NM Baskets', ageGroup: 'Senioren', gender: 'männlich',
+    lastUpdate: new Date().toISOString(),
+    matchCount: 1, homeMatchCount: 1, awayMatchCount: 0,
+    matches: [
+      {
+        date: '2026-04-19', time: '18:00', opponent: 'VfB Dragons',
+        opponentShort: 'VfB', ownShort: 'NM',
+        isHome: true, result: null, competition: 'Bayerische Oberliga', isNext: true,
+        venueName: 'Sporthalle Nordmühle',
+        venueAddress: 'Mühlenstr. 12, 12345 Neumarkt',
+      },
+    ],
+    competitions: [],
+  };
+  const html = buildNextGameTeaser(team);
+  assert.ok(html.includes('Sporthalle Nordmühle'), 'venueName fehlt');
+  assert.ok(html.includes('Mühlenstr. 12, 12345 Neumarkt'), 'venueAddress fehlt');
+  assert.ok(html.includes('maps.google.com') || html.includes('google.com/maps'), 'Google Maps Link fehlt');
+  assert.ok(html.includes('maps.apple.com'), 'Apple Maps Link fehlt');
+  assert.ok(html.includes('next-game-map'), 'Leaflet map div fehlt');
+});
