@@ -121,7 +121,7 @@ async function updateAll() {
         let venueAddress = '';
         let opponentLogoUrl = '';
         if (isNext) {
-          const feld = details[m.matchId]?.feld || {};
+          const feld = details[m.matchId]?.matchInfo?.spielfeld || details[m.matchId]?.feld || {};
           venueName = feld.bezeichnung || '';
           const plzOrt = [feld.plz, feld.ort].filter(Boolean).join(' ');
           venueAddress = (feld.strasse && feld.ort)
