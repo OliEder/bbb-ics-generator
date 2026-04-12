@@ -68,6 +68,30 @@ const teamMetadata = [
   },
 ];
 
+const teamMetadataWithVenue = [
+  {
+    teamId: '167883',
+    teamName: 'Fibalon Baskets U16',
+    ageGroup: 'U16',
+    lastUpdate: new Date().toISOString(),
+    matchCount: 2,
+    homeMatchCount: 1,
+    awayMatchCount: 1,
+    logoUrl: 'https://www.basketball-bund.net/media/team/167883/logo',
+    matches: [
+      { date: '2025-03-01', opponent: 'Roth', result: '80:70', isHome: true, isNext: false, competition: 'Bezirksliga', venueName: '', venueAddress: '', opponentLogoUrl: '' },
+      {
+        date: '2025-04-25', time: '18:00', opponent: 'TV Amberg', result: null,
+        isHome: true, isNext: true, competition: 'Bezirksliga',
+        venueName: 'Sporthalle West',
+        venueAddress: 'Woffenbacher Str. 38, 92318 Neumarkt',
+        opponentLogoUrl: 'https://www.basketball-bund.net/media/team/9999/logo',
+      },
+    ],
+    competitions: [],
+  },
+];
+
 const DEFAULT_THEME = { primary: '#004174', accent: '#009ef3', cupColor: '#7c3aed', logoUrl: null };
 const WITH_LOGO_THEME = {
   primary: '#004174',
@@ -260,6 +284,98 @@ test.describe('WCAG 2.1 AA — strukturelle Prüfungen', () => {
         const alt = await images.nth(i).getAttribute('alt');
         expect(alt).not.toBeNull();
       }
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+});
+
+test.describe('Next-Game-Teaser — Venue & Karte', () => {
+  test('Leaflet-Script im DOM vorhanden wenn venueAddress gesetzt', async ({ page }) => {
+    const { dir, htmlPath } = generateTeamHtml(DEFAULT_THEME, teamMetadataWithVenue);
+    try {
+      await page.goto('file://' + htmlPath);
+      const leafletScript = page.locator('script[src*="leaflet"]');
+      await expect(leafletScript).toBeAttached();
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  test('Leaflet-Script steht nach dem Map-Container im DOM', async ({ page }) => {
+    const { dir, htmlPath } = generateTeamHtml(DEFAULT_THEME, teamMetadataWithVenue);
+    try {
+      await page.goto('file://' + htmlPath);
+      const mapContainer = page.locator('.next-game-map');
+      await expect(mapContainer).toBeAttached();
+      // Leaflet muss nach dem map-div im DOM stehen (am Body-Ende)
+      const isAfter = await page.evaluate(() => {
+        const map = document.querySelector('.next-game-map');
+        const leaflet = document.querySelector('script[src*="leaflet"]');
+        if (!map || !leaflet) return false;
+        return map.compareDocumentPosition(leaflet) & Node.DOCUMENT_POSITION_FOLLOWING;
+      });
+      expect(isAfter).toBeTruthy();
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  test('Map-Container mit korrekter ID vorhanden', async ({ page }) => {
+    const { dir, htmlPath } = generateTeamHtml(DEFAULT_THEME, teamMetadataWithVenue);
+    try {
+      await page.goto('file://' + htmlPath);
+      const mapDiv = page.locator('#ngm-167883');
+      await expect(mapDiv).toBeAttached();
+      await expect(mapDiv).toHaveClass(/next-game-map/);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  test('Adresse im Teaser sichtbar', async ({ page }) => {
+    const { dir, htmlPath } = generateTeamHtml(DEFAULT_THEME, teamMetadataWithVenue);
+    try {
+      await page.goto('file://' + htmlPath);
+      await expect(page.getByText('Woffenbacher Str. 38, 92318 Neumarkt')).toBeVisible();
+      await expect(page.getByText('Sporthalle West')).toBeVisible();
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  test('Google Maps und Apple Maps Links vorhanden', async ({ page }) => {
+    const { dir, htmlPath } = generateTeamHtml(DEFAULT_THEME, teamMetadataWithVenue);
+    try {
+      await page.goto('file://' + htmlPath);
+      const googleLink = page.locator('a[href*="google.com/maps"]');
+      const appleLink = page.locator('a[href*="maps.apple.com"]');
+      await expect(googleLink).toBeAttached();
+      await expect(appleLink).toBeAttached();
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  test('Kein Map-Container ohne venueAddress', async ({ page }) => {
+    const { dir, htmlPath } = generateTeamHtml(DEFAULT_THEME, teamMetadata);
+    try {
+      await page.goto('file://' + htmlPath);
+      const mapDiv = page.locator('.next-game-map');
+      await expect(mapDiv).not.toBeAttached();
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  test('keine WCAG-Violations auf Team-Seite mit Venue', async ({ page }) => {
+    const { dir, htmlPath } = generateTeamHtml(DEFAULT_THEME, teamMetadataWithVenue);
+    try {
+      await page.goto('file://' + htmlPath);
+      const results = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .analyze();
+      expect(results.violations).toEqual([]);
     } finally {
       rmSync(dir, { recursive: true });
     }
