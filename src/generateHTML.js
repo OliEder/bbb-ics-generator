@@ -782,26 +782,26 @@ function buildSpotlightBlock(teams, cupColor) {
         rows.push(`<div class="spotlight-date-heading">${heading}</div>`);
       }
 
-      // Score or time
-      let scoreOrTime;
+      const shortLabel = escapeHtml(spotlightTeamLabel(team, teams));
+      const genderHtml = genderSpan(team.gender);
+      const opponent = escapeHtml(m.opponent || (m.opponentShort || ''));
+      const vsPrefix = m.isHome ? 'vs.' : '@';
+      const timeHtml = m.time
+        ? `<span class="spotlight-time">${escapeHtml(m.time)}</span>`
+        : '';
+
+      let resultHtml = '';
       if (m.result) {
         const parts = m.result.split(':');
         if (parts.length === 2) {
           const ownIdx = m.isHome ? 0 : 1;
           const oppIdx = m.isHome ? 1 : 0;
-          scoreOrTime = `<span class="spotlight-result"><strong>${escapeHtml(parts[ownIdx].trim())}</strong>:${escapeHtml(parts[oppIdx].trim())}</span>`;
+          resultHtml = `<span class="spotlight-result"><strong>${escapeHtml(parts[ownIdx].trim())}</strong>:${escapeHtml(parts[oppIdx].trim())}</span>`;
         } else {
-          scoreOrTime = `<span class="spotlight-result">${escapeHtml(m.result)}</span>`;
+          resultHtml = `<span class="spotlight-result">${escapeHtml(m.result)}</span>`;
         }
-      } else {
-        scoreOrTime = m.time
-          ? `<span class="spotlight-time">${escapeHtml(m.time)}</span>`
-          : `<span class="spotlight-time">–</span>`;
       }
 
-      const shortLabel = escapeHtml(spotlightTeamLabel(team, teams));
-      const genderHtml = genderSpan(team.gender);
-      const opponent = escapeHtml(m.opponent || (m.opponentShort || ''));
       const compHtml = m.competition
         ? `<span class="spotlight-comp">${escapeHtml(m.competition)}</span>`
         : '';
@@ -811,12 +811,13 @@ function buildSpotlightBlock(teams, cupColor) {
           `<span class="${badgeClass}">${badgeLabel}</span>` +
           `<div class="spotlight-info">` +
             `<div class="spotlight-line1">` +
-              scoreOrTime +
+              timeHtml +
               `<span class="spotlight-team">${shortLabel}${genderHtml ? ` ${genderHtml}` : ''}</span>` +
             `</div>` +
             `<div class="spotlight-line2">` +
-              `<span class="spotlight-vs">vs.&nbsp;${opponent}</span>` +
+              `<span class="spotlight-vs">${vsPrefix}&nbsp;${opponent}</span>` +
               compHtml +
+              resultHtml +
             `</div>` +
           `</div>` +
         `</div>`
