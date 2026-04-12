@@ -213,9 +213,9 @@ function buildTeaserCard(team) {
       ? (m.isHome ? 'badge badge--home' : 'badge badge--away')
       : 'badge badge--cup';
     const badgeLabel = m.isHome ? 'H' : 'A';
-    const duel = (m.ownShort && m.opponentShort)
-      ? `${escapeHtml(m.ownShort)} – ${escapeHtml(m.opponentShort)}`
-      : escapeHtml(m.opponent);
+    const prefix = m.isHome ? 'vs.' : '@';
+    const oppName = escapeHtml(m.opponentShort || m.opponent || '');
+    const duel = `${prefix} ${oppName}`;
     if (m.result) {
       const parts = m.result.split(':');
       let scoreHtml = escapeHtml(m.result);
