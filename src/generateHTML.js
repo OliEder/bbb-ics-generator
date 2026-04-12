@@ -379,7 +379,7 @@ function buildSharedStyles(primary, accent, cupColor) {
       --color-surface: #ffffff;
       --color-surface-card: color-mix(in srgb, var(--color-primary) 5%, white);
       --color-text: color-mix(in srgb, var(--color-primary) 90%, black);
-      --color-text-muted: color-mix(in srgb, var(--color-primary) 55%, white);
+      --color-text-muted: color-mix(in srgb, var(--color-primary) 80%, white);
       --color-info-bg: color-mix(in srgb, var(--color-accent) 12%, white);
       --color-info-border: color-mix(in srgb, var(--color-accent) 30%, white);
       --color-badge-bg: color-mix(in srgb, var(--color-accent) 15%, white);
@@ -503,7 +503,7 @@ function buildSharedStyles(primary, accent, cupColor) {
     .schedule-next { background: var(--color-next-bg); border: 1px solid var(--color-next-border); padding: 8px 8px; }
     .badge { border-radius: 4px; padding: 3px 7px; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; min-width: 24px; text-align: center; }
     .badge--home { background: var(--color-badge-home-bg); color: var(--color-primary); }
-    .badge--away { background: var(--color-badge-away-bg); color: #b84a00; }
+    .badge--away { background: var(--color-badge-away-bg); color: #7a3000; }
     .badge--cup  { background: color-mix(in srgb, var(--color-cup) 15%, white); color: var(--color-cup); }
     .schedule-opponent { flex: 1; font-size: 0.88rem; color: var(--color-text); min-width: 0; }
     .schedule-next .schedule-opponent { font-weight: 600; }
@@ -518,7 +518,7 @@ function buildSharedStyles(primary, accent, cupColor) {
       .btn { background: transparent; color: var(--color-accent-muted); border-color: var(--color-border); }
       .btn:hover { background: var(--color-surface-card); }
       .badge--cup { background: color-mix(in srgb, var(--color-cup) 25%, black); color: color-mix(in srgb, var(--color-cup) 80%, white); }
-      .badge--away { color: color-mix(in srgb, #b84a00 80%, white); }
+      .badge--away { color: color-mix(in srgb, #b84a00 70%, white); }
     }
     .schedule-legend { margin-top: 8px; padding: 10px 14px; font-size: 0.75rem; color: var(--color-text); display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
     .schedule-legend span { display: flex; align-items: center; gap: 5px; }
