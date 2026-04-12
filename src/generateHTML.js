@@ -523,9 +523,22 @@ function buildSharedStyles(primary, accent, cupColor) {
     .schedule-legend { margin-top: 8px; padding: 10px 14px; font-size: 0.75rem; color: var(--color-text); display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
     .schedule-legend span { display: flex; align-items: center; gap: 5px; }
     /* Next game teaser */
-    .next-game { background: var(--color-card-bg); border: 1px solid var(--color-border); border-radius: 10px; margin-bottom: 20px; overflow: hidden; }
-    .next-game-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 0; }
+    .next-game { background: var(--color-surface-card); border: 1px solid var(--color-border); border-radius: 10px; margin-bottom: 20px; overflow: hidden; }
+    .next-game-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 8px; }
     .next-game-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-primary); margin: 0; }
+    /* Matchup layout */
+    .next-game-matchup { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px 8px; }
+    .next-game-team { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1; text-align: center; }
+    .next-game-team--opp { }
+    .next-game-team-name { font-size: 0.88rem; font-weight: 700; color: var(--color-text); line-height: 1.2; word-break: break-word; }
+    .next-game-team-logo { width: 64px; height: 64px; object-fit: contain; border-radius: 8px; background: var(--color-surface); padding: 4px; border: 1px solid var(--color-border); }
+    .next-game-team-logo-placeholder { width: 64px; height: 64px; border-radius: 8px; background: var(--color-border); flex-shrink: 0; }
+    .next-game-vs { display: flex; flex-direction: column; align-items: center; gap: 2px; flex-shrink: 0; padding: 0 4px; }
+    .next-game-vs-label { font-size: 1rem; font-weight: 800; color: var(--color-text-muted); }
+    .next-game-kickoff { font-size: 0.82rem; font-weight: 600; color: var(--color-text); text-align: center; }
+    .next-game-kickoff-time { font-size: 0.78rem; color: var(--color-text-muted); text-align: center; }
+    .next-game-competition-row { font-size: 0.78rem; color: var(--color-text-muted); text-align: center; padding: 0 16px 10px; }
+    /* Legacy selectors (unused but kept for safety) */
     .next-game-details { padding: 8px 16px 12px; }
     .next-game-datetime { font-size: 0.82rem; color: var(--color-text-muted); margin-bottom: 4px; }
     .next-game-duel { font-size: 1.1rem; font-weight: 700; margin-bottom: 2px; }
@@ -626,16 +639,23 @@ function buildNextGameTeaser(team) {
     : 'badge badge--cup';
   const badgeLabel = nextMatch.isHome ? 'Heim' : 'Auswärts';
 
-  const dateStr = nextMatch.date
-    ? nextMatch.date.slice(5).split('-').reverse().join('.')
+  // Full date with weekday for the prominent teaser
+  const dateObj = nextMatch.date ? new Date(nextMatch.date + 'T12:00:00') : null;
+  const dateStr = dateObj
+    ? dateObj.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })
     : '';
-  const timeStr = nextMatch.time ? ` · ${escapeHtml(nextMatch.time)} Uhr` : '';
-  const duel = (nextMatch.ownShort && nextMatch.opponentShort)
-    ? `${escapeHtml(nextMatch.ownShort)} vs. ${escapeHtml(nextMatch.opponentShort)}`
-    : escapeHtml(nextMatch.opponent);
+  const timeStr = nextMatch.time ? `${escapeHtml(nextMatch.time)} Uhr` : '';
+
+  // Use full team names for team page teaser
+  const ownName  = escapeHtml(nextMatch.isHome ? team.teamName : nextMatch.opponent);
+  const oppName  = escapeHtml(nextMatch.isHome ? nextMatch.opponent : team.teamName);
+  const ownLogo  = team.logoUrl ? `<img src="${escapeHtml(team.logoUrl)}" alt="${ownName}" class="next-game-team-logo">` : `<div class="next-game-team-logo-placeholder"></div>`;
+  // Opponent logo: BBB media endpoint uses same pattern but we only have team.logoUrl for own team
+  const oppLogo  = `<div class="next-game-team-logo-placeholder next-game-team-logo-placeholder--opp"></div>`;
 
   const hasVenue = !!(nextMatch.venueAddress && nextMatch.venueAddress.trim());
   const encodedAddr = hasVenue ? encodeURIComponent(nextMatch.venueAddress) : '';
+  const mapId = `ngm-${escapeHtml(team.teamId)}`;
 
   const venueHtml = hasVenue ? `
   <div class="next-game-venue">
@@ -649,13 +669,14 @@ function buildNextGameTeaser(team) {
       </div>
     </div>
   </div>
-  <div id="next-game-map-${escapeHtml(team.teamId)}" class="next-game-map" data-address="${escapeHtml(nextMatch.venueAddress)}" data-venue="${escapeHtml(nextMatch.venueName || '')}"></div>
+  <div id="${mapId}" class="next-game-map" data-address="${escapeHtml(nextMatch.venueAddress)}" data-venue="${escapeHtml(nextMatch.venueName || '')}"></div>
   <script>
   (function() {
-    var el = document.currentScript.previousElementSibling;
+    var el = document.getElementById('${mapId}');
     if (!el) return;
     var addr = el.getAttribute('data-address');
     var venue = el.getAttribute('data-venue') || addr;
+    if (!addr) { el.style.display = 'none'; return; }
     fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(addr), {
       headers: { 'Accept-Language': 'de', 'User-Agent': 'bbb-ics-generator/1.0' }
     })
@@ -678,11 +699,22 @@ function buildNextGameTeaser(team) {
     <h2 class="next-game-title">Nächstes Spiel</h2>
     <span class="${badgeClass}">${badgeLabel}</span>
   </div>
-  <div class="next-game-details">
-    <div class="next-game-datetime">${escapeHtml(dateStr)}${timeStr}</div>
-    <div class="next-game-duel">${duel}</div>
-    <div class="next-game-competition">${escapeHtml(nextMatch.competition)}</div>
-  </div>${venueHtml}
+  <div class="next-game-matchup">
+    <div class="next-game-team">
+      ${ownLogo}
+      <span class="next-game-team-name">${ownName}</span>
+    </div>
+    <div class="next-game-vs">
+      <span class="next-game-vs-label">vs.</span>
+      <div class="next-game-kickoff">${escapeHtml(dateStr)}</div>
+      ${timeStr ? `<div class="next-game-kickoff-time">${timeStr}</div>` : ''}
+    </div>
+    <div class="next-game-team next-game-team--opp">
+      ${oppLogo}
+      <span class="next-game-team-name">${oppName}</span>
+    </div>
+  </div>
+  <div class="next-game-competition-row">${escapeHtml(nextMatch.competition)}</div>${venueHtml}
 </section>`;
 }
 

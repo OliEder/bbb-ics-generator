@@ -818,6 +818,11 @@ test('isNext match enthält venueName und venueAddress', () => {
   assert.ok(html.includes('maps.google.com') || html.includes('google.com/maps'), 'Google Maps Link fehlt');
   assert.ok(html.includes('maps.apple.com'), 'Apple Maps Link fehlt');
   assert.ok(html.includes('next-game-map'), 'Leaflet map div fehlt');
+  // Full names in matchup layout
+  assert.ok(html.includes('NM Baskets'), 'Eigener Teamname fehlt im Teaser');
+  assert.ok(html.includes('VfB Dragons'), 'Gegner-Vollname fehlt im Teaser');
+  assert.ok(html.includes('next-game-matchup'), 'Matchup-Layout fehlt');
+  assert.ok(html.includes('next-game-team-name'), 'team-name Element fehlt');
 });
 
 test('buildNextGameTeaser: kein Venue → kein Kartenblock', () => {
