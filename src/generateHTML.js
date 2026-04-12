@@ -551,6 +551,21 @@ function buildSharedStyles(primary, accent, cupColor) {
     .next-game-nav-btn:hover { opacity: 0.85; }
     .next-game-map { height: 220px; border-top: 1px solid var(--color-border); }
     .next-game-no-games { font-size: 0.85rem; color: var(--color-text-muted); padding: 0 0 4px; }
+    /* Spotlight block */
+    .spotlight { margin-bottom: 24px; border: 1px solid var(--color-border); border-radius: 10px; overflow: hidden; }
+    .spotlight-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-primary); padding: 12px 16px 0; margin: 0; }
+    .spotlight-tab-bar { display: flex; gap: 4px; padding: 8px 16px 0; }
+    .spotlight-tab { background: var(--color-surface-card); border: 1px solid var(--color-border); border-radius: 6px; padding: 5px 14px; font-size: 0.8rem; font-weight: 500; color: var(--color-text); cursor: pointer; }
+    .spotlight-tab--active { background: var(--color-primary); color: var(--color-on-primary); border-color: var(--color-primary); font-weight: 700; }
+    .spotlight-panel { padding: 8px 16px 12px; }
+    .spotlight-panel[hidden] { display: none; }
+    .spotlight-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--color-border); font-size: 0.85rem; }
+    .spotlight-row:last-child { border-bottom: none; }
+    .spotlight-team { font-weight: 600; color: var(--color-text); white-space: nowrap; }
+    .spotlight-opponent { flex: 1; color: var(--color-text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .spotlight-result { font-weight: 700; white-space: nowrap; color: var(--color-text); min-width: 44px; text-align: right; }
+    .spotlight-date { color: var(--color-text-muted); white-space: nowrap; font-size: 0.8rem; min-width: 60px; text-align: right; }
+    .spotlight-empty { font-size: 0.85rem; color: var(--color-text-muted); padding: 8px 0; }
   </style>`;
 }
 
@@ -905,6 +920,7 @@ function buildIndexPage(teams, theme) {
     </div>
   </header>
   <main>
+    ${buildSpotlightBlock(sorted, cupColor)}
     <div class="teaser-grid">
       ${teasers}
     </div>
