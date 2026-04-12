@@ -621,7 +621,7 @@ test('buildTeaserCard: fewer than 3 results — no empty rows', () => {
   assert.ok(!html.includes('teaser-result-empty'), 'no empty row class expected');
 });
 
-test('buildTeaserCard: no next match — no teaser-next element', () => {
+test('buildTeaserCard: no next match and no future — shows season over message', () => {
   const modPath = require.resolve('../../src/generateHTML.js');
   delete require.cache[modPath];
   const { _testExports } = require('../../src/generateHTML.js');
@@ -634,7 +634,8 @@ test('buildTeaserCard: no next match — no teaser-next element', () => {
     ],
   };
   const html = buildTeaserCard(team);
-  assert.ok(!html.includes('teaser-next'), 'teaser-next should not appear when no next match');
+  assert.ok(html.includes('teaser-next--empty'), 'season-over message should appear when no future matches');
+  assert.ok(html.includes('Keine weiteren Spiele'), 'season-over text missing');
 });
 
 // --- buildStandingsTable ---
@@ -840,7 +841,7 @@ test('buildNextGameTeaser: kein Venue → kein Kartenblock', () => {
   assert.ok(!html.includes('maps.apple.com'), 'Apple Maps Link sollte nicht erscheinen');
 });
 
-test('buildNextGameTeaser: kein nächstes Spiel → leerer String', () => {
+test('buildNextGameTeaser: kein nächstes Spiel aber Spiele vorhanden → Saisonende-Meldung', () => {
   const { buildNextGameTeaser } = require('../../src/generateHTML.js')._testExports;
   const team = {
     teamId: 'T3', teamName: 'Test Team', ageGroup: 'U14', gender: '',
@@ -850,7 +851,19 @@ test('buildNextGameTeaser: kein nächstes Spiel → leerer String', () => {
     competitions: [],
   };
   const html = buildNextGameTeaser(team);
-  assert.strictEqual(html, '', 'Sollte leerer String sein wenn kein isNext');
+  assert.ok(html.includes('next-game--empty'), 'Saisonende-Sektion fehlt');
+  assert.ok(html.includes('Aktuell sind keine weiteren Spiele geplant'), 'Saisonende-Text fehlt');
+});
+
+test('buildNextGameTeaser: keine Spiele überhaupt → leerer String', () => {
+  const { buildNextGameTeaser } = require('../../src/generateHTML.js')._testExports;
+  const team = {
+    teamId: 'T3b', teamName: 'Test Team', ageGroup: 'U14', gender: '',
+    matches: [],
+    competitions: [],
+  };
+  const html = buildNextGameTeaser(team);
+  assert.strictEqual(html, '', 'Sollte leerer String sein wenn gar keine Spiele');
 });
 
 test('buildTeamPage enthält next-game section wenn isNext vorhanden', () => {

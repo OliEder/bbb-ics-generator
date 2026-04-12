@@ -176,12 +176,15 @@ function buildTeaserCard(team) {
     : `<div class="team-logo-placeholder" aria-hidden="true"></div>`;
 
   const allMatches = Array.isArray(team.matches) ? team.matches : [];
-  const pastMatches = allMatches.filter(m => m.result).slice(-3);
+  const played     = allMatches.filter(m => m.result);
+  const pastCount  = Math.min(played.length, 3);
+  const pastMatches = played.slice(-pastCount);
+  // How many upcoming matches to show: fill up to 4 total rows
+  const upcomingCount = Math.max(0, 4 - pastCount);
+  const upcomingMatches = allMatches.filter(m => !m.result).slice(0, upcomingCount);
   const nextMatch   = allMatches.find(m => m.isNext);
 
   // Streak: count consecutive wins or losses from most recent played match
-  const played = allMatches.filter(m => m.result);
-
   // Streak as subtle info text (e.g. "3 Siege in Folge" / "2 Niederlagen in Folge")
   let streakText = '';
   if (played.length > 0) {
@@ -205,30 +208,48 @@ function buildTeaserCard(team) {
     }
   }
 
-  const resultRows = [...pastMatches].reverse().map(m => {
+  const renderMatch = m => {
     const badgeClass = isLiga(m.competition)
       ? (m.isHome ? 'badge badge--home' : 'badge badge--away')
       : 'badge badge--cup';
     const badgeLabel = m.isHome ? 'H' : 'A';
-    const parts = (m.result || '').split(':');
-    let scoreHtml = escapeHtml(m.result);
-    if (parts.length === 2) {
-      const ownIdx = m.isHome ? 0 : 1;
-      const oppIdx = m.isHome ? 1 : 0;
-      scoreHtml = `<strong>${escapeHtml(parts[ownIdx].trim())}</strong>:${escapeHtml(parts[oppIdx].trim())}`;
-    }
     const duel = (m.ownShort && m.opponentShort)
       ? `${escapeHtml(m.ownShort)} – ${escapeHtml(m.opponentShort)}`
       : escapeHtml(m.opponent);
-    return `<div class="teaser-result">` +
-      `<span class="${badgeClass}">${badgeLabel}</span>` +
-      `<span class="teaser-opponent">${duel}</span>` +
-      `<span class="teaser-score">${scoreHtml}</span>` +
-      `</div>`;
-  }).join('');
+    if (m.result) {
+      const parts = m.result.split(':');
+      let scoreHtml = escapeHtml(m.result);
+      if (parts.length === 2) {
+        const ownIdx = m.isHome ? 0 : 1;
+        const oppIdx = m.isHome ? 1 : 0;
+        scoreHtml = `<strong>${escapeHtml(parts[ownIdx].trim())}</strong>:${escapeHtml(parts[oppIdx].trim())}`;
+      }
+      return `<div class="teaser-result">` +
+        `<span class="${badgeClass}">${badgeLabel}</span>` +
+        `<span class="teaser-opponent">${duel}</span>` +
+        `<span class="teaser-score">${scoreHtml}</span>` +
+        `</div>`;
+    } else {
+      const dateStr = escapeHtml(String(m.date || '').slice(5).split('-').reverse().join('.'));
+      return `<div class="teaser-result teaser-result--upcoming">` +
+        `<span class="${badgeClass}">${badgeLabel}</span>` +
+        `<span class="teaser-opponent">${duel}</span>` +
+        `<span class="teaser-date">${dateStr}</span>` +
+        `</div>`;
+    }
+  };
 
-  const nextHtml = nextMatch
+  const resultRows = [...pastMatches].reverse().map(renderMatch).join('');
+  // Show upcoming matches inline when pastCount < 3; skip nextMatch itself if already in upcomingMatches
+  const upcomingRows = upcomingMatches.map(renderMatch).join('');
+
+  // Show teaser-next bar when 3 past results (upcoming shown in bar, not inline)
+  // or when no next match but season had matches (season over)
+  const futureMatches = allMatches.filter(m => !m.result);
+  const nextHtml = (nextMatch && pastCount >= 3)
     ? `<div class="teaser-next">Nächstes: ${escapeHtml(String(nextMatch.date || '').slice(5).split('-').reverse().join('.'))} · <span class="teaser-next-venue">${nextMatch.isHome ? 'Heim' : 'Auswärts'}</span> · ${escapeHtml(nextMatch.opponent)}</div>`
+    : (!nextMatch && played.length > 0 && futureMatches.length === 0)
+    ? `<div class="teaser-next teaser-next--empty">Keine weiteren Spiele geplant</div>`
     : '';
 
   return `<div class="teaser-card">
@@ -237,7 +258,7 @@ function buildTeaserCard(team) {
     <span class="teaser-team-name">${teamLabel(team.teamName, team.ageGroup, team.gender)}</span>
   </div>
   ${streakText ? `<div class="teaser-streak-info"><span class="teaser-streak-label">Serie:</span> ${escapeHtml(streakText)}</div>` : ''}
-  <div class="teaser-results">${resultRows}</div>
+  <div class="teaser-results">${resultRows}${upcomingRows}</div>
   ${nextHtml}
   <a class="teaser-link" href="teams/${escapeHtml(team.teamId)}.html">Zum Team →</a>
 </div>`;
@@ -420,7 +441,10 @@ function buildSharedStyles(primary, accent, cupColor) {
     .teaser-results { flex: 1; padding: 8px 14px; }
     .teaser-result { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--color-border); font-size: 0.82rem; }
     .teaser-score { font-weight: 600; }
+    .teaser-date { font-size: 0.78rem; color: var(--color-text-muted); }
+    .teaser-result--upcoming { opacity: 0.75; }
     .teaser-next { background: var(--color-next-bg); border: 1px solid var(--color-next-border); border-radius: 6px; margin: 6px 14px; padding: 6px 10px; font-size: 0.78rem; font-weight: 600; color: var(--color-text); }
+    .teaser-next--empty { font-weight: 400; opacity: 0.7; }
     .teaser-next-venue { opacity: 0.7; font-weight: 400; }
     .teaser-link { display: block; text-align: right; padding: 8px 14px; color: var(--color-primary); font-size: 0.82rem; font-weight: 600; text-decoration: none; }
     /* Team page */
@@ -513,6 +537,7 @@ function buildSharedStyles(primary, accent, cupColor) {
     .next-game-nav-btn { display: inline-block; padding: 4px 10px; background: var(--color-primary); color: #fff; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-decoration: none; }
     .next-game-nav-btn:hover { opacity: 0.85; }
     .next-game-map { height: 220px; border-top: 1px solid var(--color-border); }
+    .next-game-no-games { font-size: 0.85rem; color: var(--color-text-muted); padding: 0 0 4px; }
   </style>`;
 }
 
@@ -580,8 +605,21 @@ function buildNavScript() {
 }
 
 function buildNextGameTeaser(team) {
-  const nextMatch = (team.matches || []).find(m => m.isNext);
-  if (!nextMatch) return '';
+  const allMatches = Array.isArray(team.matches) ? team.matches : [];
+  const nextMatch = allMatches.find(m => m.isNext);
+
+  if (!nextMatch) {
+    // Only show "no more games" if there were matches this season
+    if (allMatches.length === 0) return '';
+    return `<section class="next-game next-game--empty">
+  <div class="next-game-header">
+    <h2 class="next-game-title">Nächstes Spiel</h2>
+  </div>
+  <div class="next-game-details">
+    <div class="next-game-no-games">Aktuell sind keine weiteren Spiele geplant.</div>
+  </div>
+</section>`;
+  }
 
   const badgeClass = isLiga(nextMatch.competition)
     ? (nextMatch.isHome ? 'badge badge--home' : 'badge badge--away')
