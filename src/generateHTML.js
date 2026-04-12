@@ -564,11 +564,11 @@ function buildSharedStyles(primary, accent, cupColor) {
     .spotlight-info { flex: 1; min-width: 0; }
     .spotlight-line1 { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; }
     .spotlight-line2 { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--color-text); margin-top: 1px; }
+    .spotlight-line3 { font-size: 0.72rem; color: var(--color-text); margin-top: 1px; }
     .spotlight-time { white-space: nowrap; color: var(--color-text); min-width: 36px; }
     .spotlight-team { font-weight: 700; color: var(--color-text); white-space: nowrap; }
     .spotlight-result { font-weight: 700; white-space: nowrap; color: var(--color-text); min-width: 44px; }
     .spotlight-vs { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .spotlight-comp { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; }
     .spotlight-empty { font-size: 0.85rem; color: var(--color-text-muted); padding: 8px 0; }
   </style>`;
 }
@@ -802,8 +802,8 @@ function buildSpotlightBlock(teams, cupColor) {
         }
       }
 
-      const compHtml = m.competition
-        ? `<span class="spotlight-comp">${escapeHtml(m.competition)}</span>`
+      const line3 = m.competition
+        ? `<div class="spotlight-line3">${escapeHtml(m.competition)}</div>`
         : '';
 
       rows.push(
@@ -816,9 +816,9 @@ function buildSpotlightBlock(teams, cupColor) {
             `</div>` +
             `<div class="spotlight-line2">` +
               `<span class="spotlight-vs">${vsPrefix}&nbsp;${opponent}</span>` +
-              compHtml +
               resultHtml +
             `</div>` +
+            line3 +
           `</div>` +
         `</div>`
       );
