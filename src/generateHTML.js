@@ -779,7 +779,6 @@ function buildTeamPage(team, allTeams, theme) {
   <title>${escapeHtml(team.teamName)}${team.ageGroup && !/^(senioren|herren)$/i.test(team.ageGroup) ? ' ' + escapeHtml(team.ageGroup) : ''}</title>
   ${buildSharedStyles(primary, accent, cupColor)}
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WPeM=" crossorigin=""></script>
 </head>
 <body>
   ${nav}
@@ -805,6 +804,7 @@ function buildTeamPage(team, allTeams, theme) {
       <span><span class="badge badge--cup">H/A</span> Pokal / Cup</span>
     </div>
   </main>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WPeM=" crossorigin=""></script>
   ${buildTabScript()}
   ${buildNavScript()}
 </body>
