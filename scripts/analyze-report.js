@@ -5,9 +5,9 @@ const path = require('node:path');
 
 const reportPath = process.env.PLAYWRIGHT_JSON_OUTPUT_NAME
   ? path.resolve(process.cwd(), process.env.PLAYWRIGHT_JSON_OUTPUT_NAME)
-  : path.resolve(__dirname, '../test-results.json');
+  : path.resolve(process.cwd(), 'test-results.json');
 
-const outputPath = path.resolve(__dirname, '../test-report-analysis.md');
+const outputPath = path.resolve(process.cwd(), 'test-report-analysis.md');
 
 if (!fs.existsSync(reportPath)) {
   console.error(`Report nicht gefunden: ${reportPath}`);
@@ -15,18 +15,27 @@ if (!fs.existsSync(reportPath)) {
   process.exit(1);
 }
 
-const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+let report;
+try {
+  report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+} catch (e) {
+  console.error(`Ungültiges JSON in Report-Datei: ${reportPath}`);
+  console.error(e.message);
+  process.exit(1);
+}
 
-const stats = report.stats || {};
+const stats  = report.stats || {};
 const passed  = stats.expected   || 0;
 const failed  = stats.unexpected || 0;
 const skipped = stats.skipped    || 0;
-const total   = passed + failed + skipped;
+const flaky   = stats.flaky      || 0;
+const total   = passed + failed + skipped + flaky;
 
 const failures = [];
 function collectFailures(suite) {
   for (const spec of (suite.specs || [])) {
     for (const testResult of (spec.tests || [])) {
+      // testResult.status is "expected" (pass) or "unexpected" (fail)
       if (testResult.status === 'unexpected') {
         const msg = testResult.results?.[0]?.error?.message || 'Kein Fehlertext';
         failures.push({
@@ -54,6 +63,7 @@ const lines = [
   '|--------|--------|',
   `| ✅ Bestanden | ${passed} |`,
   `| ❌ Fehlgeschlagen | ${failed} |`,
+  `| 🔁 Flaky | ${flaky} |`,
   `| ⏭ Übersprungen | ${skipped} |`,
   `| Gesamt | ${total} |`,
   '',
