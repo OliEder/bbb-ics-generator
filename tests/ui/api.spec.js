@@ -1,13 +1,16 @@
 // @ts-check
 'use strict';
 
+// NOTE: Diese Tests benötigen eine aktive Internetverbindung zu basketball-bund.net.
+// In CI-Umgebungen ohne Netzwerkzugang schlagen sie fehl — das ist beabsichtigt (Smoke Tests).
+
 const { test, expect } = require('@playwright/test');
 const config = require('../../config.json');
 
 const BASE = 'https://www.basketball-bund.net/rest';
 const CLUB_ID = config.clubId;
 
-test.describe('BBB API Smoke Tests', () => {
+test.describe('BBB API Smoke Tests @network', () => {
   test('Club-Matches Endpoint antwortet mit HTTP 200', async ({ request }) => {
     const res = await request.get(`${BASE}/club/id/${CLUB_ID}/actualmatches?justHome=false&rangeDays=150`);
     expect(res.status()).toBe(200);
