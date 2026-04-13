@@ -64,9 +64,14 @@ BBB ICS Generator — Qualitätsanforderungen
     |   +-- Szenario: Vollständige Bedienung der Übersichtsseite ohne Maus
     |   +-- Szenario: Tab-Wechsel per ArrowRight/ArrowLeft/Home/End
     |
-    +-- WCAG 2.1 AA
-    |   +-- Szenario: axe-core meldet keine Violations (wcag2a + wcag2aa Tags)
+    +-- WCAG 2.1 AA (automatisch prüfbar, ~30–40% aller Kriterien)
+    |   +-- Szenario: axe-core meldet keine Violations (wcag2a + wcag2aa + wcag21a + wcag21aa Tags)
     |   +-- Szenario: Alle Texte erreichen Kontrastverhältnis 4,5:1
+    |   HINWEIS: color-mix()-Werte werden von axe-core nicht ausgewertet →
+    |   Kontrast muss manuell / per dediziertem Test sichergestellt werden
+    |
+    +-- WCAG 2.2 (nicht automatisch abgedeckt — ausstehend)
+        +-- Szenario: 2.5.8 Zielgröße — interaktive Elemente mindestens 24×24 px
     |
     +-- ARIA-Korrektheit
         +-- Szenario: aria-controls zeigt auf existierende Panels mit role="tabpanel"
@@ -125,8 +130,13 @@ BBB ICS Generator — Qualitätsanforderungen
 | Mittel
 
 | Q-10
-| axe-core scannt die generierte `index.html` mit Tags `wcag2a` und `wcag2aa`.
-| Keine Violations. Alle ARIA-Rollen, Kontrastverhältnisse und semantischen Anforderungen erfüllt.
+| axe-core scannt die generierte `index.html` und Team-Seiten mit Tags `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`.
+| Keine Violations. Alle ARIA-Rollen und semantischen Anforderungen erfüllt. *Einschränkung:* `color-mix()`-basierte Farben werden von axe-core nicht ausgewertet — Kontrast für diese Werte ist durch manuelle Prüfung bzw. dedizierte Tests sicherzustellen.
+| Mittel
+
+| Q-12
+| Das gesamte Farbsystem basiert auf `color-mix()` CSS-Funktion. axe-core kann diese Werte nicht auflösen.
+| Kontrast wird durch strukturelle Maßnahmen sichergestellt: Primärfarbe auf weißem Hintergrund mit mindestens 4,5:1, Fließtext immer `color-mix(in srgb, var(--color-primary) 90%, black)` auf weißer Fläche. Manuelle Prüfung bei Theme-Änderungen erforderlich.
 | Mittel
 
 | Q-11

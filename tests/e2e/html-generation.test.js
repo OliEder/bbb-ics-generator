@@ -1023,3 +1023,81 @@ test('buildBarrierefreiheit: enthält "teilweise konform"', () => {
   const html = buildBarrierefreiheit({}, [], { primary: '#004174', accent: '#009ef3', cupColor: '#7c3aed' });
   assert.ok(html.toLowerCase().includes('teilweise konform'), 'Konformitätsstatus fehlt');
 });
+
+// ─── buildCalHelp ────────────────────────────────────────────────────────────
+
+test('buildCalHelp: enthält <details> mit <summary>', () => {
+  const { buildCalHelp } = require('../../src/generateHTML.js')._testExports;
+  const html = buildCalHelp();
+  assert.ok(html.includes('<details'), '<details> fehlt');
+  assert.ok(html.includes('<summary'), '<summary> fehlt');
+  assert.ok(html.includes('Kalender abonnieren'), 'Summary-Text fehlt');
+});
+
+test('buildCalHelp: enthält Erklärung für alle vier Optionen', () => {
+  const { buildCalHelp } = require('../../src/generateHTML.js')._testExports;
+  const html = buildCalHelp();
+  assert.ok(html.includes('iOS / macOS'), 'iOS/macOS-Abschnitt fehlt');
+  assert.ok(html.includes('Google'), 'Google-Abschnitt fehlt');
+  assert.ok(html.includes('Outlook'), 'Outlook-Abschnitt fehlt');
+  assert.ok(html.includes('ICS'), 'ICS-Abschnitt fehlt');
+});
+
+test('buildCalHelp: enthält offizielle Support-Links', () => {
+  const { buildCalHelp } = require('../../src/generateHTML.js')._testExports;
+  const html = buildCalHelp();
+  assert.ok(html.includes('support.apple.com'), 'Apple Support-Link fehlt');
+  assert.ok(html.includes('support.google.com'), 'Google Support-Link fehlt');
+  assert.ok(html.includes('support.microsoft.com'), 'Microsoft Support-Link fehlt');
+});
+
+test('buildCalHelp: externe Links haben target="_blank" und rel="noopener"', () => {
+  const { buildCalHelp } = require('../../src/generateHTML.js')._testExports;
+  const html = buildCalHelp();
+  const links = html.match(/<a [^>]*href="https?:\/\/[^"]*"[^>]*>/g) || [];
+  assert.ok(links.length > 0, 'Keine externen Links gefunden');
+  for (const link of links) {
+    assert.ok(link.includes('target="_blank"'), `Link ohne target="_blank": ${link}`);
+    assert.ok(link.includes('rel="noopener"'), `Link ohne rel="noopener": ${link}`);
+  }
+});
+
+// ─── buildTabPanel: Link kopieren Button ─────────────────────────────────────
+
+test('buildTabPanel: enthält btn--copy Button mit data-copy-url', () => {
+  const { buildTabPanel } = require('../../src/generateHTML.js')._testExports;
+  const html = buildTabPanel('team1', 'all', 'webcal://example.com/a.ics', 'https://google.com/cal', 'https://example.com/a.ics', [], '#7c3aed');
+  assert.ok(html.includes('btn--copy'), 'btn--copy Klasse fehlt');
+  assert.ok(html.includes('data-copy-url="https://example.com/a.ics"'), 'data-copy-url fehlt oder falsch');
+});
+
+test('buildTabPanel: Link kopieren Button escapet die URL', () => {
+  const { buildTabPanel } = require('../../src/generateHTML.js')._testExports;
+  const html = buildTabPanel('team1', 'all', 'webcal://x.com/a.ics', 'https://google.com/cal', 'https://x.com/a.ics?foo=1&bar=2', [], '#7c3aed');
+  assert.ok(!html.includes('foo=1&bar=2'), 'Unescaped & in data-copy-url');
+  assert.ok(html.includes('foo=1&amp;bar=2'), 'HTML-Escaping für & in URL fehlt');
+});
+
+test('buildTabPanel: enthält cal-help <details> Block', () => {
+  const { buildTabPanel } = require('../../src/generateHTML.js')._testExports;
+  const html = buildTabPanel('team1', 'all', 'webcal://x.com/a.ics', 'https://google.com/cal', 'https://x.com/a.ics', [], '#7c3aed');
+  assert.ok(html.includes('cal-help'), 'cal-help Block fehlt');
+  assert.ok(html.includes('<details'), '<details> fehlt im Tab-Panel');
+});
+
+test('buildTabPanel: hidden panel enthält ebenfalls cal-help', () => {
+  const { buildTabPanel } = require('../../src/generateHTML.js')._testExports;
+  const html = buildTabPanel('team1', 'home', 'webcal://x.com/a.ics', 'https://google.com/cal', 'https://x.com/a.ics', [], '#7c3aed');
+  assert.ok(html.includes('hidden'), 'hidden Attribut fehlt für home-Panel');
+  assert.ok(html.includes('cal-help'), 'cal-help fehlt im hidden Panel');
+});
+
+// ─── buildTabScript: Clipboard-Handler ───────────────────────────────────────
+
+test('buildTabScript: enthält Clipboard-Handler für btn--copy', () => {
+  const { buildTabScript } = require('../../src/generateHTML.js')._testExports;
+  const script = buildTabScript();
+  assert.ok(script.includes('btn--copy'), 'btn--copy Selektor fehlt im Script');
+  assert.ok(script.includes('navigator.clipboard'), 'navigator.clipboard fehlt im Script');
+  assert.ok(script.includes('data-copy-url'), 'data-copy-url Attribut-Zugriff fehlt im Script');
+});

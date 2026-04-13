@@ -158,6 +158,8 @@ a|
 
 | *Wichtige interne Funktionen*
 a|
+* `buildCalHelp()` — aufklappbarer `<details>`-Block mit Erklärung zu Kalender-Abonnements (iOS/macOS, Google, Outlook, ICS) inkl. offizieller Support-Links; wird in jedem Tab-Panel eingebettet
+* `buildTabPanel(teamId, type, webcalLink, googleLink, httpsLink, matches, cupColor)` — rendert einen Tab-Panel mit Spielplan, Abo-Buttons (inkl. „Link kopieren"-Button für Outlook/HTTPS-URL) und eingebettetem `buildCalHelp()`-Block
 * `buildTeaserCard(team)` — adaptiver Teaser mit bis zu 3 vergangenen Ergebnissen + bis zu 4−n zukünftigen Terminen
 * `buildNextGameTeaser(team)` — detaillierter Next-Game-Block mit Leaflet-Karte (clientseitig per Nominatim geocodiert)
 * `buildSpotlightBlock(teams, cupColor)` — "Nächste Spiele"-Block auf der Startseite mit Tabs Alle/Heim/Auswärts, chronologisch sortiert über alle Teams

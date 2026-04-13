@@ -117,6 +117,26 @@ function buildSchedule(matches, filter, cupColor) {
 const ICON_APPLE    = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>`;
 const ICON_ANDROID  = `<svg width="14" height="17" viewBox="-147 -70 294 345" aria-hidden="true"><g fill="currentColor"><ellipse cy="41" rx="91" ry="84"/><rect rx="22" height="182" width="182" y="20" x="-91"/><rect rx="24" height="133" width="48" y="41" x="-143"/><rect rx="24" height="133" width="48" y="41" x="95"/><rect rx="6.5" transform="rotate(29)" height="86" width="13" y="-86" x="14"/><rect rx="6.5" transform="rotate(-29)" height="86" width="13" y="-86" x="-27"/></g><g fill="white"><circle cx="-42" cy="41" r="9"/><circle cx="42" cy="41" r="9"/></svg>`;
 const ICON_DOWNLOAD = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+const ICON_COPY     = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+
+function buildCalHelp() {
+  return `<details class="cal-help">
+  <summary class="cal-help__summary">Kalender abonnieren – wie funktioniert das?</summary>
+  <div class="cal-help__body">
+    <p>Mit einem Kalender-Abo werden neue Spiele und Änderungen automatisch in deiner Kalender-App angezeigt – du musst nichts manuell aktualisieren.</p>
+    <dl>
+      <dt>${ICON_APPLE} iOS / macOS Kalender</dt>
+      <dd>Tippe auf „iOS / macOS Kalender". Der Spielplan wird direkt in der Kalender-App geöffnet. Beim Abonnieren kannst du festlegen, ob Erinnerungen für die Spiele aktiviert werden sollen. <a href="https://support.apple.com/de-at/guide/iphone/iph3d1110d4/18.0/ios/18.0" target="_blank" rel="noopener">Apple Support ↗</a></dd>
+      <dt>${ICON_ANDROID} Google Kalender</dt>
+      <dd>Tippe auf „Google Calendar". Das Abo muss einmalig in der Google Kalender <strong>Web-App</strong> eingerichtet werden – danach synchronisiert es sich automatisch auf allen Geräten. Erinnerungen lassen sich in den Einstellungen des abonnierten Kalenders anpassen. Hinweis: Es kann bis zu 12 Stunden dauern, bis Änderungen erscheinen. <a href="https://support.google.com/calendar/answer/37100?hl=de&amp;co=GENIE.Platform%3DDesktop" target="_blank" rel="noopener">Google Support ↗</a></dd>
+      <dt>${ICON_COPY} Outlook</dt>
+      <dd>Klicke auf „Link kopieren" und füge die URL in Outlook ein: Kalender → „Aus dem Internet abonnieren" → Link einfügen. Der Spielplan bleibt automatisch aktuell. Hinweis: Änderungen können bis zu 24 Stunden brauchen, bis sie in Outlook erscheinen. <a href="https://support.microsoft.com/de-de/office/importieren-oder-abonnieren-eines-kalenders-in-outlook-im-web-503ffaf6-7b86-44fe-8dd6-8099d95f38df" target="_blank" rel="noopener">Microsoft Support ↗</a></dd>
+      <dt>${ICON_DOWNLOAD} Andere Apps (ICS)</dt>
+      <dd>Lade die Kalenderdatei einmalig herunter – geeignet für Apps ohne Abo-Funktion. Erinnerungen müssen dort manuell eingestellt werden.</dd>
+    </dl>
+  </div>
+</details>`;
+}
 
 function buildTabPanel(teamId, type, webcalLink, googleLink, httpsLink, matches, cupColor) {
   const id     = `panel-${teamId}-${type}`;
@@ -129,8 +149,10 @@ function buildTabPanel(teamId, type, webcalLink, googleLink, httpsLink, matches,
       <div class="btn-group">
         <a href="${escapeHtml(webcalLink)}" class="btn">${ICON_APPLE} iOS / macOS Kalender</a>
         <a href="${escapeHtml(googleLink)}" class="btn">${ICON_ANDROID} Google Calendar</a>
+        <button class="btn btn--copy" data-copy-url="${escapeHtml(httpsLink)}">${ICON_COPY} Link kopieren</button>
         <a href="${escapeHtml(httpsLink)}" class="btn" download>${ICON_DOWNLOAD} ICS herunterladen</a>
       </div>
+      ${buildCalHelp()}
     </div>`;
 }
 
@@ -513,9 +535,23 @@ function buildSharedStyles(primary, accent, cupColor) {
     .schedule-competition { font-size: 0.75rem; color: var(--color-text); white-space: nowrap; }
     .schedule-result { font-size: 0.88rem; font-weight: 600; white-space: nowrap; min-width: 44px; text-align: right; color: var(--color-text); }
     .btn-group { display: flex; flex-direction: column; gap: 8px; }
-    .btn { display: inline-flex; align-items: center; gap: 8px; background: var(--color-surface); color: var(--color-primary); border: 1.5px solid var(--color-border); padding: 9px 14px; border-radius: 7px; font-size: 0.82rem; font-weight: 600; text-decoration: none; transition: background 0.15s, border-color 0.15s; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; background: var(--color-surface); color: var(--color-primary); border: 1.5px solid var(--color-border); padding: 9px 14px; border-radius: 7px; font-size: 0.82rem; font-weight: 600; text-decoration: none; transition: background 0.15s, border-color 0.15s; cursor: pointer; font-family: inherit; }
     .btn:hover { background: var(--color-primary-light); border-color: var(--color-primary); }
     .btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+    .btn--copy--copied { color: #1a7a3f; border-color: #1a7a3f; }
+    .cal-help { margin-top: 16px; border: 1px solid var(--color-border); border-radius: 7px; font-size: 0.82rem; }
+    .cal-help__summary { padding: 10px 14px; font-weight: 600; color: var(--color-primary); cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; }
+    .cal-help__summary::-webkit-details-marker { display: none; }
+    .cal-help__summary::before { content: '▶'; font-size: 0.65em; transition: transform 0.15s; }
+    details[open] .cal-help__summary::before { transform: rotate(90deg); }
+    .cal-help__body { padding: 0 14px 14px; }
+    .cal-help__body p { color: var(--color-text); margin-bottom: 12px; line-height: 1.5; }
+    .cal-help__body dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: baseline; }
+    .cal-help__body dt { font-weight: 700; color: var(--color-text); white-space: nowrap; display: flex; align-items: center; gap: 5px; padding-top: 4px; }
+    .cal-help__body dd { color: var(--color-text); line-height: 1.5; padding-top: 4px; border-top: 1px solid var(--color-border); }
+    .cal-help__body dd:first-of-type { border-top: none; }
+    .cal-help__body a { color: var(--color-primary); text-decoration: underline; white-space: nowrap; }
+    .cal-help__body a:hover { opacity: 0.8; }
     @media (prefers-color-scheme: dark) {
       .btn { background: transparent; color: var(--color-accent-muted); border-color: var(--color-border); }
       .btn:hover { background: var(--color-surface-card); }
@@ -586,6 +622,22 @@ function buildSharedStyles(primary, accent, cupColor) {
 
 function buildTabScript() {
   return `<script>
+    document.querySelectorAll('.btn--copy').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var url = btn.getAttribute('data-copy-url');
+        if (!url) return;
+        var origNodes = Array.from(btn.childNodes).map(function(n) { return n.cloneNode(true); });
+        navigator.clipboard.writeText(url).then(function() {
+          btn.textContent = '✓ Link kopiert';
+          btn.classList.add('btn--copy--copied');
+          setTimeout(function() {
+            btn.textContent = '';
+            origNodes.forEach(function(n) { btn.appendChild(n.cloneNode(true)); });
+            btn.classList.remove('btn--copy--copied');
+          }, 2000);
+        });
+      });
+    });
     document.querySelectorAll('[role="tablist"]').forEach(function(tablist) {
       var tabs = Array.from(tablist.querySelectorAll('[role="tab"]'));
       tablist.addEventListener('keydown', function(e) {
@@ -1128,7 +1180,7 @@ function genHTML(theme = {}, legal = {}) {
 }
 
 module.exports = { genHTML };
-module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket, buildNavScript, buildSharedStyles, buildTabScript, buildTeamPage, buildIndexPage, buildNextGameTeaser, buildSpotlightBlock, spotlightTeamLabel, buildFooter, buildImpressum, buildDatenschutz, buildBarrierefreiheit };
+module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket, buildNavScript, buildSharedStyles, buildTabScript, buildTeamPage, buildIndexPage, buildNextGameTeaser, buildSpotlightBlock, spotlightTeamLabel, buildFooter, buildImpressum, buildDatenschutz, buildBarrierefreiheit, buildCalHelp, buildTabPanel };
 
 if (require.main === module) {
   const config = require('../config.json');
