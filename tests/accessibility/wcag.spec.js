@@ -198,12 +198,13 @@ test.describe('WCAG 2.1 AA — strukturelle Prüfungen', () => {
     }
   });
 
-  test('2.4.1 <main> und <header> Landmarks vorhanden', async ({ page }) => {
+  test('2.4.1 <main>, <nav> und <footer> Landmarks vorhanden', async ({ page }) => {
     const { dir, htmlPath } = generateIndexHtml(DEFAULT_THEME, sampleMetadata);
     try {
       await page.goto('file://' + htmlPath);
       await expect(page.locator('main')).toBeAttached();
-      await expect(page.locator('header')).toBeAttached();
+      await expect(page.locator('nav')).toBeAttached();
+      await expect(page.locator('footer')).toBeAttached();
     } finally {
       rmSync(dir, { recursive: true });
     }
