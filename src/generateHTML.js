@@ -574,6 +574,12 @@ function buildSharedStyles(primary, accent, cupColor) {
     .site-footer { padding: 16px; text-align: center; font-size: 0.78rem; color: var(--color-text-muted); border-top: 1px solid var(--color-border); margin-top: 24px; }
     .site-footer a { color: var(--color-primary); text-decoration: none; }
     .site-footer a:hover { text-decoration: underline; }
+    .legal-page { max-width: 720px; margin: 0 auto; padding: 24px 16px; }
+    .legal-page h1 { font-size: 1.4rem; margin-bottom: 8px; color: var(--color-text); }
+    .legal-page h2 { font-size: 1.05rem; margin: 20px 0 6px; color: var(--color-text); }
+    .legal-page p, .legal-page li { font-size: 0.9rem; line-height: 1.6; color: var(--color-text); }
+    .legal-page ul { padding-left: 20px; }
+    .legal-page a { color: var(--color-primary); }
   </style>`;
 }
 
@@ -995,6 +1001,96 @@ function buildIndexPage(teams, theme, legal = {}) {
 }
 
 
+function buildLegalSkeleton(title, content, allTeams, theme, legal) {
+  const { primary, accent, cupColor } = theme;
+  const nav = buildNavigation(allTeams, 'index');
+  return `<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapeHtml(title)}</title>
+  ${buildSharedStyles(primary, accent, cupColor)}
+</head>
+<body>
+  ${nav}
+  <main class="legal-page">
+    ${content}
+  </main>
+  ${buildFooter(legal, './')}
+  ${buildNavScript()}
+</body>
+</html>`;
+}
+
+function buildImpressum(legal, allTeams, theme) {
+  const op      = escapeHtml(legal.operator    || '');
+  const addr    = escapeHtml(legal.address     || '');
+  const email   = escapeHtml(legal.email       || '');
+  const phone   = escapeHtml(legal.phone       || '');
+  const resp    = escapeHtml(legal.responsible || '');
+  const phoneRow = phone ? `<p><strong>Telefon:</strong> ${phone}</p>` : '';
+  const respRow  = resp  ? `<p><strong>Verantwortlich:</strong> ${resp}</p>` : '';
+  const content = `
+<h1>Impressum</h1>
+<p>Angaben gemäß § 5 TMG</p>
+<p><strong>Betreiber:</strong> ${op}</p>
+<p><strong>Adresse:</strong> ${addr}</p>
+${phoneRow}
+<p><strong>E-Mail:</strong> ${email}</p>
+${respRow}
+<h2>Haftungshinweis</h2>
+<p>Diese Seite aggregiert öffentlich verfügbare Spielplandaten von
+<a href="https://www.basketball-bund.net" target="_blank" rel="noopener">basketball-bund.net</a>.
+Für die Richtigkeit der Daten wird keine Gewähr übernommen.</p>`;
+  return buildLegalSkeleton('Impressum', content, allTeams, theme, legal);
+}
+
+function buildDatenschutz(legal, allTeams, theme) {
+  const op    = escapeHtml(legal.operator || '');
+  const email = escapeHtml(legal.email    || '');
+  const year  = new Date().getFullYear();
+  const content = `
+<h1>Datenschutzerklärung</h1>
+<p>Stand: ${year}</p>
+<h2>Verantwortlicher</h2>
+<p>${op || 'Siehe Impressum'}</p>
+<h2>Datenerhebung</h2>
+<p>Diese Website erhebt selbst keine personenbezogenen Daten, setzt keine Cookies und verwendet kein Tracking.</p>
+<h2>Technische Drittanbieter</h2>
+<p>Beim Aufruf dieser Seite werden Verbindungen zu folgenden externen Diensten hergestellt, dabei werden technisch notwendige Daten (u.&thinsp;a. IP-Adressen) übertragen:</p>
+<ul>
+  <li><strong>cdnjs.cloudflare.com</strong> — Bereitstellung von Font-Awesome-Icons (CSS- und Schriftdateien)</li>
+  <li><strong>basketball-bund.net</strong> — Spielplandaten und Team-Logos (Datenquelle)</li>
+  <li><strong>nominatim.openstreetmap.org</strong> — Geocodierung von Spielfeldern (clientseitig, nur bei Aufruf einer Teamseite)</li>
+</ul>
+<h2>Auskunft und Löschung</h2>
+<p>${email ? `Anfragen richten Sie bitte per E-Mail an: <a href="mailto:${email}">${email}</a>` : 'Bitte wenden Sie sich an den Seitenbetreiber (siehe Impressum).'}</p>`;
+  return buildLegalSkeleton('Datenschutzerklärung', content, allTeams, theme, legal);
+}
+
+function buildBarrierefreiheit(legal, allTeams, theme) {
+  const email = escapeHtml(legal.email || '');
+  const year  = new Date().getFullYear();
+  const content = `
+<h1>Barrierefreiheitserklärung</h1>
+<p>Stand: ${year}</p>
+<h2>Konformitätsstatus</h2>
+<p>Diese Website ist <strong>teilweise konform</strong> mit der WCAG 2.1 Stufe AA.</p>
+<h2>Nicht konforme Bereiche</h2>
+<p>Es wurde kein formales BITV-Audit oder offizielles WCAG-Audit durchgeführt. Folgende bekannte Einschränkungen bestehen:</p>
+<ul>
+  <li>Teamlogos werden extern von basketball-bund.net geladen — alternativer Text kann nicht garantiert werden.</li>
+  <li>Die Darstellung bei stark vergrößertem Text (über 200&thinsp;%) wurde nicht vollständig getestet.</li>
+</ul>
+<h2>Feedback und Kontakt</h2>
+<p>${email ? `Bei Problemen mit der Barrierefreiheit wenden Sie sich bitte an: <a href="mailto:${email}">${email}</a>` : 'Bitte wenden Sie sich an den Seitenbetreiber (siehe Impressum).'}</p>
+<h2>Durchsetzungsverfahren</h2>
+<p>Wenn Sie nach Kontaktaufnahme keine zufriedenstellende Antwort erhalten haben, können Sie die
+<a href="https://www.schlichtungsstelle-bgg.de/" target="_blank" rel="noopener">Schlichtungsstelle nach dem Behindertengleichstellungsgesetz (BGG)</a> einschalten.</p>`;
+  return buildLegalSkeleton('Barrierefreiheitserklärung', content, allTeams, theme, legal);
+}
+
 function genHTML(theme = {}, legal = {}) {
   const primary  = sanitizeCssColor(theme.primary  || '#004174');
   const accent   = sanitizeCssColor(theme.accent   || '#009ef3');
@@ -1020,10 +1116,18 @@ function genHTML(theme = {}, legal = {}) {
       'utf8'
     );
   }
+
+  // Write legal pages
+  fs.writeFileSync(path.join(generatedDir, 'datenschutz.html'), buildDatenschutz(legal, teams, resolvedTheme), 'utf8');
+  fs.writeFileSync(path.join(generatedDir, 'barrierefreiheit.html'), buildBarrierefreiheit(legal, teams, resolvedTheme), 'utf8');
+  const hasLegal = legal && Object.values(legal).some(v => v && String(v).trim());
+  if (hasLegal) {
+    fs.writeFileSync(path.join(generatedDir, 'impressum.html'), buildImpressum(legal, teams, resolvedTheme), 'utf8');
+  }
 }
 
 module.exports = { genHTML };
-module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket, buildNavScript, buildSharedStyles, buildTabScript, buildTeamPage, buildIndexPage, buildNextGameTeaser, buildSpotlightBlock, spotlightTeamLabel, buildFooter };
+module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket, buildNavScript, buildSharedStyles, buildTabScript, buildTeamPage, buildIndexPage, buildNextGameTeaser, buildSpotlightBlock, spotlightTeamLabel, buildFooter, buildImpressum, buildDatenschutz, buildBarrierefreiheit };
 
 if (require.main === module) {
   const config = require('../config.json');

@@ -989,3 +989,36 @@ test('buildFooter: enthält footer-Element mit role contentinfo', () => {
   const html = buildFooter({}, './');
   assert.ok(html.includes('<footer') && html.includes('role="contentinfo"'), 'footer-Element fehlt');
 });
+
+const { buildImpressum, buildDatenschutz, buildBarrierefreiheit } = require('../../src/generateHTML.js')._testExports;
+
+test('buildImpressum: enthält Betreibernamen', () => {
+  const html = buildImpressum({ operator: 'TV Neumarkt e.V.', address: 'Str. 1', email: 'test@test.de', phone: '', responsible: '' }, [], {});
+  assert.ok(html.includes('TV Neumarkt e.V.'), 'Betreibername fehlt');
+  assert.ok(html.includes('Str. 1'), 'Adresse fehlt');
+});
+
+test('buildImpressum: Telefon-Zeile fehlt wenn leer', () => {
+  const html = buildImpressum({ operator: 'TV', address: 'Str.', email: 'a@b.de', phone: '', responsible: '' }, [], {});
+  assert.ok(!html.includes('Telefon'), 'Telefon-Zeile sollte fehlen wenn leer');
+});
+
+test('buildImpressum: escapet HTML in operator', () => {
+  const html = buildImpressum({ operator: '<script>xss</script>', address: 'x', email: 'x@x.de', phone: '', responsible: '' }, [], {});
+  assert.ok(!html.includes('<script>xss</script>'), 'XSS nicht escapet');
+});
+
+test('buildDatenschutz: enthält basketball-bund.net', () => {
+  const html = buildDatenschutz({}, [], {});
+  assert.ok(html.includes('basketball-bund.net'), 'BBB-Verweis fehlt');
+});
+
+test('buildDatenschutz: enthält cdnjs', () => {
+  const html = buildDatenschutz({}, [], {});
+  assert.ok(html.includes('cdnjs'), 'cdnjs-Verweis fehlt');
+});
+
+test('buildBarrierefreiheit: enthält "teilweise konform"', () => {
+  const html = buildBarrierefreiheit({}, [], {});
+  assert.ok(html.toLowerCase().includes('teilweise konform'), 'Konformitätsstatus fehlt');
+});
