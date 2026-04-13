@@ -1078,11 +1078,13 @@ test('buildTabPanel: Link kopieren Button escapet die URL', () => {
   assert.ok(html.includes('foo=1&amp;bar=2'), 'HTML-Escaping für & in URL fehlt');
 });
 
-test('buildTabPanel: enthält cal-help <details> Block', () => {
+test('buildTabPanel: enthält cal-help <details> Block vor den Buttons', () => {
   const { buildTabPanel } = require('../../src/generateHTML.js')._testExports;
   const html = buildTabPanel('team1', 'all', 'webcal://x.com/a.ics', 'https://google.com/cal', 'https://x.com/a.ics', [], '#7c3aed');
   assert.ok(html.includes('cal-help'), 'cal-help Block fehlt');
   assert.ok(html.includes('<details'), '<details> fehlt im Tab-Panel');
+  // details muss vor btn-group stehen
+  assert.ok(html.indexOf('cal-help') < html.indexOf('btn-group'), 'cal-help sollte vor btn-group stehen');
 });
 
 test('buildTabPanel: hidden panel enthält ebenfalls cal-help', () => {
@@ -1090,6 +1092,16 @@ test('buildTabPanel: hidden panel enthält ebenfalls cal-help', () => {
   const html = buildTabPanel('team1', 'home', 'webcal://x.com/a.ics', 'https://google.com/cal', 'https://x.com/a.ics', [], '#7c3aed');
   assert.ok(html.includes('hidden'), 'hidden Attribut fehlt für home-Panel');
   assert.ok(html.includes('cal-help'), 'cal-help fehlt im hidden Panel');
+});
+
+test('buildTabPanel: Überschrift zeigt korrekten Tab-Typ', () => {
+  const { buildTabPanel } = require('../../src/generateHTML.js')._testExports;
+  const all  = buildTabPanel('t', 'all',  'webcal://x', 'https://g', 'https://x', [], '#000');
+  const home = buildTabPanel('t', 'home', 'webcal://x', 'https://g', 'https://x', [], '#000');
+  const away = buildTabPanel('t', 'away', 'webcal://x', 'https://g', 'https://x', [], '#000');
+  assert.ok(all.includes('alle Spiele'), 'Überschrift für all fehlt');
+  assert.ok(home.includes('Heimspiele'), 'Überschrift für home fehlt');
+  assert.ok(away.includes('Auswärtsspiele'), 'Überschrift für away fehlt');
 });
 
 // ─── buildTabScript: Clipboard-Handler ───────────────────────────────────────

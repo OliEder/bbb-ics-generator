@@ -32,6 +32,18 @@ class TeamPage {
   footerLink(href) {
     return this.page.locator(`footer a[href="${href}"]`);
   }
+
+  calSectionHeading(panelId) {
+    return this.page.locator(`#${panelId} .cal-section-heading`);
+  }
+
+  calHelp(panelId) {
+    return this.page.locator(`#${panelId} .cal-help`);
+  }
+
+  copyButton(panelId) {
+    return this.page.locator(`#${panelId} .btn--copy`);
+  }
 }
 
 module.exports = { TeamPage };

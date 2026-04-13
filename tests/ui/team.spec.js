@@ -42,6 +42,47 @@ test.describe('Spielzeilen-Badges', () => {
   });
 });
 
+test.describe('Kalender-Abo-Bereich', () => {
+  test('Überschrift "alle Spiele" im Alle-Panel sichtbar', async ({ page }) => {
+    const pg = new TeamPage(page);
+    await expect(pg.calSectionHeading('panel-167881-all')).toContainText('alle Spiele');
+  });
+
+  test('Hilfe-Block ist initial zugeklappt', async ({ page }) => {
+    const pg = new TeamPage(page);
+    const details = pg.calHelp('panel-167881-all');
+    await expect(details).toBeAttached();
+    expect(await details.getAttribute('open')).toBeNull();
+  });
+
+  test('Hilfe-Block steht vor den Abo-Buttons', async ({ page }) => {
+    const isBefore = await page.evaluate(() => {
+      const help = document.querySelector('#panel-167881-all .cal-help');
+      const btns = document.querySelector('#panel-167881-all .btn-group');
+      if (!help || !btns) return false;
+      return help.compareDocumentPosition(btns) & Node.DOCUMENT_POSITION_FOLLOWING;
+    });
+    expect(isBefore).toBeTruthy();
+  });
+
+  test('"Link kopieren"-Button vorhanden', async ({ page }) => {
+    const pg = new TeamPage(page);
+    await expect(pg.copyButton('panel-167881-all')).toBeAttached();
+  });
+
+  test('Überschrift wechselt beim Tab-Wechsel zu "Heimspiele"', async ({ page }) => {
+    const pg = new TeamPage(page);
+    await pg.scheduleTab('Heim').click();
+    await expect(pg.calSectionHeading('panel-167881-home')).toContainText('Heimspiele');
+  });
+
+  test('Überschrift wechselt beim Tab-Wechsel zu "Auswärtsspiele"', async ({ page }) => {
+    const pg = new TeamPage(page);
+    await pg.scheduleTab('Auswärts').click();
+    await expect(pg.calSectionHeading('panel-167881-away')).toContainText('Auswärtsspiele');
+  });
+});
+
 test.describe('Footer', () => {
   test('Footer ist vorhanden', async ({ page }) => {
     const pg = new TeamPage(page);

@@ -46,3 +46,12 @@ test('Teamseite existiert für jeden Team-Eintrag', () => {
     expect(existsSync(p), `Team-Seite fehlt: ${p}`).toBe(true);
   }
 });
+
+test('Teamseite enthält Support-Links für Apple, Google und Microsoft', async ({ page }) => {
+  const teamId = sampleMetadata()[0].teamId;
+  await page.goto(`file://${pages.teamPath(teamId)}`);
+  const hrefs = await page.locator('.cal-help__body a[href^="https"]').evaluateAll(els => els.map(el => el.getAttribute('href')));
+  expect(hrefs.some(h => h.includes('support.apple.com'))).toBe(true);
+  expect(hrefs.some(h => h.includes('support.google.com'))).toBe(true);
+  expect(hrefs.some(h => h.includes('support.microsoft.com'))).toBe(true);
+});

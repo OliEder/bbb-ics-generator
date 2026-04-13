@@ -143,16 +143,22 @@ function buildTabPanel(teamId, type, webcalLink, googleLink, httpsLink, matches,
   const tabId  = `tab-${teamId}-${type}`;
   const hidden = type !== 'all' ? ' hidden' : '';
   const schedule = buildSchedule(matches, type, cupColor);
+  const subHeading = type === 'all'
+    ? 'Kalender für alle Spiele abonnieren'
+    : type === 'home'
+      ? 'Kalender nur für Heimspiele abonnieren'
+      : 'Kalender nur für Auswärtsspiele abonnieren';
   return `
     <div id="${id}" role="tabpanel" aria-labelledby="${tabId}" class="tab-panel"${hidden}>
       ${schedule}
+      <h3 class="cal-section-heading">${subHeading}</h3>
+      ${buildCalHelp()}
       <div class="btn-group">
         <a href="${escapeHtml(webcalLink)}" class="btn">${ICON_APPLE} iOS / macOS Kalender</a>
         <a href="${escapeHtml(googleLink)}" class="btn">${ICON_ANDROID} Google Calendar</a>
         <button class="btn btn--copy" data-copy-url="${escapeHtml(httpsLink)}">${ICON_COPY} Link kopieren</button>
         <a href="${escapeHtml(httpsLink)}" class="btn" download>${ICON_DOWNLOAD} ICS herunterladen</a>
       </div>
-      ${buildCalHelp()}
     </div>`;
 }
 
@@ -534,6 +540,7 @@ function buildSharedStyles(primary, accent, cupColor) {
     .schedule-next-label { font-size: 0.75rem; font-weight: 600; color: var(--color-primary); margin-left: 4px; }
     .schedule-competition { font-size: 0.75rem; color: var(--color-text); white-space: nowrap; }
     .schedule-result { font-size: 0.88rem; font-weight: 600; white-space: nowrap; min-width: 44px; text-align: right; color: var(--color-text); }
+    .cal-section-heading { font-size: 0.85rem; font-weight: 700; color: var(--color-text); margin: 16px 0 8px; }
     .btn-group { display: flex; flex-direction: column; gap: 8px; }
     .btn { display: inline-flex; align-items: center; gap: 8px; background: var(--color-surface); color: var(--color-primary); border: 1.5px solid var(--color-border); padding: 9px 14px; border-radius: 7px; font-size: 0.82rem; font-weight: 600; text-decoration: none; transition: background 0.15s, border-color 0.15s; cursor: pointer; font-family: inherit; }
     .btn:hover { background: var(--color-primary-light); border-color: var(--color-primary); }
