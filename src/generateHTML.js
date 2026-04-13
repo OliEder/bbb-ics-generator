@@ -942,13 +942,14 @@ function buildTeamPage(team, allTeams, theme, legal = {}) {
 
 function buildFooter(legal, relativePath) {
   const hasImpressum = legal && Object.values(legal).some(v => v && String(v).trim());
+  const safeRel = escapeHtml(relativePath);
   const impressumLink = hasImpressum
-    ? ` &middot; <a href="${relativePath}impressum.html">Impressum</a>`
+    ? ` &middot; <a href="${safeRel}impressum.html">Impressum</a>`
     : '';
   return `<footer role="contentinfo" class="site-footer">
   <span>Quelle: <a href="https://www.basketball-bund.net" target="_blank" rel="noopener">basketball-bund.net</a></span>${impressumLink}
-  &middot; <a href="${relativePath}datenschutz.html">Datenschutz</a>
-  &middot; <a href="${relativePath}barrierefreiheit.html">Barrierefreiheit</a>
+  &middot; <a href="${safeRel}datenschutz.html">Datenschutz</a>
+  &middot; <a href="${safeRel}barrierefreiheit.html">Barrierefreiheit</a>
 </footer>`;
 }
 
