@@ -19,7 +19,7 @@ const sampleTheme = {
   logoUrl:  null,
 };
 
-const sampleMetadata = [
+const _sampleMetadata = [
   {
     teamId: '167881',
     teamName: 'Fibalon Baskets U16',
@@ -43,14 +43,17 @@ const sampleMetadata = [
   },
 ];
 
-function generatePages(theme = sampleTheme, metadata = sampleMetadata, legal = sampleLegal) {
+function generatePages(theme = sampleTheme, metadata = _sampleMetadata, legal = sampleLegal) {
   const dir = mkdtempSync(join(tmpdir(), 'bbb-ui-'));
   writeFileSync(join(dir, 'metadata.json'), JSON.stringify(metadata));
   const modPath = require.resolve('../../src/generateHTML.js');
   delete require.cache[modPath];
+  const prev = process.env.BBB_GENERATED_DIR;
   process.env.BBB_GENERATED_DIR = dir;
   const { genHTML } = require('../../src/generateHTML.js');
   genHTML(theme, legal);
+  if (prev === undefined) delete process.env.BBB_GENERATED_DIR;
+  else process.env.BBB_GENERATED_DIR = prev;
   return {
     dir,
     indexPath:         join(dir, 'index.html'),
@@ -59,4 +62,9 @@ function generatePages(theme = sampleTheme, metadata = sampleMetadata, legal = s
   };
 }
 
-module.exports = { generatePages, sampleMetadata, sampleTheme, sampleLegal };
+module.exports = {
+  generatePages,
+  sampleMetadata: () => JSON.parse(JSON.stringify(_sampleMetadata)),
+  sampleTheme,
+  sampleLegal,
+};

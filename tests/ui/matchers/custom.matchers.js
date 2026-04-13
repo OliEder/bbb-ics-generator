@@ -10,7 +10,9 @@ expect.extend({
     const pass = actual === expected;
     return {
       pass,
-      message: () => `Expected text-align to be "${expected}", got "${actual}"`,
+      message: () => pass
+        ? `Expected text-align NOT to be "${expected}"`
+        : `Expected text-align to be "${expected}", got "${actual}"`,
     };
   },
 
@@ -18,7 +20,9 @@ expect.extend({
     const hidden = await locator.evaluate(el => el.hasAttribute('hidden'));
     return {
       pass: hidden,
-      message: () => `Expected panel to have [hidden] attribute`,
+      message: () => hidden
+        ? 'Expected panel NOT to have [hidden] attribute'
+        : 'Expected panel to have [hidden] attribute',
     };
   },
 });

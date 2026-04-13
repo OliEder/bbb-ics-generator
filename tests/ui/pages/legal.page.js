@@ -9,8 +9,8 @@ class LegalPage {
     return this.page.locator('h1');
   }
 
-  async bodyText() {
-    return this.page.locator('main').innerText();
+  bodyText() {
+    return this.page.locator('main');
   }
 }
 
