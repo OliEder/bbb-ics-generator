@@ -450,11 +450,7 @@ function buildSharedStyles(primary, accent, cupColor) {
     .nav-drawer a { display: block; padding: 10px 16px; color: var(--color-text); text-decoration: none; font-weight: 500; font-size: 0.9rem; text-align: right; }
     .nav-drawer a[aria-current="page"] { background: var(--color-tab-active-bg); color: var(--color-primary); font-weight: 700; }
     .nav-drawer a:hover { background: var(--color-primary-light); }
-    /* Header */
-    header { background: var(--color-primary); color: var(--color-on-primary); padding: 16px 20px; display: flex; align-items: center; gap: 14px; }
     .club-logo { height: 48px; width: 48px; object-fit: contain; background: white; border-radius: 8px; padding: 4px; flex-shrink: 0; }
-    .header-text h1 { font-size: 1.1rem; font-weight: 700; line-height: 1.2; }
-    .header-text p  { font-size: 0.78rem; opacity: 0.75; margin-top: 2px; }
     /* Main layout */
     main { max-width: 760px; margin: 0 auto; padding: 20px 16px; }
     /* Teaser grid */
@@ -594,7 +590,7 @@ function buildSharedStyles(primary, accent, cupColor) {
     .next-game-nav-links { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
     .next-game-nav-btn { display: inline-block; padding: 4px 10px; background: var(--color-primary); color: #fff; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-decoration: none; }
     .next-game-nav-btn:hover { opacity: 0.85; }
-    .next-game-map { height: 220px; border-top: 1px solid var(--color-border); }
+    .next-game-map { height: 220px; border-top: 1px solid var(--color-border); position: relative; z-index: 0; }
     .next-game-no-games { font-size: 0.85rem; color: var(--color-text-muted); padding: 0 0 4px; }
     /* Spotlight block */
     .spotlight { margin-bottom: 24px; border: 1px solid var(--color-border); border-radius: 10px; overflow: hidden; }
@@ -1040,14 +1036,14 @@ function buildIndexPage(teams, theme, legal = {}) {
 </head>
 <body>
   ${nav}
-  <header>
-    ${headerLogoHtml}
-    <div class="header-text">
-      <h1>Basketball Spielplan</h1>
-      <p>Spielplan-Kalender · alle Teams</p>
-    </div>
-  </header>
   <main>
+    <div class="team-page-header">
+      ${headerLogoHtml}
+      <div>
+        <h1 class="team-page-title">Basketball Spielplan</h1>
+        <p class="team-page-meta">Spielplan-Kalender · alle Teams</p>
+      </div>
+    </div>
     ${buildSpotlightBlock(sorted, cupColor)}
     <div class="teaser-grid">
       ${teasers}
