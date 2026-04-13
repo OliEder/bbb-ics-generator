@@ -212,7 +212,8 @@ async function updateAll() {
 
   const generatedDir = process.env.BBB_ICS_DIR || path.resolve(__dirname, '../generated');
   fs.writeFileSync(path.join(generatedDir, 'metadata.json'), JSON.stringify(meta, null, 2));
-  genHTML(theme);
+  const legal = config.legal || {};
+  genHTML(theme, legal);
 }
 
 module.exports = { getTeams, updateAll, mapMatches, computeSpotlight };

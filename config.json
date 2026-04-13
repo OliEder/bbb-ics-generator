@@ -1,5 +1,12 @@
 {
   "clubId": "4468",
+  "legal": {
+    "operator": "Fibalon Baskets Neumarkt e.V.",
+    "address": "Musterstraße 1, 92318 Neumarkt i.d.OPf.",
+    "email": "",
+    "phone": "",
+    "responsible": ""
+  },
   "_theme_example": {
     "comment": "Optionale Overrides — entferne '_example' um sie zu aktivieren",
     "primary": "#004174",

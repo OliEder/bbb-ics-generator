@@ -571,6 +571,9 @@ function buildSharedStyles(primary, accent, cupColor) {
     .spotlight-result { display: flex; align-items: center; align-self: stretch; font-weight: 700; white-space: nowrap; color: var(--color-text); font-size: 0.92rem; padding-left: 8px; flex-shrink: 0; }
     .spotlight-vs { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .spotlight-empty { font-size: 0.85rem; color: var(--color-text-muted); padding: 8px 0; }
+    .site-footer { padding: 16px; text-align: center; font-size: 0.78rem; color: var(--color-text-muted); border-top: 1px solid var(--color-border); margin-top: 24px; }
+    .site-footer a { color: var(--color-primary); text-decoration: none; }
+    .site-footer a:hover { text-decoration: underline; }
   </style>`;
 }
 
@@ -847,7 +850,7 @@ function buildSpotlightBlock(teams, cupColor) {
 </section>`;
 }
 
-function buildTeamPage(team, allTeams, theme) {
+function buildTeamPage(team, allTeams, theme, legal = {}) {
   const { primary, accent, cupColor } = theme;
 
   const logoHtml = team.logoUrl
@@ -929,6 +932,7 @@ function buildTeamPage(team, allTeams, theme) {
       <span><span class="badge badge--cup">H/A</span> Pokal / Cup</span>
     </div>
   </main>
+  ${buildFooter(legal, '../')}
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   ${buildTabScript()}
   ${buildNavScript()}
@@ -936,7 +940,19 @@ function buildTeamPage(team, allTeams, theme) {
 </html>`;
 }
 
-function buildIndexPage(teams, theme) {
+function buildFooter(legal, relativePath) {
+  const hasImpressum = legal && Object.values(legal).some(v => v && String(v).trim());
+  const impressumLink = hasImpressum
+    ? ` &middot; <a href="${relativePath}impressum.html">Impressum</a>`
+    : '';
+  return `<footer role="contentinfo" class="site-footer">
+  <span>Quelle: <a href="https://www.basketball-bund.net" target="_blank" rel="noopener">basketball-bund.net</a></span>${impressumLink}
+  &middot; <a href="${relativePath}datenschutz.html">Datenschutz</a>
+  &middot; <a href="${relativePath}barrierefreiheit.html">Barrierefreiheit</a>
+</footer>`;
+}
+
+function buildIndexPage(teams, theme, legal = {}) {
   const { primary, accent, cupColor, logoUrl } = theme;
   const sorted = sortTeams(teams);
   const nav = buildNavigation(teams, 'index');
@@ -970,6 +986,7 @@ function buildIndexPage(teams, theme) {
       ${teasers}
     </div>
   </main>
+  ${buildFooter(legal, './')}
   ${buildTabScript()}
   ${buildNavScript()}
 </body>
@@ -977,7 +994,7 @@ function buildIndexPage(teams, theme) {
 }
 
 
-function genHTML(theme = {}) {
+function genHTML(theme = {}, legal = {}) {
   const primary  = sanitizeCssColor(theme.primary  || '#004174');
   const accent   = sanitizeCssColor(theme.accent   || '#009ef3');
   const cupColor = sanitizeCssColor(theme.cupColor || '#7c3aed');
@@ -990,7 +1007,7 @@ function genHTML(theme = {}) {
   const teams    = fs.existsSync(metaPath) ? JSON.parse(fs.readFileSync(metaPath, 'utf8')) : [];
 
   // Write index.html
-  fs.writeFileSync(path.join(generatedDir, 'index.html'), buildIndexPage(teams, resolvedTheme), 'utf8');
+  fs.writeFileSync(path.join(generatedDir, 'index.html'), buildIndexPage(teams, resolvedTheme, legal), 'utf8');
 
   // Write teams/{teamId}.html
   const teamsDir = path.join(generatedDir, 'teams');
@@ -998,21 +1015,24 @@ function genHTML(theme = {}) {
   for (const team of teams) {
     fs.writeFileSync(
       path.join(teamsDir, `${team.teamId}.html`),
-      buildTeamPage(team, teams, resolvedTheme),
+      buildTeamPage(team, teams, resolvedTheme, legal),
       'utf8'
     );
   }
 }
 
 module.exports = { genHTML };
-module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket, buildNavScript, buildSharedStyles, buildTabScript, buildTeamPage, buildIndexPage, buildNextGameTeaser, buildSpotlightBlock, spotlightTeamLabel };
+module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket, buildNavScript, buildSharedStyles, buildTabScript, buildTeamPage, buildIndexPage, buildNextGameTeaser, buildSpotlightBlock, spotlightTeamLabel, buildFooter };
 
 if (require.main === module) {
   const config = require('../config.json');
-  genHTML({
-    primary:  config.theme?.primary  || '#004174',
-    accent:   config.theme?.accent   || '#009ef3',
-    logoUrl:  config.theme?.logoUrl  || null,
-    cupColor: config.theme?.cupColor || '#7c3aed',
-  });
+  genHTML(
+    {
+      primary:  config.theme?.primary  || '#004174',
+      accent:   config.theme?.accent   || '#009ef3',
+      logoUrl:  config.theme?.logoUrl  || null,
+      cupColor: config.theme?.cupColor || '#7c3aed',
+    },
+    config.legal || {}
+  );
 }

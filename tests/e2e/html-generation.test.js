@@ -962,3 +962,30 @@ test('buildSpotlightBlock: Ergebnis-Spiel zeigt Score statt Datum', () => {
   assert.ok(html.includes('80'), 'Score fehlt');
   assert.ok(html.includes('70'), 'Score fehlt');
 });
+
+const { buildFooter } = require('../../src/generateHTML.js')._testExports;
+
+test('buildFooter: enthält Quellenlink zu basketball-bund.net', () => {
+  const html = buildFooter({}, './');
+  assert.ok(html.includes('https://www.basketball-bund.net'), 'Quellenlink fehlt');
+});
+
+test('buildFooter: enthält Impressum-Link wenn legal konfiguriert', () => {
+  const html = buildFooter({ operator: 'TV Neumarkt e.V.', address: 'Str. 1' }, './');
+  assert.ok(html.includes('impressum.html'), 'Impressum-Link fehlt');
+});
+
+test('buildFooter: kein Impressum-Link ohne legal-Konfiguration', () => {
+  const html = buildFooter({}, './');
+  assert.ok(!html.includes('impressum.html'), 'Impressum-Link sollte fehlen');
+});
+
+test('buildFooter: relativ Pfad für Teamseiten', () => {
+  const html = buildFooter({ operator: 'Test' }, '../');
+  assert.ok(html.includes('../datenschutz.html'), 'Relativer Pfad fehlt');
+});
+
+test('buildFooter: enthält footer-Element mit role contentinfo', () => {
+  const html = buildFooter({}, './');
+  assert.ok(html.includes('<footer') && html.includes('role="contentinfo"'), 'footer-Element fehlt');
+});
