@@ -13,7 +13,7 @@ flowchart LR
         DEV --> NS2["node src/server.js\nPort 3000"]
     end
     subgraph GITHUB["Produktionsumgebung (GitHub)"]
-        GHA["GitHub Actions\nubuntu-latest\nNode.js 18"] -->|upload artifact| GP["GitHub Pages\nhttps://olieder.github.io/\nbbb-ics-generator/"]
+        GHA["GitHub Actions\nubuntu-latest\nNode.js 24"] -->|upload artifact| GP["GitHub Pages\nhttps://olieder.github.io/\nbbb-ics-generator/"]
     end
 ----
 
@@ -59,7 +59,7 @@ Der Workflow benötigt drei spezifische Permissions:
 
 . *Checkout* (`actions/checkout@v4`): Klont den `main`-Branch in das Runner-Arbeitsverzeichnis. Enthält `src/`, `config.json`, `package.json`.
 
-. *Setup Node.js* (`actions/setup-node@v4`, `node-version: '18'`): Installiert Node.js 18 LTS auf dem Ubuntu-Runner.
+. *Setup Node.js* (`actions/setup-node@v5`, `node-version: '24'`): Installiert Node.js 24 LTS auf dem Ubuntu-Runner.
 
 . *Install dependencies* (`npm install`): Installiert alle npm-Abhängigkeiten aus `package.json` (`axios`, `ics`, `express`, `node-cron`). Kein `--ci`-Flag, kein Lockfile-Enforcement.
 

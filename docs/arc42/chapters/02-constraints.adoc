@@ -6,9 +6,9 @@
 |===
 | Randbedingung | Beschreibung | Konsequenz
 
-| *Node.js 18*
-| Die GitHub Actions-Pipeline verwendet explizit `node-version: '18'`. Alle verwendeten npm-Pakete müssen mit Node.js 18 kompatibel sein.
-| Kein Einsatz von Node.js-21+-only-Features; Abhängigkeiten müssen LTS-kompatibel sein.
+| *Node.js 24*
+| Die GitHub Actions-Pipeline verwendet explizit `node-version: '24'`. Node.js 20 wird von GitHub Actions ab 2025-11-04 nicht mehr unterstützt (https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/). Alle Workflows setzen zudem `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true`. Alle verwendeten npm-Pakete müssen mit Node.js 24 kompatibel sein.
+| Kein Einsatz von veralteten Node.js-APIs; Abhängigkeiten müssen mit Node.js 24 LTS kompatibel sein.
 
 | *RFC 5545 (iCalendar)*
 | Die erzeugten Dateien müssen dem iCalendar-Standard RFC 5545 entsprechen. Pflichtfelder (`DTSTART`, `DTEND`, `UID`, `DTSTAMP`) müssen vorhanden sein. Sonderzeichen müssen nach ICS-Escape-Regeln kodiert werden. Zeilen dürfen maximal 75 Oktetts lang sein (Line-Folding).

@@ -19,6 +19,12 @@ Die `render-docs.yml` Action rendert die arc42-Doku automatisch bei Änderungen 
 - Tests: `node:test` + `node:assert/strict` — keine externen Test-Frameworks
 - Playwright + axe-core für WCAG 2.1 AA Accessibility-Tests
 
+## GitHub Actions
+
+- Alle Workflows verwenden `node-version: '24'` und `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true`
+- Node.js 20 wird von GitHub Actions ab 2025-11-04 nicht mehr unterstützt — niemals auf node 18 oder 20 zurückgehen
+- Actions-Versionen: `actions/checkout@v5`, `actions/setup-node@v5`, `actions/upload-artifact@v5`
+
 ## Testregeln
 
 - `npm test` muss vor jedem Commit grün sein
