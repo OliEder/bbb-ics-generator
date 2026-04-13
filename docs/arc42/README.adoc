@@ -162,6 +162,7 @@ flowchart TD
     GHPAGES -->|Google Calendar URL| AND["🤖 Android\nGoogle Calendar"]
     GHPAGES -->|HTTPS Download| OTHER["💻 Outlook\nThunderbird"]
     GHPAGES -->|Leaflet + Nominatim| OSM["🗺️ OpenStreetMap\nNominatim Geocoding\n(clientseitig)"]
+    GHPAGES -->|Font Awesome CSS/Fonts| CDNJS["☁️ cdnjs.cloudflare.com\nFont Awesome\n(clientseitig)"]
 ----
 
 === Fachlicher Kontext
@@ -197,6 +198,10 @@ flowchart TD
 | *Kalender-Clients (Abonnenten)*
 | GitHub Pages → Kalender-Clients (HTTP GET / webcal)
 | Endnutzer abonnieren ICS-Feeds via `webcal://`-Protokoll (iOS/macOS) oder `https://`-URLs (Google Calendar, Outlook, Thunderbird). Der Client fragt die URL periodisch ab und synchronisiert Änderungen.
+
+| *cdnjs.cloudflare.com (Font Awesome)*
+| Browser → cdnjs.cloudflare.com (HTTP GET, clientseitig)
+| Font Awesome Icons werden aus dem Cloudflare CDN geladen (`https://cdnjs.cloudflare.com/ajax/libs/font-awesome/…`). Wird im Browser des Nutzers aufgerufen. Dabei werden IP-Adressen an Cloudflare übertragen.
 |===
 
 === Technischer Kontext
@@ -224,6 +229,10 @@ flowchart TD
 | GitHub Pages → Kalender-Clients
 | HTTPS (TLS 1.2+) / text/calendar
 | Statische Datei-Auslieferung; kein Content-Negotiation; `Content-Type: text/calendar` für `.ics`-Dateien
+
+| Browser → cdnjs.cloudflare.com
+| HTTPS / CSS + Webfonts
+| Font Awesome CSS und Webfont-Dateien; clientseitiger Abruf pro Seitenaufruf; keine Authentifizierung; IP-Adresse des Nutzers wird übertragen
 |===
 
 === Externe API-Endpunkte im Detail
@@ -497,10 +506,12 @@ a|
 | `generated/metadata.json` mit vollständigen Team-Metadaten: Spielplan (mit `isNext`, `ownShort`, `opponentShort`, `venueName`, `venueAddress`), Ligatabellen (`competitions[].table`), Turnierbäume (`competitions[].bracket`), Geschlecht, Altersgruppe, Logo-URL, `spotlightMatches` (0–2 Spotlight-Spiele pro Team).
 
 | *Ausgang*
-| `generated/index.html` (Startseite) und `generated/teams/{teamId}.html` (eine Datei pro Team). Alle HTML-Dateien sind vollständig eigenständig (inline CSS + JS, keine externen Assets außer Leaflet CDN und BBB-Logo-URL).
+| `generated/index.html` (Startseite), `generated/teams/{teamId}.html` (eine Datei pro Team), `generated/datenschutz.html` und `generated/barrierefreiheit.html` (immer), sowie `generated/impressum.html` (nur wenn `config.legal` mindestens ein nicht-leeres Feld hat). Alle HTML-Dateien sind vollständig eigenständig (inline CSS + JS, keine externen Assets außer Leaflet CDN, Font Awesome CDN und BBB-Logo-URL).
 
 | *Wichtige interne Funktionen*
 a|
+* `buildCalHelp()` — aufklappbarer `<details>`-Block mit Erklärung zu Kalender-Abonnements (iOS/macOS, Google, Outlook, ICS) inkl. offizieller Support-Links; wird in jedem Tab-Panel eingebettet
+* `buildTabPanel(teamId, type, webcalLink, googleLink, httpsLink, matches, cupColor)` — rendert einen Tab-Panel mit Spielplan, Abo-Buttons (inkl. „Link kopieren"-Button für Outlook/HTTPS-URL) und eingebettetem `buildCalHelp()`-Block
 * `buildTeaserCard(team)` — adaptiver Teaser mit bis zu 3 vergangenen Ergebnissen + bis zu 4−n zukünftigen Terminen
 * `buildNextGameTeaser(team)` — detaillierter Next-Game-Block mit Leaflet-Karte (clientseitig per Nominatim geocodiert)
 * `buildSpotlightBlock(teams, cupColor)` — "Nächste Spiele"-Block auf der Startseite mit Tabs Alle/Heim/Auswärts, chronologisch sortiert über alle Teams
@@ -510,9 +521,14 @@ a|
 * `buildIndexPage(teams, theme)` — Startseite
 * `teamLabel(teamName, ageGroup, gender)` — einheitliche Teambezeichnung mit Geschlechtssymbol
 * `sortTeams(teams)` — Senioren zuerst, dann aufsteigend nach Altersgruppe
+* `buildFooter(legal, relativePath)` — rendert `<footer role="contentinfo">` mit Quellenlink zu basketball-bund.net, optionalem Impressum-Link (nur wenn `legal` mindestens ein nicht-leeres Feld hat), Datenschutz-Link und Barrierefreiheit-Link. `relativePath` ist `'./'` für Index- und Legal-Seiten, `'../'` für Team-Seiten. Wird in `buildIndexPage`, `buildTeamPage` und allen Legal-Page-Buildern verwendet.
+* `buildImpressum(legal, allTeams, theme)` — erzeugt `generated/impressum.html` nur wenn `config.legal` mindestens ein nicht-leeres Feld hat. Zeigt Betreiber, Adresse, Telefon (optional), E-Mail und Verantwortlichen (optional) aus der Konfiguration sowie einen Haftungshinweis zu aggregierten öffentlichen Daten.
+* `buildDatenschutz(legal, allTeams, theme)` — erzeugt `generated/datenschutz.html` (wird immer generiert). Nennt Drittanbieter: cdnjs.cloudflare.com (Font Awesome), basketball-bund.net (Spielplandaten + Logos). Betreiber und E-Mail werden aus `config.legal` bezogen.
+* `buildBarrierefreiheit(legal, allTeams, theme)` — erzeugt `generated/barrierefreiheit.html` (wird immer generiert). Status: "Teilweise konform mit WCAG 2.1 Stufe AA". E-Mail-Kontakt aus der Konfiguration.
+* `genHTML(theme, legal)` — Einstiegsfunktion; `legal`-Parameter wurde hinzugefügt (vorher `genHTML(theme)`).
 
 | *Abhängigkeiten*
-| `fs`, `path` (Node.js Stdlib); Leaflet 1.9.4 (CDN, nur in Team-Seiten)
+| `fs`, `path` (Node.js Stdlib); Leaflet 1.9.4 (CDN, nur in Team-Seiten); Font Awesome (cdnjs.cloudflare.com, CDN)
 |===
 
 === Modul: server.js (Lokaler Entwicklungsserver)
@@ -1495,9 +1511,14 @@ BBB ICS Generator — Qualitätsanforderungen
     |   +-- Szenario: Vollständige Bedienung der Übersichtsseite ohne Maus
     |   +-- Szenario: Tab-Wechsel per ArrowRight/ArrowLeft/Home/End
     |
-    +-- WCAG 2.1 AA
-    |   +-- Szenario: axe-core meldet keine Violations (wcag2a + wcag2aa Tags)
+    +-- WCAG 2.1 AA (automatisch prüfbar, ~30–40% aller Kriterien)
+    |   +-- Szenario: axe-core meldet keine Violations (wcag2a + wcag2aa + wcag21a + wcag21aa Tags)
     |   +-- Szenario: Alle Texte erreichen Kontrastverhältnis 4,5:1
+    |   HINWEIS: color-mix()-Werte werden von axe-core nicht ausgewertet →
+    |   Kontrast muss manuell / per dediziertem Test sichergestellt werden
+    |
+    +-- WCAG 2.2 (nicht automatisch abgedeckt — ausstehend)
+        +-- Szenario: 2.5.8 Zielgröße — interaktive Elemente mindestens 24×24 px
     |
     +-- ARIA-Korrektheit
         +-- Szenario: aria-controls zeigt auf existierende Panels mit role="tabpanel"
@@ -1556,8 +1577,13 @@ BBB ICS Generator — Qualitätsanforderungen
 | Mittel
 
 | Q-10
-| axe-core scannt die generierte `index.html` mit Tags `wcag2a` und `wcag2aa`.
-| Keine Violations. Alle ARIA-Rollen, Kontrastverhältnisse und semantischen Anforderungen erfüllt.
+| axe-core scannt die generierte `index.html` und Team-Seiten mit Tags `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`.
+| Keine Violations. Alle ARIA-Rollen und semantischen Anforderungen erfüllt. *Einschränkung:* `color-mix()`-basierte Farben werden von axe-core nicht ausgewertet — Kontrast für diese Werte ist durch manuelle Prüfung bzw. dedizierte Tests sicherzustellen.
+| Mittel
+
+| Q-12
+| Das gesamte Farbsystem basiert auf `color-mix()` CSS-Funktion. axe-core kann diese Werte nicht auflösen.
+| Kontrast wird durch strukturelle Maßnahmen sichergestellt: Primärfarbe auf weißem Hintergrund mit mindestens 4,5:1, Fließtext immer `color-mix(in srgb, var(--color-primary) 90%, black)` auf weißer Fläche. Manuelle Prüfung bei Theme-Änderungen erforderlich.
 | Mittel
 
 | Q-11
