@@ -154,7 +154,7 @@ a|
 | `generated/metadata.json` mit vollständigen Team-Metadaten: Spielplan (mit `isNext`, `ownShort`, `opponentShort`, `venueName`, `venueAddress`), Ligatabellen (`competitions[].table`), Turnierbäume (`competitions[].bracket`), Geschlecht, Altersgruppe, Logo-URL, `spotlightMatches` (0–2 Spotlight-Spiele pro Team).
 
 | *Ausgang*
-| `generated/index.html` (Startseite) und `generated/teams/{teamId}.html` (eine Datei pro Team). Alle HTML-Dateien sind vollständig eigenständig (inline CSS + JS, keine externen Assets außer Leaflet CDN und BBB-Logo-URL).
+| `generated/index.html` (Startseite), `generated/teams/{teamId}.html` (eine Datei pro Team), `generated/datenschutz.html` und `generated/barrierefreiheit.html` (immer), sowie `generated/impressum.html` (nur wenn `config.legal` mindestens ein nicht-leeres Feld hat). Alle HTML-Dateien sind vollständig eigenständig (inline CSS + JS, keine externen Assets außer Leaflet CDN, Font Awesome CDN und BBB-Logo-URL).
 
 | *Wichtige interne Funktionen*
 a|
@@ -167,9 +167,14 @@ a|
 * `buildIndexPage(teams, theme)` — Startseite
 * `teamLabel(teamName, ageGroup, gender)` — einheitliche Teambezeichnung mit Geschlechtssymbol
 * `sortTeams(teams)` — Senioren zuerst, dann aufsteigend nach Altersgruppe
+* `buildFooter(legal, relativePath)` — rendert `<footer role="contentinfo">` mit Quellenlink zu basketball-bund.net, optionalem Impressum-Link (nur wenn `legal` mindestens ein nicht-leeres Feld hat), Datenschutz-Link und Barrierefreiheit-Link. `relativePath` ist `'./'` für Index- und Legal-Seiten, `'../'` für Team-Seiten. Wird in `buildIndexPage`, `buildTeamPage` und allen Legal-Page-Buildern verwendet.
+* `buildImpressum(legal, allTeams, theme)` — erzeugt `generated/impressum.html` nur wenn `config.legal` mindestens ein nicht-leeres Feld hat. Zeigt Betreiber, Adresse, Telefon (optional), E-Mail und Verantwortlichen (optional) aus der Konfiguration sowie einen Haftungshinweis zu aggregierten öffentlichen Daten.
+* `buildDatenschutz(legal, allTeams, theme)` — erzeugt `generated/datenschutz.html` (wird immer generiert). Nennt Drittanbieter: cdnjs.cloudflare.com (Font Awesome), basketball-bund.net (Spielplandaten + Logos). Betreiber und E-Mail werden aus `config.legal` bezogen.
+* `buildBarrierefreiheit(legal, allTeams, theme)` — erzeugt `generated/barrierefreiheit.html` (wird immer generiert). Status: "Teilweise konform mit WCAG 2.1 Stufe AA". E-Mail-Kontakt aus der Konfiguration.
+* `genHTML(theme, legal)` — Einstiegsfunktion; `legal`-Parameter wurde hinzugefügt (vorher `genHTML(theme)`).
 
 | *Abhängigkeiten*
-| `fs`, `path` (Node.js Stdlib); Leaflet 1.9.4 (CDN, nur in Team-Seiten)
+| `fs`, `path` (Node.js Stdlib); Leaflet 1.9.4 (CDN, nur in Team-Seiten); Font Awesome (cdnjs.cloudflare.com, CDN)
 |===
 
 === Modul: server.js (Lokaler Entwicklungsserver)

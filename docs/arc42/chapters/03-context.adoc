@@ -14,6 +14,7 @@ flowchart TD
     GHPAGES -->|Google Calendar URL| AND["🤖 Android\nGoogle Calendar"]
     GHPAGES -->|HTTPS Download| OTHER["💻 Outlook\nThunderbird"]
     GHPAGES -->|Leaflet + Nominatim| OSM["🗺️ OpenStreetMap\nNominatim Geocoding\n(clientseitig)"]
+    GHPAGES -->|Font Awesome CSS/Fonts| CDNJS["☁️ cdnjs.cloudflare.com\nFont Awesome\n(clientseitig)"]
 ----
 
 === Fachlicher Kontext
@@ -49,6 +50,10 @@ flowchart TD
 | *Kalender-Clients (Abonnenten)*
 | GitHub Pages → Kalender-Clients (HTTP GET / webcal)
 | Endnutzer abonnieren ICS-Feeds via `webcal://`-Protokoll (iOS/macOS) oder `https://`-URLs (Google Calendar, Outlook, Thunderbird). Der Client fragt die URL periodisch ab und synchronisiert Änderungen.
+
+| *cdnjs.cloudflare.com (Font Awesome)*
+| Browser → cdnjs.cloudflare.com (HTTP GET, clientseitig)
+| Font Awesome Icons werden aus dem Cloudflare CDN geladen (`https://cdnjs.cloudflare.com/ajax/libs/font-awesome/…`). Wird im Browser des Nutzers aufgerufen. Dabei werden IP-Adressen an Cloudflare übertragen.
 |===
 
 === Technischer Kontext
@@ -76,6 +81,10 @@ flowchart TD
 | GitHub Pages → Kalender-Clients
 | HTTPS (TLS 1.2+) / text/calendar
 | Statische Datei-Auslieferung; kein Content-Negotiation; `Content-Type: text/calendar` für `.ics`-Dateien
+
+| Browser → cdnjs.cloudflare.com
+| HTTPS / CSS + Webfonts
+| Font Awesome CSS und Webfont-Dateien; clientseitiger Abruf pro Seitenaufruf; keine Authentifizierung; IP-Adresse des Nutzers wird übertragen
 |===
 
 === Externe API-Endpunkte im Detail

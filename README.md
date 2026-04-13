@@ -88,9 +88,22 @@ bbb-ics-generator/
     "accent":  "#009ef3",
     "logoUrl": null
   },
-  "cupColor": "#7c3aed"
+  "cupColor": "#7c3aed",
+  "legal": {
+    "operator": "Fibalon Baskets Neumarkt e.V.",
+    "address": "Musterstraße 1, 92318 Neumarkt i.d.OPf.",
+    "email": "",
+    "phone": "",
+    "responsible": ""
+  }
 }
 ```
+
+Das `legal`-Objekt steuert Footer-Links und rechtliche Pflichtseiten:
+- Alle Felder sind optionale Strings.
+- `datenschutz.html` und `barrierefreiheit.html` werden immer generiert.
+- `impressum.html` und der Impressum-Footer-Link werden **nur** generiert, wenn mindestens ein Feld in `legal` nicht leer ist.
+- Ist `legal` vollständig absent oder alle Felder leer, entfällt der Impressum-Link im Footer.
 
 Teams werden automatisch über die Basketball-Bund API ermittelt und für 30 Tage gecacht. Der Cache erneuert sich nach 30 Tagen automatisch.
 
