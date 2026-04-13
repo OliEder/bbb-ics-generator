@@ -154,8 +154,8 @@ function buildTabPanel(teamId, type, webcalLink, googleLink, httpsLink, matches,
       <h3 class="cal-section-heading">${subHeading}</h3>
       ${buildCalHelp()}
       <div class="btn-group">
-        <a href="${escapeHtml(webcalLink)}" class="btn">${ICON_APPLE} iOS / macOS Kalender</a>
-        <a href="${escapeHtml(googleLink)}" class="btn">${ICON_ANDROID} Google Calendar</a>
+        <a href="${escapeHtml(webcalLink)}" class="btn">${ICON_APPLE} In iOS / macOS Kalender abonnieren</a>
+        <a href="${escapeHtml(googleLink)}" class="btn">${ICON_ANDROID} In Google Calendar abonnieren</a>
         <button class="btn btn--copy" data-copy-url="${escapeHtml(httpsLink)}">${ICON_COPY} Link kopieren</button>
         <a href="${escapeHtml(httpsLink)}" class="btn" download>${ICON_DOWNLOAD} ICS herunterladen</a>
       </div>
@@ -546,7 +546,7 @@ function buildSharedStyles(primary, accent, cupColor) {
     .btn:hover { background: var(--color-primary-light); border-color: var(--color-primary); }
     .btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
     .btn--copy--copied { color: #1a7a3f; border-color: #1a7a3f; }
-    .cal-help { margin-top: 16px; border: 1px solid var(--color-border); border-radius: 7px; font-size: 0.82rem; }
+    .cal-help { margin-top: 16px; margin-bottom: 8px; border: 1px solid var(--color-border); border-radius: 7px; font-size: 0.82rem; }
     .cal-help__summary { padding: 10px 14px; font-weight: 600; color: var(--color-primary); cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; }
     .cal-help__summary::-webkit-details-marker { display: none; }
     .cal-help__summary::before { content: '▶'; font-size: 0.65em; transition: transform 0.15s; }
