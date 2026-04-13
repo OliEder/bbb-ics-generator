@@ -18,16 +18,14 @@ test.describe('Spotlight-Tabs', () => {
   test('Klick auf "Heim" zeigt Home-Panel und versteckt Away-Panel', async ({ page }) => {
     const pg = new IndexPage(page);
     await pg.spotlightTab('Heim').click();
-    const awayHidden = await pg.spotlightPanel('spotlight-away').evaluate(el => el.hasAttribute('hidden'));
-    expect(awayHidden).toBe(true);
+    await expect(pg.spotlightPanel('spotlight-away')).toBeHidden();
     await expect(pg.spotlightPanel('spotlight-home')).toBeVisible();
   });
 
   test('Klick auf "Auswärts" zeigt Away-Panel und versteckt Home-Panel', async ({ page }) => {
     const pg = new IndexPage(page);
     await pg.spotlightTab('Auswärts').click();
-    const homeHidden = await pg.spotlightPanel('spotlight-home').evaluate(el => el.hasAttribute('hidden'));
-    expect(homeHidden).toBe(true);
+    await expect(pg.spotlightPanel('spotlight-home')).toBeHidden();
     await expect(pg.spotlightPanel('spotlight-away')).toBeVisible();
   });
 
@@ -41,14 +39,14 @@ test.describe('Spotlight-Tabs', () => {
 
 test.describe('Teaser-Karten', () => {
   test('Heimspiel-Zeile enthält "vs." Prefix', async ({ page }) => {
-    const rows = page.locator('.teaser-result');
-    const texts = await rows.allInnerTexts();
+    const pg = new IndexPage(page);
+    const texts = await pg.teaserRows().allInnerTexts();
     expect(texts.some(t => t.includes('vs.'))).toBe(true);
   });
 
   test('Auswärtsspiel-Zeile enthält "@" Prefix', async ({ page }) => {
-    const rows = page.locator('.teaser-result');
-    const texts = await rows.allInnerTexts();
+    const pg = new IndexPage(page);
+    const texts = await pg.teaserRows().allInnerTexts();
     expect(texts.some(t => t.includes('@'))).toBe(true);
   });
 
