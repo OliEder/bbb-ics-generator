@@ -11,8 +11,10 @@
     "generate-html": "node src/generateHTML.js",
     "test": "node --test 'tests/e2e/*.test.js'",
     "test:watch": "node --watch --test 'tests/e2e/*.test.js'",
-    "test:a11y": "playwright test",
-    "test:a11y:report": "playwright show-report"
+    "test:a11y": "playwright test --project=chromium-a11y",
+    "test:a11y:report": "playwright show-report",
+    "test:ui": "playwright test --project=chromium-ui",
+    "test:ui:report": "PLAYWRIGHT_JSON_OUTPUT_NAME=test-results.json playwright test --project=chromium-ui --reporter=json,html && node scripts/analyze-report.js"
   },
   "dependencies": {
     "axios": "^1.7.9",
