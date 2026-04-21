@@ -160,9 +160,12 @@ a|
 a|
 * `buildCalHelp()` — aufklappbarer `<details>`-Block mit Erklärung zu Kalender-Abonnements (iOS/macOS, Google, Outlook, ICS) inkl. offizieller Support-Links; wird in jedem Tab-Panel eingebettet
 * `buildTabPanel(teamId, type, webcalLink, googleLink, httpsLink, matches, cupColor)` — rendert einen Tab-Panel mit Spielplan, Abo-Buttons (inkl. „Link kopieren"-Button für Outlook/HTTPS-URL) und eingebettetem `buildCalHelp()`-Block
-* `buildTeaserCard(team)` — adaptiver Teaser mit bis zu 3 vergangenen Ergebnissen + bis zu 4−n zukünftigen Terminen
+* `buildScheduleRow(match, cupColor)` — rendert eine zweizeilige Spielzeile: Zeile 1 enthält Datum, Gegnername, Sieg/Niederlage-Icon und Ergebnis; Zeile 2 den Liganamen. Verwendet `resultIcon(match)` für das Icon.
+* `buildTeaserCard(team)` — adaptiver Teaser mit bis zu 3 vergangenen Ergebnissen (mit Sieg/Niederlage-Icon) + bis zu 4−n zukünftigen Terminen
 * `buildNextGameTeaser(team)` — detaillierter Next-Game-Block mit Leaflet-Karte (clientseitig per Nominatim geocodiert)
-* `buildSpotlightBlock(teams, cupColor)` — "Nächste Spiele"-Block auf der Startseite mit Tabs Alle/Heim/Auswärts, chronologisch sortiert über alle Teams
+* `buildSpotlightBlock(teams, cupColor)` — "Nächste Spiele"-Block auf der Startseite mit Tabs Alle/Heim/Auswärts, chronologisch sortiert über alle Teams; vergangene Spiele mit Sieg/Niederlage-Icon
+* `isWin(match)` — Hilfsfunktion: gibt `true` (Sieg), `false` (Niederlage) oder `null` (kein Ergebnis / Unentschieden) zurück; berücksichtigt `match.isHome` für korrekte Punktezuordnung
+* `resultIcon(match)` — gibt SVG-Icon-String für Sieg (Pokal) oder Niederlage (✕) zurück, oder leeren String wenn kein Ergebnis/Unentschieden
 * `buildStandingsTable(comp)` — zwei Tabs: offizielle Tabelle + Games-Behind-Ranking
 * `buildBracket(comp, ownTeamName)` — Turnierbaum mit Highlight des eigenen Teams und TBD-Platzhaltern für zukünftige Runden
 * `buildTeamPage(team, allTeams, theme)` — vollständige Team-Seite

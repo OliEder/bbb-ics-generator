@@ -341,6 +341,44 @@ a|
 * Negative: GB macht wenig Sinn bei sehr ungleicher Spielanzahl (unterschiedlich viele Spiele absolviert). Bei Gleichstand (GB = 0.5) wird `.toFixed(1)` angezeigt — leicht ungewohnt für deutsche Nutzer.
 |===
 
+=== ADR-007: Outline-SVG-Icons statt Farbe für Sieg/Niederlage-Anzeige
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-04-21
+
+| *Kontext*
+| Vergangene Spielergebnisse sollen auf einen Blick als Sieg oder Niederlage erkennbar sein. Die ursprüngliche Lösung (fetter eigener Score) hob sich nicht genug ab. Alternativen wie Rot/Grün-Färbung scheiden wegen Farbenblindheit und Konflikt mit konfigurierbaren Teamfarben (`--color-primary`, `--color-accent`) aus. Opacity-/Dimming-Ansätze verletzen WCAG 2.1 AA (Kontrastverhältnis min. 4.5:1).
+
+| *Entscheidung*
+a|
+* Sieg: Outline-Pokal-SVG-Icon (`aria-label="Sieg"`, `role="img"`, `stroke="currentColor"`, 14×14px)
+* Niederlage: ✕-SVG-Icon (`aria-label="Niederlage"`, `role="img"`, `stroke="currentColor"`, 14×14px)
+* Kein Icon bei zukünftigen Spielen (kein `result`) und Unentschieden
+* Spielzeilen zweizeilig: Zeile 1 = Datum · Gegner + Icon + Ergebnis, Zeile 2 = Liganame
+
+| *Begründung*
+a|
+* `stroke="currentColor"` — keine fixen Farben, kein Konflikt mit konfigurierbaren Teamfarben
+* Form statt Farbe — farbenblinde Nutzer erkennen Sieg/Niederlage am Symbol, nicht an der Farbe
+* Kein Dimmen — kein Kontrastverlust, WCAG 2.1 AA bleibt gewahrt
+* `aria-label` auf SVGs — Screenreader-zugänglich
+* Zweizeiliges Layout löst das Mobilproblem mit langen Liganamen (keine Abschneidung mehr)
+
+| *Konsequenzen*
+a|
+* `isWin(match)` und `resultIcon(match)` als wiederverwendbare Hilfsfunktionen in `generateHTML.js`
+* Drei Render-Funktionen nutzen `resultIcon`: `buildScheduleRow`, `buildTeaserCard`, `buildSpotlightBlock`
+* `<strong>`-basierte Score-Hervorhebung in allen drei Bereichen entfernt
+* CSS: `.result-icon`, `.result-icon--win`, `.result-icon--loss` in `buildSharedStyles`
+|===
+
 === ADR-006: X-ALT-DESC für HTML-Beschreibungen (aktuell deaktiviert)
 
 [cols="2,5", options="header"]
