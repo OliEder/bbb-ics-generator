@@ -544,18 +544,23 @@ function buildSharedStyles(primary, accent, cupColor) {
     .tab-panel[hidden] { display: none; }
     .schedule-list { margin-bottom: 12px; }
     .schedule-header { font-size: 0.72rem; font-weight: 700; color: var(--color-text); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
-    .schedule-row { display: flex; align-items: center; gap: 8px; padding: 7px 6px; border-radius: 6px; }
+    .schedule-row { display: flex; align-items: flex-start; gap: 8px; padding: 7px 6px; border-radius: 6px; }
     .schedule-row--past { color: color-mix(in srgb, var(--color-primary) 75%, white); }
     .schedule-next { background: var(--color-next-bg); border: 1px solid var(--color-next-border); padding: 8px 8px; }
     .badge { border-radius: 4px; padding: 3px 7px; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; min-width: 24px; text-align: center; }
     .badge--home { background: var(--color-badge-home-bg); color: var(--color-primary); }
     .badge--away { background: var(--color-badge-away-bg); color: #7a3000; }
     .badge--cup  { background: color-mix(in srgb, var(--color-cup) 15%, white); color: var(--color-cup); }
-    .schedule-opponent { flex: 1; font-size: 0.88rem; color: var(--color-text); min-width: 0; }
+    .schedule-row-content { flex: 1; min-width: 0; }
+    .schedule-row-main { display: flex; align-items: center; gap: 6px; }
+    .schedule-opponent { flex: 1; font-size: 0.88rem; color: var(--color-text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .schedule-next .schedule-opponent { font-weight: 600; }
     .schedule-next-label { font-size: 0.75rem; font-weight: 600; color: var(--color-primary); margin-left: 4px; }
-    .schedule-competition { font-size: 0.75rem; color: var(--color-text); white-space: nowrap; }
+    .schedule-competition { font-size: 0.75rem; color: var(--color-text-muted); margin-top: 2px; }
     .schedule-result { font-size: 0.88rem; font-weight: 600; white-space: nowrap; min-width: 44px; text-align: right; color: var(--color-text); }
+    .result-icon { width: 14px; height: 14px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .result-icon--win  { color: var(--color-text); }
+    .result-icon--loss { color: var(--color-text-muted); }
     .cal-section-heading { font-size: 0.85rem; font-weight: 700; color: var(--color-text); margin: 16px 0 8px; }
     .btn-group { display: flex; flex-direction: column; gap: 8px; }
     .btn { display: inline-flex; align-items: center; gap: 8px; background: var(--color-surface); color: var(--color-primary); border: 1.5px solid var(--color-border); padding: 9px 14px; border-radius: 7px; font-size: 0.82rem; font-weight: 600; text-decoration: none; transition: background 0.15s, border-color 0.15s; cursor: pointer; font-family: inherit; }
