@@ -264,17 +264,11 @@ function buildTeaserCard(team) {
     const oppName = escapeHtml(m.opponent || '');
     const duel = `${prefix} ${oppName}`;
     if (m.result) {
-      const parts = m.result.split(':');
-      let scoreHtml = escapeHtml(m.result);
-      if (parts.length === 2) {
-        const ownIdx = m.isHome ? 0 : 1;
-        const oppIdx = m.isHome ? 1 : 0;
-        scoreHtml = `<strong>${escapeHtml(parts[ownIdx].trim())}</strong>:${escapeHtml(parts[oppIdx].trim())}`;
-      }
       return `<div class="teaser-result">` +
         `<span class="${badgeClass}">${badgeLabel}</span>` +
         `<span class="teaser-opponent">${duel}</span>` +
-        `<span class="teaser-score">${scoreHtml}</span>` +
+        resultIcon(m) +
+        `<span class="teaser-score">${escapeHtml(m.result)}</span>` +
         `</div>`;
     } else {
       const dateStr = escapeHtml(String(m.date || '').slice(5).split('-').reverse().join('.'));

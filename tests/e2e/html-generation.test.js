@@ -554,9 +554,9 @@ test('buildTeaserCard: shows last 3 results, next match, and team link', () => {
     ],
   };
   const html = buildTeaserCard(team);
-  assert.ok(html.includes('>72<') && html.includes(':68'), 'first result missing');
-  assert.ok(html.includes('>61<') && html.includes(':55'), 'second result missing');
-  assert.ok(html.includes('>80<') && html.includes(':74'), 'third result missing');
+  assert.ok(html.includes('72:68'), 'first result missing');
+  assert.ok(html.includes('55:61'), 'second result missing');
+  assert.ok(html.includes('80:74'), 'third result missing');
   assert.ok(html.includes('Freising'), 'next match missing');
   assert.ok(html.includes('teaser-next'), 'next highlight class missing');
   assert.ok(html.includes('teams/100.html'), 'team page link missing');
@@ -617,7 +617,7 @@ test('buildTeaserCard: fewer than 3 results — no empty rows', () => {
     ],
   };
   const html = buildTeaserCard(team);
-  assert.ok(html.includes('>24<') && html.includes(':18'), 'result missing');
+  assert.ok(html.includes('24:18'), 'result missing');
   assert.ok(!html.includes('teaser-result-empty'), 'no empty row class expected');
 });
 
@@ -1221,5 +1221,38 @@ test('buildTabScript: enthält Clipboard-Handler für btn--copy', () => {
     };
     const html = buildTeamPage(team, allTeams, theme);
     assert.ok(!html.includes('<strong>82</strong>'), '<strong> darf nicht mehr im Spielplan-Ergebnis sein');
+  });
+}
+
+// --- buildTeaserCard: result icons ---
+{
+  const { _testExports } = require('../../src/generateHTML.js');
+  const { buildTeaserCard } = _testExports;
+
+  test('buildTeaserCard: Sieg zeigt Pokal-Icon', () => {
+    const team = {
+      teamId: 't10', teamName: 'Test', ageGroup: '', gender: '', logoUrl: null,
+      matches: [{ date: '2026-03-01', opponent: 'Gegner', result: '82:71', isHome: true, isNext: false, competition: 'BBL' }],
+    };
+    const html = buildTeaserCard(team);
+    assert.ok(html.includes('aria-label="Sieg"'), 'Pokal-Icon fehlt in Teaser-Karte');
+  });
+
+  test('buildTeaserCard: Niederlage zeigt X-Icon', () => {
+    const team = {
+      teamId: 't11', teamName: 'Test', ageGroup: '', gender: '', logoUrl: null,
+      matches: [{ date: '2026-03-01', opponent: 'Gegner', result: '61:74', isHome: true, isNext: false, competition: 'BBL' }],
+    };
+    const html = buildTeaserCard(team);
+    assert.ok(html.includes('aria-label="Niederlage"'), 'X-Icon fehlt in Teaser-Karte');
+  });
+
+  test('buildTeaserCard: kein <strong> mehr im Ergebnis', () => {
+    const team = {
+      teamId: 't12', teamName: 'Test', ageGroup: '', gender: '', logoUrl: null,
+      matches: [{ date: '2026-03-01', opponent: 'Gegner', result: '82:71', isHome: true, isNext: false, competition: 'BBL' }],
+    };
+    const html = buildTeaserCard(team);
+    assert.ok(!html.includes('<strong>82</strong>'), '<strong> darf nicht mehr in Teaser-Karte sein');
   });
 }
