@@ -46,6 +46,25 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
+const ICON_WIN = `<svg class="result-icon result-icon--win" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Sieg"><path d="M6 9H4a2 2 0 0 1-2-2V5h4"/><path d="M18 9h2a2 2 0 0 0 2-2V5h-4"/><path d="M12 17v4"/><path d="M8 21h8"/><path d="M6 9a6 6 0 0 0 12 0V3H6z"/></svg>`;
+const ICON_LOSS = `<svg class="result-icon result-icon--loss" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" role="img" aria-label="Niederlage"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+
+function isWin(match) {
+  if (!match.result) return null;
+  const parts = match.result.split(':');
+  if (parts.length !== 2) return null;
+  const own = parseInt(parts[match.isHome ? 0 : 1], 10);
+  const opp = parseInt(parts[match.isHome ? 1 : 0], 10);
+  if (isNaN(own) || isNaN(opp)) return null;
+  return own > opp;
+}
+
+function resultIcon(match) {
+  const win = isWin(match);
+  if (win === null) return '';
+  return win ? ICON_WIN : ICON_LOSS;
+}
+
 function sanitizeCssColor(value) {
   if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value)) return value;
   if (/^(rgb|rgba|hsl|hsla)\([^)]*\)$/.test(value)) return value;
@@ -1183,7 +1202,7 @@ function genHTML(theme = {}, legal = {}) {
 }
 
 module.exports = { genHTML };
-module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket, buildNavScript, buildSharedStyles, buildTabScript, buildTeamPage, buildIndexPage, buildNextGameTeaser, buildSpotlightBlock, spotlightTeamLabel, buildFooter, buildImpressum, buildDatenschutz, buildBarrierefreiheit, buildCalHelp, buildTabPanel };
+module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket, buildNavScript, buildSharedStyles, buildTabScript, buildTeamPage, buildIndexPage, buildNextGameTeaser, buildSpotlightBlock, spotlightTeamLabel, buildFooter, buildImpressum, buildDatenschutz, buildBarrierefreiheit, buildCalHelp, buildTabPanel, isWin, resultIcon };
 
 if (require.main === module) {
   const config = require('../config.json');

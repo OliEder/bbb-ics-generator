@@ -1113,3 +1113,28 @@ test('buildTabScript: enthält Clipboard-Handler für btn--copy', () => {
   assert.ok(script.includes('navigator.clipboard'), 'navigator.clipboard fehlt im Script');
   assert.ok(script.includes('data-copy-url'), 'data-copy-url Attribut-Zugriff fehlt im Script');
 });
+
+// --- isWin ---
+{
+  const { _testExports } = require('../../src/generateHTML.js');
+  const { isWin } = _testExports;
+
+  test('isWin: Heim-Sieg', () => {
+    assert.strictEqual(isWin({ result: '82:71', isHome: true }), true);
+  });
+  test('isWin: Heim-Niederlage', () => {
+    assert.strictEqual(isWin({ result: '61:74', isHome: true }), false);
+  });
+  test('isWin: Auswärts-Sieg', () => {
+    assert.strictEqual(isWin({ result: '61:74', isHome: false }), true);
+  });
+  test('isWin: Auswärts-Niederlage', () => {
+    assert.strictEqual(isWin({ result: '82:71', isHome: false }), false);
+  });
+  test('isWin: kein Ergebnis', () => {
+    assert.strictEqual(isWin({ result: null, isHome: true }), null);
+  });
+  test('isWin: ungültiges Ergebnis', () => {
+    assert.strictEqual(isWin({ result: 'w.o.', isHome: true }), null);
+  });
+}
