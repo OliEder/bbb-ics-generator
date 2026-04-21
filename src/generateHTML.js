@@ -85,16 +85,9 @@ function buildScheduleRow(match, cupColor) {
   const compStyle = cup ? ` style="color:${escapeHtml(cupColor)};font-weight:600"` : '';
   const compText  = escapeHtml(match.competition);
 
-  // Format result: bold own score, normal opponent score
-  let resultText = match.result ? escapeHtml(match.result) : '–';
-  if (match.result) {
-    const parts = match.result.split(':');
-    if (parts.length === 2) {
-      const ownIdx = match.isHome ? 0 : 1;
-      const oppIdx = match.isHome ? 1 : 0;
-      resultText = `<strong>${escapeHtml(parts[ownIdx].trim())}</strong>:${escapeHtml(parts[oppIdx].trim())}`;
-    }
-  }
+  const icon = match.result ? resultIcon(match) : '';
+
+  const resultText = match.result ? escapeHtml(match.result) : '–';
 
   const rowClass = match.isNext
     ? 'schedule-row schedule-next'
@@ -110,9 +103,14 @@ function buildScheduleRow(match, cupColor) {
 
   return `<div class="${rowClass}">` +
     `<span class="${badgeClass}">${badgeLabel}</span>` +
-    `<span class="schedule-opponent">${dateLabel} · ${escapeHtml(match.opponent)}${nextLabel}</span>` +
-    `<span class="schedule-competition"${compStyle}>${compText}</span>` +
-    `<span class="schedule-result">${resultText || '–'}</span>` +
+    `<div class="schedule-row-content">` +
+      `<div class="schedule-row-main">` +
+        `<span class="schedule-opponent">${dateLabel} · ${escapeHtml(match.opponent)}${nextLabel}</span>` +
+        icon +
+        `<span class="schedule-result">${resultText}</span>` +
+      `</div>` +
+      `<div class="schedule-competition"${compStyle}>${compText}</div>` +
+    `</div>` +
     `</div>`;
 }
 

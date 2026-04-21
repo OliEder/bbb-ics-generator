@@ -1153,3 +1153,73 @@ test('buildTabScript: enthält Clipboard-Handler für btn--copy', () => {
     assert.strictEqual(icon, '');
   });
 }
+
+// --- buildScheduleRow via buildTeamPage ---
+{
+  const { _testExports } = require('../../src/generateHTML.js');
+  const { buildTeamPage } = _testExports;
+
+  const theme = { primary: '#004174', accent: '#009ef3', cupColor: '#7c3aed' };
+  const allTeams = [];
+
+  test('buildScheduleRow: Sieg zeigt Pokal-Icon', () => {
+    const team = {
+      teamId: 't1', teamName: 'Test', ageGroup: '', gender: '',
+      lastUpdate: new Date().toISOString(),
+      matchCount: 1, homeMatchCount: 1, awayMatchCount: 0,
+      matches: [{ date: '2026-03-01', opponent: 'Gegner', result: '82:71', isHome: true, isNext: false, competition: 'BBL' }],
+      competitions: [],
+    };
+    const html = buildTeamPage(team, allTeams, theme);
+    assert.ok(html.includes('aria-label="Sieg"'), 'Pokal-Icon fehlt bei Sieg');
+  });
+
+  test('buildScheduleRow: Niederlage zeigt X-Icon', () => {
+    const team = {
+      teamId: 't2', teamName: 'Test', ageGroup: '', gender: '',
+      lastUpdate: new Date().toISOString(),
+      matchCount: 1, homeMatchCount: 1, awayMatchCount: 0,
+      matches: [{ date: '2026-03-01', opponent: 'Gegner', result: '61:74', isHome: true, isNext: false, competition: 'BBL' }],
+      competitions: [],
+    };
+    const html = buildTeamPage(team, allTeams, theme);
+    assert.ok(html.includes('aria-label="Niederlage"'), 'X-Icon fehlt bei Niederlage');
+  });
+
+  test('buildScheduleRow: zukünftiges Spiel hat kein Icon', () => {
+    const team = {
+      teamId: 't3', teamName: 'Test', ageGroup: '', gender: '',
+      lastUpdate: new Date().toISOString(),
+      matchCount: 1, homeMatchCount: 1, awayMatchCount: 0,
+      matches: [{ date: '2026-05-01', opponent: 'Gegner', result: null, isHome: true, isNext: true, competition: 'BBL' }],
+      competitions: [],
+    };
+    const html = buildTeamPage(team, allTeams, theme);
+    assert.ok(!html.includes('aria-label="Sieg"') && !html.includes('aria-label="Niederlage"'), 'Icon darf bei zukünftigem Spiel nicht erscheinen');
+  });
+
+  test('buildScheduleRow: Liga in zweiter Zeile (schedule-competition)', () => {
+    const team = {
+      teamId: 't4', teamName: 'Test', ageGroup: '', gender: '',
+      lastUpdate: new Date().toISOString(),
+      matchCount: 1, homeMatchCount: 1, awayMatchCount: 0,
+      matches: [{ date: '2026-03-01', opponent: 'Gegner', result: '82:71', isHome: true, isNext: false, competition: 'Bayernliga Herren Mitte' }],
+      competitions: [],
+    };
+    const html = buildTeamPage(team, allTeams, theme);
+    assert.ok(html.includes('schedule-competition'), 'schedule-competition fehlt');
+    assert.ok(html.includes('Bayernliga Herren Mitte'), 'Liganame fehlt');
+  });
+
+  test('buildScheduleRow: kein <strong> mehr im Ergebnis', () => {
+    const team = {
+      teamId: 't5', teamName: 'Test', ageGroup: '', gender: '',
+      lastUpdate: new Date().toISOString(),
+      matchCount: 1, homeMatchCount: 1, awayMatchCount: 0,
+      matches: [{ date: '2026-03-01', opponent: 'Gegner', result: '82:71', isHome: true, isNext: false, competition: 'BBL' }],
+      competitions: [],
+    };
+    const html = buildTeamPage(team, allTeams, theme);
+    assert.ok(!html.includes('<strong>82</strong>'), '<strong> darf nicht mehr im Spielplan-Ergebnis sein');
+  });
+}
