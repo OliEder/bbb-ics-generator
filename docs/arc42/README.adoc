@@ -512,9 +512,12 @@ a|
 a|
 * `buildCalHelp()` — aufklappbarer `<details>`-Block mit Erklärung zu Kalender-Abonnements (iOS/macOS, Google, Outlook, ICS) inkl. offizieller Support-Links; wird in jedem Tab-Panel eingebettet
 * `buildTabPanel(teamId, type, webcalLink, googleLink, httpsLink, matches, cupColor)` — rendert einen Tab-Panel mit Spielplan, Abo-Buttons (inkl. „Link kopieren"-Button für Outlook/HTTPS-URL) und eingebettetem `buildCalHelp()`-Block
-* `buildTeaserCard(team)` — adaptiver Teaser mit bis zu 3 vergangenen Ergebnissen + bis zu 4−n zukünftigen Terminen
+* `buildScheduleRow(match, cupColor)` — rendert eine zweizeilige Spielzeile: Zeile 1 enthält Datum, Gegnername, Sieg/Niederlage-Icon und Ergebnis; Zeile 2 den Liganamen. Verwendet `resultIcon(match)` für das Icon.
+* `buildTeaserCard(team)` — adaptiver Teaser mit bis zu 3 vergangenen Ergebnissen (mit Sieg/Niederlage-Icon) + bis zu 4−n zukünftigen Terminen
 * `buildNextGameTeaser(team)` — detaillierter Next-Game-Block mit Leaflet-Karte (clientseitig per Nominatim geocodiert)
-* `buildSpotlightBlock(teams, cupColor)` — "Nächste Spiele"-Block auf der Startseite mit Tabs Alle/Heim/Auswärts, chronologisch sortiert über alle Teams
+* `buildSpotlightBlock(teams, cupColor)` — "Nächste Spiele"-Block auf der Startseite mit Tabs Alle/Heim/Auswärts, chronologisch sortiert über alle Teams; vergangene Spiele mit Sieg/Niederlage-Icon
+* `isWin(match)` — Hilfsfunktion: gibt `true` (Sieg), `false` (Niederlage) oder `null` (kein Ergebnis / Unentschieden) zurück; berücksichtigt `match.isHome` für korrekte Punktezuordnung
+* `resultIcon(match)` — gibt SVG-Icon-String für Sieg (Pokal) oder Niederlage (✕) zurück, oder leeren String wenn kein Ergebnis/Unentschieden
 * `buildStandingsTable(comp)` — zwei Tabs: offizielle Tabelle + Games-Behind-Ranking
 * `buildBracket(comp, ownTeamName)` — Turnierbaum mit Highlight des eigenen Teams und TBD-Platzhaltern für zukünftige Runden
 * `buildTeamPage(team, allTeams, theme)` — vollständige Team-Seite
@@ -1412,6 +1415,44 @@ a|
 a|
 * Positive: Reichhaltigere Darstellung ohne zusätzliche API-Aufrufe.
 * Negative: GB macht wenig Sinn bei sehr ungleicher Spielanzahl (unterschiedlich viele Spiele absolviert). Bei Gleichstand (GB = 0.5) wird `.toFixed(1)` angezeigt — leicht ungewohnt für deutsche Nutzer.
+|===
+
+=== ADR-007: Outline-SVG-Icons statt Farbe für Sieg/Niederlage-Anzeige
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-04-21
+
+| *Kontext*
+| Vergangene Spielergebnisse sollen auf einen Blick als Sieg oder Niederlage erkennbar sein. Die ursprüngliche Lösung (fetter eigener Score) hob sich nicht genug ab. Alternativen wie Rot/Grün-Färbung scheiden wegen Farbenblindheit und Konflikt mit konfigurierbaren Teamfarben (`--color-primary`, `--color-accent`) aus. Opacity-/Dimming-Ansätze verletzen WCAG 2.1 AA (Kontrastverhältnis min. 4.5:1).
+
+| *Entscheidung*
+a|
+* Sieg: Outline-Pokal-SVG-Icon (`aria-label="Sieg"`, `role="img"`, `stroke="currentColor"`, 14×14px)
+* Niederlage: ✕-SVG-Icon (`aria-label="Niederlage"`, `role="img"`, `stroke="currentColor"`, 14×14px)
+* Kein Icon bei zukünftigen Spielen (kein `result`) und Unentschieden
+* Spielzeilen zweizeilig: Zeile 1 = Datum · Gegner + Icon + Ergebnis, Zeile 2 = Liganame
+
+| *Begründung*
+a|
+* `stroke="currentColor"` — keine fixen Farben, kein Konflikt mit konfigurierbaren Teamfarben
+* Form statt Farbe — farbenblinde Nutzer erkennen Sieg/Niederlage am Symbol, nicht an der Farbe
+* Kein Dimmen — kein Kontrastverlust, WCAG 2.1 AA bleibt gewahrt
+* `aria-label` auf SVGs — Screenreader-zugänglich
+* Zweizeiliges Layout löst das Mobilproblem mit langen Liganamen (keine Abschneidung mehr)
+
+| *Konsequenzen*
+a|
+* `isWin(match)` und `resultIcon(match)` als wiederverwendbare Hilfsfunktionen in `generateHTML.js`
+* Drei Render-Funktionen nutzen `resultIcon`: `buildScheduleRow`, `buildTeaserCard`, `buildSpotlightBlock`
+* `<strong>`-basierte Score-Hervorhebung in allen drei Bereichen entfernt
+* CSS: `.result-icon`, `.result-icon--win`, `.result-icon--loss` in `buildSharedStyles`
 |===
 
 === ADR-006: X-ALT-DESC für HTML-Beschreibungen (aktuell deaktiviert)
