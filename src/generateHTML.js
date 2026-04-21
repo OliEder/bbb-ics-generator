@@ -56,6 +56,7 @@ function isWin(match) {
   const own = parseInt(parts[match.isHome ? 0 : 1], 10);
   const opp = parseInt(parts[match.isHome ? 1 : 0], 10);
   if (isNaN(own) || isNaN(opp)) return null;
+  if (own === opp) return null;
   return own > opp;
 }
 

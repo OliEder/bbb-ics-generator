@@ -1117,7 +1117,7 @@ test('buildTabScript: enthält Clipboard-Handler für btn--copy', () => {
 // --- isWin ---
 {
   const { _testExports } = require('../../src/generateHTML.js');
-  const { isWin } = _testExports;
+  const { isWin, resultIcon } = _testExports;
 
   test('isWin: Heim-Sieg', () => {
     assert.strictEqual(isWin({ result: '82:71', isHome: true }), true);
@@ -1136,5 +1136,20 @@ test('buildTabScript: enthält Clipboard-Handler für btn--copy', () => {
   });
   test('isWin: ungültiges Ergebnis', () => {
     assert.strictEqual(isWin({ result: 'w.o.', isHome: true }), null);
+  });
+  test('isWin: Unentschieden', () => {
+    assert.strictEqual(isWin({ result: '70:70', isHome: true }), null);
+  });
+  test('resultIcon: Sieg gibt ICON_WIN zurück', () => {
+    const icon = resultIcon({ result: '82:71', isHome: true });
+    assert.ok(icon.includes('aria-label="Sieg"'), 'resultIcon muss Pokal-SVG zurückgeben');
+  });
+  test('resultIcon: Niederlage gibt ICON_LOSS zurück', () => {
+    const icon = resultIcon({ result: '61:74', isHome: true });
+    assert.ok(icon.includes('aria-label="Niederlage"'), 'resultIcon muss X-SVG zurückgeben');
+  });
+  test('resultIcon: kein Ergebnis gibt leeren String zurück', () => {
+    const icon = resultIcon({ result: null, isHome: true });
+    assert.strictEqual(icon, '');
   });
 }
