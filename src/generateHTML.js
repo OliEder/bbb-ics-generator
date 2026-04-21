@@ -873,17 +873,8 @@ function buildSpotlightBlock(teams, cupColor) {
         ? `<span class="spotlight-time">${escapeHtml(m.time)}</span>`
         : '';
 
-      let resultInner = '';
-      if (m.result) {
-        const parts = m.result.split(':');
-        if (parts.length === 2) {
-          const ownIdx = m.isHome ? 0 : 1;
-          const oppIdx = m.isHome ? 1 : 0;
-          resultInner = `<strong>${escapeHtml(parts[ownIdx].trim())}</strong>:${escapeHtml(parts[oppIdx].trim())}`;
-        } else {
-          resultInner = escapeHtml(m.result);
-        }
-      }
+      const resultInner = m.result ? escapeHtml(m.result) : '';
+      const icon = m.result ? resultIcon(m) : '';
 
       const line3 = m.competition
         ? `<div class="spotlight-line3">${escapeHtml(m.competition)}</div>`
@@ -902,7 +893,7 @@ function buildSpotlightBlock(teams, cupColor) {
             `</div>` +
             line3 +
           `</div>` +
-          (resultInner ? `<div class="spotlight-result">${resultInner}</div>` : '') +
+          (resultInner ? `${icon}<div class="spotlight-result">${resultInner}</div>` : '') +
         `</div>`
       );
     }

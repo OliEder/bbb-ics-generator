@@ -1256,3 +1256,36 @@ test('buildTabScript: enthält Clipboard-Handler für btn--copy', () => {
     assert.ok(!html.includes('<strong>82</strong>'), '<strong> darf nicht mehr in Teaser-Karte sein');
   });
 }
+
+// --- buildSpotlightBlock: result icons ---
+{
+  const { _testExports } = require('../../src/generateHTML.js');
+  const { buildSpotlightBlock } = _testExports;
+
+  test('buildSpotlightBlock: Sieg zeigt Pokal-Icon', () => {
+    const teams = [{
+      teamId: 't20', teamName: 'Test', ageGroup: 'U16', gender: 'männlich',
+      spotlightMatches: [{ date: '2026-03-01', time: '18:00', opponent: 'Gegner', result: '82:71', isHome: true, isNext: false, competition: 'BBL' }],
+    }];
+    const html = buildSpotlightBlock(teams, '#7c3aed');
+    assert.ok(html.includes('aria-label="Sieg"'), 'Pokal-Icon fehlt im Spotlight');
+  });
+
+  test('buildSpotlightBlock: Niederlage zeigt X-Icon', () => {
+    const teams = [{
+      teamId: 't21', teamName: 'Test', ageGroup: 'U16', gender: 'männlich',
+      spotlightMatches: [{ date: '2026-03-01', time: '18:00', opponent: 'Gegner', result: '61:74', isHome: true, isNext: false, competition: 'BBL' }],
+    }];
+    const html = buildSpotlightBlock(teams, '#7c3aed');
+    assert.ok(html.includes('aria-label="Niederlage"'), 'X-Icon fehlt im Spotlight');
+  });
+
+  test('buildSpotlightBlock: zukünftiges Spiel hat kein Icon', () => {
+    const teams = [{
+      teamId: 't22', teamName: 'Test', ageGroup: 'U16', gender: 'männlich',
+      spotlightMatches: [{ date: '2026-05-01', time: '18:00', opponent: 'Gegner', result: null, isHome: true, isNext: true, competition: 'BBL' }],
+    }];
+    const html = buildSpotlightBlock(teams, '#7c3aed');
+    assert.ok(!html.includes('aria-label="Sieg"') && !html.includes('aria-label="Niederlage"'), 'Icon darf bei zukünftigem Spotlight-Spiel nicht erscheinen');
+  });
+}
