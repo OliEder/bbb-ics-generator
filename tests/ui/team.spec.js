@@ -104,3 +104,28 @@ test.describe('Footer', () => {
     await expect(pg.footerLink('../impressum.html')).toBeVisible();
   });
 });
+
+test.describe('Ergebnis-Icons im Spielplan', () => {
+  test('Sieg-Icon (Pokal) ist sichtbar', async ({ page }) => {
+    const icons = page.locator('[aria-label="Sieg"]');
+    await expect(icons.first()).toBeVisible();
+  });
+
+  test('Niederlage-Icon (X) ist sichtbar', async ({ page }) => {
+    const icons = page.locator('[aria-label="Niederlage"]');
+    await expect(icons.first()).toBeVisible();
+  });
+
+  test('Kein Icon bei zukünftigen Spielen', async ({ page }) => {
+    const allIcons = page.locator('[aria-label="Sieg"], [aria-label="Niederlage"]');
+    const count = await allIcons.count();
+    // We have 2 past matches (loss + win), each appearing in 2 tab panels (Alle + Heim), so 4 icons total
+    expect(count).toBe(4);
+  });
+
+  test('Liganame steht in zweiter Zeile (.schedule-competition)', async ({ page }) => {
+    const comp = page.locator('.schedule-competition').first();
+    await expect(comp).toBeVisible();
+    await expect(comp).toContainText('Bezirksliga');
+  });
+});

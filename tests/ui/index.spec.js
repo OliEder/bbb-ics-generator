@@ -85,3 +85,29 @@ test.describe('Footer', () => {
     await expect(pg.footerLink('./barrierefreiheit.html')).toBeVisible();
   });
 });
+
+test.describe('Ergebnis-Icons auf Startseite', () => {
+  test('Teaser-Karte zeigt Sieg-Icon', async ({ page }) => {
+    await page.goto(`file://${pages.indexPath}`);
+    const icon = page.locator('.teaser-result [aria-label="Sieg"]');
+    await expect(icon.first()).toBeVisible();
+  });
+
+  test('Teaser-Karte zeigt Niederlage-Icon', async ({ page }) => {
+    await page.goto(`file://${pages.indexPath}`);
+    const icon = page.locator('.teaser-result [aria-label="Niederlage"]');
+    await expect(icon.first()).toBeVisible();
+  });
+
+  test('Spotlight zeigt Sieg-Icon', async ({ page }) => {
+    await page.goto(`file://${pages.indexPath}`);
+    const icon = page.locator('.spotlight [aria-label="Sieg"]');
+    await expect(icon.first()).toBeVisible();
+  });
+
+  test('Spotlight zeigt Niederlage-Icon', async ({ page }) => {
+    await page.goto(`file://${pages.indexPath}`);
+    const icon = page.locator('.spotlight [aria-label="Niederlage"]');
+    await expect(icon.first()).toBeVisible();
+  });
+});
