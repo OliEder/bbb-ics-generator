@@ -232,20 +232,22 @@ a|
 | Die Übersichtsseite soll pro Team den Spielplan der aktuellen Saison anzeigen — vergangene Spiele mit Ergebnis, kommende ohne — direkt in den Tab-Panels, oberhalb der Kalender-Abo-Buttons.
 
 | *Entscheidung*
-| `cronUpdate.js` filtert die rohen API-Matches auf `seasonId === 2025`, sortiert sie aufsteigend und speichert sie als `matches[]`-Array in `metadata.json`. `generateHTML.js` rendert dieses Array als HTML-Tabelle im jeweiligen Tab-Panel (Alle/Heim/Auswärts). Liga-Erkennung per Namens-Heuristik: enthält `liganame` das Wort "Liga" → Liga-Typ, sonst Cup/Pokal. Cup-Farbe ist konfigurierbar via `config.theme.cupColor` (Default `#7c3aed`).
+| `cronUpdate.js` filtert die rohen API-Matches auf die aktuelle Saison, sortiert sie aufsteigend und speichert sie als `matches[]`-Array in `metadata.json`. `generateHTML.js` rendert dieses Array als HTML-Tabelle im jeweiligen Tab-Panel (Alle/Heim/Auswärts). Liga-Erkennung per Namens-Heuristik: enthält `liganame` das Wort "Liga" → Liga-Typ, sonst Cup/Pokal. Cup-Farbe ist konfigurierbar via `config.theme.cupColor` (Default `#7c3aed`).
++
+*Update 2026-09-08:* Die anfängliche Implementierung nutzte eine harte Konstante `CURRENT_SEASON` auf Modul-Ebene. Das führte zu einem Produktionsbug: Beim Saisonwechsel 2026/27 lieferte die API ausschließlich Matches mit `seasonId: 2026`, während `CURRENT_SEASON` noch auf `2025` stand — `matches[]` und `competitions[]` liefen für alle Teams leer, obwohl die (ungefiltert erzeugten) ICS-Kalender die neuen Spiele korrekt enthielten. Die Konstante wurde durch `currentSeasonId(matches)` ersetzt, das pro Team die höchste vorkommende `seasonId` aus den geladenen Matches ermittelt (die API liefert Matches mehrerer Saisons gemischt zurück, z.B. während der Übergangsphase).
 
 | *Begründung*
 a|
 * Matches sind bereits per `fetchTeamMatches()` geladen — kein zusätzlicher API-Aufruf nötig.
-* Saison-Filter (`seasonId === 2025`) ist im Daten-Layer (`cronUpdate.js`), nicht im View-Layer — `generateHTML.js` bekommt nur saubere, vorverarbeitete Daten.
+* Saison-Filter ist im Daten-Layer (`cronUpdate.js`), nicht im View-Layer — `generateHTML.js` bekommt nur saubere, vorverarbeitete Daten.
 * `isNext`-Flag kennzeichnet das nächste anstehende Spiel bereits beim Schreiben der Metadaten — keine Zeitberechnungen im Template nötig.
 * Konfigurierbare Cup-Farbe (`config.theme.cupColor`) ermöglicht Anpassung ohne Code-Änderung.
-* Harte Saison-Konstante (`CURRENT_SEASON = 2025`) auf Modul-Ebene ist dokumentierter Trade-off: einfach, aber erfordert jährliche Code-Änderung.
+* Dynamische Saison-Ermittlung (`currentSeasonId()`, höchste `seasonId` unter den geladenen Matches) statt harter Konstante — vermeidet die jährliche manuelle Code-Änderung und die Klasse von Bug, die die harte Konstante verursacht hat.
 
 | *Konsequenzen*
 a|
-* Positive: Spielplan ohne zusätzliche API-Calls, Tab-Filterung (Alle/Heim/Auswärts) konsistent mit Kalender-Abo-Struktur, WCAG-konform (axe-core-geprüft).
-* Negative: `CURRENT_SEASON` muss jährlich aktualisiert werden. `metadata.json` wächst durch das `matches`-Array (bei typisch 14–20 Spielen pro Team vernachlässigbar). Liga-Heuristik ("liga" im Namen) kann bei ungewöhnlichen Wettbewerbsnamen fehlschlagen.
+* Positive: Spielplan ohne zusätzliche API-Calls, Tab-Filterung (Alle/Heim/Auswärts) konsistent mit Kalender-Abo-Struktur, WCAG-konform (axe-core-geprüft), kein jährlicher manueller Eingriff mehr nötig.
+* Negative: `metadata.json` wächst durch das `matches`-Array (bei typisch 14–20 Spielen pro Team vernachlässigbar). Liga-Heuristik ("liga" im Namen) kann bei ungewöhnlichen Wettbewerbsnamen fehlschlagen. Falls die API für ein Team ausschließlich Matches einer alten, abgeschlossenen Saison zurückgibt (kein Nachfolgewettbewerb vorhanden), zeigt `currentSeasonId()` weiterhin diese als "aktuell" an — das ist aber identisch zum Vorgängerverhalten.
 |===
 
 === ADR-010: Statische Multi-Page-Site statt Single-Page-Application

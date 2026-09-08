@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { mapMatches, computeSpotlight } = require('../../src/cronUpdate');
+const { mapMatches, computeSpotlight, currentSeasonId } = require('../../src/cronUpdate');
 
 // Minimal match factory
 function makeMatch({ matchId = 1, teamId = 100, isHome = true, result = null, date = '2026-05-01', time = '18:00', liganame = 'Bezirksliga', oppId = 999 } = {}) {
@@ -204,4 +204,25 @@ test('computeSpotlight: nur ein Spiel mit Ergebnis → 1 Spiel', () => {
   const result = computeSpotlight(matches);
   assert.equal(result.length, 1);
   assert.equal(result[0].result, '80:70');
+});
+
+test('currentSeasonId: liefert höchste seasonId aus gemischten Saisons', () => {
+  const matches = [
+    makeMatch({ matchId: 1 }),
+    { ...makeMatch({ matchId: 2 }), ligaData: { liganame: 'Liga', seasonId: 2026 } },
+    { ...makeMatch({ matchId: 3 }), ligaData: { liganame: 'Liga', seasonId: 2025 } },
+  ];
+  assert.equal(currentSeasonId(matches), 2026);
+});
+
+test('currentSeasonId: leere Liste → null', () => {
+  assert.equal(currentSeasonId([]), null);
+});
+
+test('currentSeasonId: fehlende seasonId wird ignoriert', () => {
+  const matches = [
+    { ligaData: {} },
+    { ligaData: { seasonId: 2026 } },
+  ];
+  assert.equal(currentSeasonId(matches), 2026);
 });

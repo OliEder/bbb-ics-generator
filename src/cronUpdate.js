@@ -6,11 +6,23 @@ const config = require('../config.json');
 const fs = require('fs');
 const path = require('path');
 
-const CURRENT_SEASON = 2026; // Saison 2025/26
 const BBB_MEDIA_BASE = 'https://www.basketball-bund.net/media/team';
 
 function isLiga(liganame) {
   return String(liganame || '').toLowerCase().includes('liga');
+}
+
+// Die API liefert Spiele mehrerer Saisons gemischt zurück (z.B. laufende Vorbereitung
+// der Folgesaison). Statt eines hartcodierten Jahres wird die aktuelle Saison pro Team
+// aus der höchsten vorkommenden seasonId bestimmt — funktioniert saisonübergreifend
+// ohne jährliche manuelle Anpassung.
+function currentSeasonId(matches) {
+  let max = null;
+  for (const m of matches) {
+    const id = m.ligaData?.seasonId;
+    if (typeof id === 'number' && (max === null || id > max)) max = id;
+  }
+  return max;
 }
 
 async function getTeams() {
@@ -156,8 +168,9 @@ async function updateAll() {
         }
       }
 
+      const seasonId = currentSeasonId(matches);
       const seasonMatches = matches
-        .filter(m => m.ligaData?.seasonId === CURRENT_SEASON)
+        .filter(m => m.ligaData?.seasonId === seasonId)
         .sort((a, b) => {
           const da = (a.kickoffDate || '') + (a.kickoffTime || '');
           const db = (b.kickoffDate || '') + (b.kickoffTime || '');
@@ -216,7 +229,7 @@ async function updateAll() {
   genHTML(theme, legal);
 }
 
-module.exports = { getTeams, updateAll, mapMatches, computeSpotlight };
+module.exports = { getTeams, updateAll, mapMatches, computeSpotlight, currentSeasonId };
 
 if (require.main === module) {
   updateAll();
