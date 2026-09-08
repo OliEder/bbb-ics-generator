@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { groupBySeasonId } = require('../../src/seasonArchive');
+const { buildArchiveTeamEntry } = require('../../src/seasonArchive');
 
 test('groupBySeasonId: gruppiert Matches nach ligaData.seasonId', () => {
   const matches = [
@@ -28,4 +29,58 @@ test('groupBySeasonId: ignoriert Matches ohne seasonId', () => {
 
 test('groupBySeasonId: leere Liste ergibt leeres Objekt', () => {
   assert.deepEqual(groupBySeasonId([]), {});
+});
+
+function makeMatch({ matchId = 1, teamId = 100, isHome = true, result = null, date = '2026-05-01', time = '18:00', liganame = 'Bezirksliga', ligaId = '1', oppId = 999, seasonId = 2025 } = {}) {
+  return {
+    matchId,
+    kickoffDate: date,
+    kickoffTime: time,
+    result,
+    homeTeam: {
+      teamPermanentId: isHome ? teamId : oppId,
+      teamname: isHome ? 'Eigenes Team' : 'Gegner',
+      teamnameSmall: isHome ? 'ET' : 'GG',
+    },
+    guestTeam: {
+      teamPermanentId: isHome ? oppId : teamId,
+      teamname: isHome ? 'Gegner' : 'Eigenes Team',
+      teamnameSmall: isHome ? 'GG' : 'ET',
+    },
+    ligaData: { liganame, ligaId, seasonId },
+  };
+}
+
+test('buildArchiveTeamEntry: baut matches und competitions aus Saison-Matches', async () => {
+  const seasonMatches = [
+    makeMatch({ matchId: 1, result: '80:70', date: '2026-03-01' }),
+    makeMatch({ matchId: 2, result: '70:75', date: '2026-04-01' }),
+  ];
+  const teamMeta = { id: '100', name: 'Eigenes Team', ageGroup: 'U18', gender: 'männlich' };
+  const fetchTable = async () => ([{ rank: 1, teamName: 'Eigenes Team', played: 2, won: 1, lost: 1, points: 2, korbdiff: 5, isOwn: true }]);
+  const fetchBracket = async () => null;
+
+  const entry = await buildArchiveTeamEntry(teamMeta, seasonMatches, {}, { fetchLeagueTable: fetchTable, fetchTournamentRounds: fetchBracket });
+
+  assert.equal(entry.teamName, 'Eigenes Team');
+  assert.equal(entry.ageGroup, 'U18');
+  assert.equal(entry.gender, 'männlich');
+  assert.equal(entry.matches.length, 2);
+  assert.equal(entry.matches[0].result, '80:70');
+  assert.equal(entry.competitions.length, 1);
+  assert.equal(entry.competitions[0].liganame, 'Bezirksliga');
+  assert.ok(entry.competitions[0].table);
+  assert.equal(entry.competitions[0].bracket, null);
+});
+
+test('buildArchiveTeamEntry: Pokal-Wettbewerb bekommt bracket statt table', async () => {
+  const seasonMatches = [makeMatch({ matchId: 1, liganame: 'Bezirkspokal Herren', ligaId: '9', result: '80:70' })];
+  const teamMeta = { id: '100', name: 'Eigenes Team', ageGroup: 'U18', gender: 'männlich' };
+  const fetchTable = async () => { throw new Error('sollte nicht aufgerufen werden'); };
+  const fetchBracket = async () => ([{ roundName: 'Finale', matches: [] }]);
+
+  const entry = await buildArchiveTeamEntry(teamMeta, seasonMatches, {}, { fetchLeagueTable: fetchTable, fetchTournamentRounds: fetchBracket });
+
+  assert.equal(entry.competitions[0].table, null);
+  assert.ok(entry.competitions[0].bracket);
 });
