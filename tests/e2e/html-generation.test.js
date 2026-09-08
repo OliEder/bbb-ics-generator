@@ -1318,6 +1318,12 @@ test('buildTabScript: enthält Clipboard-Handler für btn--copy', () => {
     assert.ok(label.includes('Fibalon Baskets Neumarkt'));
   });
 
+  test('buildTeamLabel: escaped teamName im Fallback-Pfad auch bei includeIcon=false', () => {
+    const label = buildTeamLabel({ teamName: '<script>alert(1)</script>', ageGroup: 'U16', gender: 'männlich' }, false);
+    assert.ok(!label.includes('<script>'), 'Roher <script>-Tag darf auch im includeIcon=false-Fallback-Pfad nicht im Output landen');
+    assert.ok(label.includes('&lt;script&gt;'), 'teamName muss escaped sein');
+  });
+
   test('spotlightTeamLabel: liefert reinen Text ohne eingebettetes Icon (kein Doppel-Escaping am Spotlight-Aufrufer)', () => {
     const { spotlightTeamLabel } = require('../../src/generateHTML.js')._testExports;
     const label = spotlightTeamLabel({ teamName: 'Fibalon Baskets Neumarkt 2', ageGroup: 'Senioren', gender: 'männlich', teamAkjId: 1, teamNumber: 2 }, []);
