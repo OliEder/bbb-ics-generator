@@ -8,6 +8,24 @@ const { join } = require('node:path');
 const axios = require('axios');
 const { mapMatches, computeSpotlight, currentSeasonId } = require('../../src/cronUpdate');
 
+// Helper: reload cronUpdate (and its deps) with fresh module instances,
+// pointed at a specific tmp dir — mirrors requireCronUpdate() in
+// tests/e2e/cache-scenarios.test.js.
+function requireCronUpdate(dir) {
+  [
+    '../../src/storage.js',
+    '../../src/cronUpdate.js',
+    '../../src/seasonArchive.js',
+    '../../src/apiClient.js',
+    '../../src/generateHTML.js',
+  ].forEach(rel => {
+    const p = require.resolve(rel);
+    delete require.cache[p];
+  });
+  process.env.BBB_ICS_DIR = dir;
+  return require('../../src/cronUpdate.js');
+}
+
 // Minimal match factory
 function makeMatch({ matchId = 1, teamId = 100, isHome = true, result = null, date = '2026-05-01', time = '18:00', liganame = 'Bezirksliga', oppId = 999 } = {}) {
   return {
@@ -407,14 +425,13 @@ test('updateAll: Team, das wieder in der API-Team-Liste auftaucht, verliert notC
 test('updateAll: übernimmt teamAkjId und teamNumber in metadata.json', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'bbb-cron-label-'));
   const originalIcsDir = process.env.BBB_ICS_DIR;
-  process.env.BBB_ICS_DIR = dir;
-
-  for (const mod of ['../../src/cronUpdate', '../../src/storage', '../../src/seasonArchive', '../../src/apiClient', '../../src/generateHTML']) {
-    delete require.cache[require.resolve(mod)];
-  }
 
   const seniorsMatch = makeMatch({ matchId: 1, teamId: 167890, result: null, date: '2026-10-01' });
 
+  // URL-Dispatch statt fixer 1:1-Fixtures, da dieser Test den vollen
+  // Update-Zyklus durchläuft (Team-Liste, Matches, Match-Details, Tabelle) —
+  // ein unerwarteter Call fällt auf den Promise.reject-Zweig und lässt
+  // den Test laut fehlschlagen statt still eine falsche Form zu liefern.
   t.mock.method(axios, 'get', (url) => {
     if (url.includes('/club/id/')) {
       return Promise.resolve({ data: { data: { matches: [
@@ -431,7 +448,7 @@ test('updateAll: übernimmt teamAkjId und teamNumber in metadata.json', async (t
   });
 
   try {
-    const cronUpdate = require('../../src/cronUpdate');
+    const cronUpdate = requireCronUpdate(dir);
     await cronUpdate.updateAll();
 
     const meta = JSON.parse(readFileSync(join(dir, 'metadata.json'), 'utf8'));
@@ -443,8 +460,5 @@ test('updateAll: übernimmt teamAkjId und teamNumber in metadata.json', async (t
     if (originalIcsDir === undefined) delete process.env.BBB_ICS_DIR;
     else process.env.BBB_ICS_DIR = originalIcsDir;
     rmSync(dir, { recursive: true });
-    for (const mod of ['../../src/cronUpdate', '../../src/storage', '../../src/seasonArchive', '../../src/apiClient', '../../src/generateHTML']) {
-      delete require.cache[require.resolve(mod)];
-    }
   }
 });
