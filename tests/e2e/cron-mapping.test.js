@@ -2,6 +2,10 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const { mkdtempSync, rmSync } = require('node:fs');
+const { tmpdir } = require('node:os');
+const { join } = require('node:path');
+const axios = require('axios');
 const { mapMatches, computeSpotlight, currentSeasonId } = require('../../src/cronUpdate');
 
 // Minimal match factory
@@ -225,4 +229,62 @@ test('currentSeasonId: fehlende seasonId wird ignoriert', () => {
     { ligaData: { seasonId: 2026 } },
   ];
   assert.equal(currentSeasonId(matches), 2026);
+});
+
+test('updateAll: archiviert ältere Saison beim Übergang (Integrationstest)', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-cron-archive-'));
+  const originalIcsDir = process.env.BBB_ICS_DIR;
+  process.env.BBB_ICS_DIR = dir;
+
+  // Volle Abhängigkeitskette frisch laden, damit sie den env-var-Pfad greifen
+  for (const mod of ['../../src/cronUpdate', '../../src/storage', '../../src/seasonArchive', '../../src/apiClient', '../../src/generateHTML']) {
+    const p = require.resolve(mod);
+    delete require.cache[p];
+  }
+
+  // currentSeasonId(matches) ermittelt die höchste seasonId aus den Rohdaten (hier 2025);
+  // 2024 taucht daneben noch auf (Übergangsphase) und soll archiviert werden.
+  const oldMatch = makeMatch({ matchId: 1, teamId: 100, result: '80:70', date: '2024-03-01' });
+  oldMatch.ligaData.seasonId = 2024;
+  const newMatch = makeMatch({ matchId: 2, teamId: 100, result: null, date: '2025-10-01' });
+  newMatch.ligaData.seasonId = 2025;
+
+  t.mock.method(axios, 'get', (url) => {
+    if (url.includes('/club/id/')) {
+      return Promise.resolve({ data: { data: { matches: [
+        { homeTeam: { teamPermanentId: 100, clubId: 4468, teamname: 'Eigenes Team' }, guestTeam: { teamPermanentId: 999, clubId: 1, teamname: 'Gegner' }, ligaData: { akName: 'U18', geschlecht: 'männlich' } },
+      ] } } });
+    }
+    if (url.includes('/team/id/')) {
+      return Promise.resolve({ data: { data: { team: { teamGenderId: 1 }, matches: [oldMatch, newMatch] } } });
+    }
+    if (url.includes('/match/id/')) {
+      return Promise.resolve({ data: { data: {} } });
+    }
+    if (url.includes('/competition/table/')) {
+      return Promise.resolve({ data: { data: { tabelle: { entries: [] } } } });
+    }
+    if (url.includes('/competition/spielplan/')) {
+      return Promise.resolve({ data: { data: { spieltage: [] } } });
+    }
+    return Promise.reject(new Error(`Unerwarteter Request in Test: ${url}`));
+  });
+
+  try {
+    const cronUpdate = require('../../src/cronUpdate');
+    await cronUpdate.updateAll();
+
+    const { loadArchive } = require('../../src/seasonArchive');
+    const archive2024 = loadArchive(2024);
+    assert.ok(archive2024, 'Archiv für 2024 wurde beim Update angelegt');
+    assert.equal(archive2024.teams['100'].status, 'provisional');
+    assert.equal(archive2024.teams['100'].matches[0].result, '80:70');
+  } finally {
+    if (originalIcsDir === undefined) delete process.env.BBB_ICS_DIR;
+    else process.env.BBB_ICS_DIR = originalIcsDir;
+    rmSync(dir, { recursive: true });
+    for (const mod of ['../../src/cronUpdate', '../../src/storage', '../../src/seasonArchive', '../../src/apiClient', '../../src/generateHTML']) {
+      delete require.cache[require.resolve(mod)];
+    }
+  }
 });

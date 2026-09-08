@@ -2,6 +2,7 @@ const { fetchTeamMatches, fetchMatchInfo, fetchClubTeams, fetchLeagueTable, fetc
 const { generateICS } = require('./icsGenerator');
 const { saveICS, saveTeamsCache, loadTeamsCache } = require('./storage');
 const { genHTML } = require('./generateHTML');
+const { groupBySeasonId, updateArchiveForTeam } = require('./seasonArchive');
 const config = require('../config.json');
 const fs = require('fs');
 const path = require('path');
@@ -169,6 +170,16 @@ async function updateAll() {
       }
 
       const seasonId = currentSeasonId(matches);
+      const groupedBySeason = groupBySeasonId(matches);
+
+      await updateArchiveForTeam(
+        { id: t.id, name: t.name, ageGroup: t.ageGroup, gender: teamGender || t.gender },
+        groupedBySeason,
+        seasonId,
+        details,
+        { fetchLeagueTable, fetchTournamentRounds }
+      );
+
       const seasonMatches = matches
         .filter(m => m.ligaData?.seasonId === seasonId)
         .sort((a, b) => {
