@@ -187,6 +187,10 @@ flowchart TD
 | Browser → Nominatim (HTTP GET, clientseitig)
 | Geocoding für den Next-Game-Teaser: `https://nominatim.openstreetmap.org/search?format=json&q=<adresse>`. Wird im Browser des Nutzers aufgerufen (1 Anfrage pro Seitenaufruf). Kein API-Key erforderlich.
 
+| *Leaflet.js (CDN)*
+| Browser → CDN (HTTP GET, clientseitig)
+| Kartenbibliothek für den Next-Game-Teaser (v1.9.4, SRI-Hash-gesichert). Rendert die von Nominatim georeferenzierte Spielhalle als interaktive Karte mit OpenStreetMap-Tiles. Wird im Browser des Nutzers geladen, nur auf Team-Seiten mit bekannter `venueAddress`. Siehe ADR-011.
+
 | *GitHub Actions*
 | GitHub Actions → BBB Vereinsportal (triggert Build)
 | Führt den Node.js-Prozess (`npm run update` und `npm run generate-html`) in einer Ubuntu-Runner-Umgebung aus. Trigger: Cron alle 6 Stunden, Push auf `main`, manueller `workflow_dispatch`.
@@ -224,7 +228,7 @@ flowchart TD
 
 | GitHub Actions → GitHub Pages
 | GitHub Actions API / HTTP Upload
-| Artefakt-Upload via `actions/upload-pages-artifact@v3`; Deployment via `actions/deploy-pages@v4`; Concurrency-Gruppe `pages` verhindert parallele Deployments
+| Artefakt-Upload via `actions/upload-pages-artifact@v3`; Deployment via `actions/deploy-pages@v5`; Concurrency-Gruppe `pages` verhindert parallele Deployments
 
 | GitHub Pages → Kalender-Clients
 | HTTPS (TLS 1.2+) / text/calendar
@@ -233,6 +237,10 @@ flowchart TD
 | Browser → cdnjs.cloudflare.com
 | HTTPS / CSS + Webfonts
 | Font Awesome CSS und Webfont-Dateien; clientseitiger Abruf pro Seitenaufruf; keine Authentifizierung; IP-Adresse des Nutzers wird übertragen
+
+| Browser → Leaflet-CDN
+| HTTPS / JS + CSS
+| Leaflet.js v1.9.4 (SRI-Hash-gesichert); lädt anschließend Kartenkacheln direkt von OpenStreetMap-Tile-Servern nach; nur auf Team-Seiten mit bekannter Spielhallen-Adresse
 |===
 
 === Externe API-Endpunkte im Detail
@@ -562,7 +570,7 @@ a|
 * `buildArchiveSeasonBlock(archiveEntry, cupColor)` — rendert eine archivierte Saison: Überschrift „Saison YYYY/YY", optionaler „vorläufiger Stand"-Hinweis bei `status === 'provisional'`, Ligatabellen/Turnierbäume (wiederverwendet `buildStandingsTable`/`buildBracket`) und Spielplanzeilen (wiederverwendet `buildScheduleRow`)
 * `buildArchiveTab(teamId, archives, cupColor)` — liefert leeren String wenn keine Archive vorhanden sind, sonst ein `role="tabpanel"`-Element mit allen Saison-Blöcken
 * `buildIndexPage(teams, theme)` — Startseite
-* `buildTeamLabel(team, includeIcon = true)` — zentrale Team-Bezeichnungs-Funktion, ersetzt die frühere array-positionsbasierte Nummerierung (Bug, siehe ADR-013). Baut das Label aus den echten API-Feldern `team.teamAkjId`, `team.gender` und `team.teamNumber`: Senioren-Teams (`teamAkjId === 1`) erhalten `"Herren"`/`"Damen"`, Jugend-Teams `"{Altersklasse}{m\|w}"` (z. B. `"U16m"`); ist `teamNumber > 1`, wird `" N"` angehängt (z. B. `"Herren 2"`, `"U14w 2"`). Der Parameter `includeIcon` (Default `true`) steuert, ob ein eingebettetes Gender-Icon-`<span>` Teil des Rückgabewerts ist — `false` liefert reinen (bereits HTML-escapten) Text ohne Icon, für Aufrufer wie `spotlightTeamLabel`, die das Icon separat rendern und den Rückgabewert zusätzlich selbst escapen würden (sonst doppeltes Escaping). Fehlen `teamAkjId`/`teamNumber` (z. B. bei `metadata.json`-Einträgen aus der Zeit vor diesem Fix), fällt die Funktion auf das alte `teamLabel()`-Format zurück.
+* `buildTeamLabel(team, includeIcon = true)` — zentrale Team-Bezeichnungs-Funktion, ersetzt die frühere array-positionsbasierte Nummerierung (Bug, siehe ADR-015). Baut das Label aus den echten API-Feldern `team.teamAkjId`, `team.gender` und `team.teamNumber`: Senioren-Teams (`teamAkjId === 1`) erhalten `"Herren"`/`"Damen"`, Jugend-Teams `"{Altersklasse}{m\|w}"` (z. B. `"U16m"`); ist `teamNumber > 1`, wird `" N"` angehängt (z. B. `"Herren 2"`, `"U14w 2"`). Der Parameter `includeIcon` (Default `true`) steuert, ob ein eingebettetes Gender-Icon-`<span>` Teil des Rückgabewerts ist — `false` liefert reinen (bereits HTML-escapten) Text ohne Icon, für Aufrufer wie `spotlightTeamLabel`, die das Icon separat rendern und den Rückgabewert zusätzlich selbst escapen würden (sonst doppeltes Escaping). Fehlen `teamAkjId`/`teamNumber` (z. B. bei `metadata.json`-Einträgen aus der Zeit vor diesem Fix), fällt die Funktion auf das alte `teamLabel()`-Format zurück.
 * `teamLabel(teamName, ageGroup, gender)` — legacy Teambezeichnung mit Geschlechtssymbol, direkt aus rohem Teamnamen + Altersgruppe gebaut (keine Nummerierung). Seit Einführung von `buildTeamLabel` nur noch intern als dessen Fallback-Zweig aufgerufen (kein eigenständiger Aufrufer mehr in `generateHTML.js`).
 * `spotlightTeamLabel(team, allTeams)` — Kurzlabel für den Spotlight-Block; delegiert vollständig an `buildTeamLabel(team, false)`. Enthielt vor diesem Fix eine eigene, fehlerhafte Nummerierungslogik anhand der Array-Position innerhalb `allTeams` (Ursache des Produktions-Bugs "Senioren 1"/"Senioren 2"/"Senioren 3" bzw. "U14 1"/"U14 2"); der Parameter `allTeams` wird seither nicht mehr ausgewertet, ist aber aus Kompatibilitätsgründen (Aufrufer übergeben ihn weiterhin) in der Signatur verblieben.
 * `sortTeams(teams)` — Senioren zuerst, dann aufsteigend nach Altersgruppe
@@ -710,7 +718,8 @@ sequenceDiagram
 . `createEvents()` der ics-Bibliothek erzeugt RFC-5545-konforme VEVENT-Blöcke.
 . Post-Processing: VCALENDAR-Header wird mit X-WR-CALNAME, X-WR-TIMEZONE etc. angereichert.
 . `saveICS(teamId, type, ics)` schreibt die Datei nach `generated/{teamId}_{type}.ics`.
-. Nach allen Teams: `metadata.json` wird je Team mit Update-Zeitstempel, Spielzahlen, `logoUrl` und einem `matches`-Array geschrieben. Das `matches`-Array enthält alle Spiele der aktuellen Saison (seasonId 2025), gefiltert aus den Roh-API-Daten, aufsteigend nach Datum sortiert. Jeder Eintrag enthält: `date`, `time`, `opponent`, `isHome`, `result` (null = noch nicht gespielt), `competition` (Liga-Name), `isNext` (erstes Spiel ohne Ergebnis). Die `logoUrl` wird direkt konstruiert: `https://www.basketball-bund.net/media/team/{teamPermanentId}/logo` — kein zusätzlicher API-Aufruf.
+. Vor der Verarbeitung der aktuellen Saison ruft `cronUpdate.js` pro Team `updateArchiveForTeam()` aus `seasonArchive.js` auf (siehe Szenario 3 für den Rolling-Update-Mechanismus).
+. Nach allen Teams: `metadata.json` wird je Team mit Update-Zeitstempel, Spielzahlen, `logoUrl`, `teamAkjId`, `teamNumber` und einem `matches`-Array geschrieben. Das `matches`-Array enthält alle Spiele der aktuellen Saison, ermittelt per `currentSeasonId(matches)` (höchste vorkommende `seasonId` in den Roh-API-Daten des Teams — siehe ADR-009-Update), gefiltert und aufsteigend nach Datum sortiert. Jeder Eintrag enthält: `date`, `time`, `opponent`, `isHome`, `result` (null = noch nicht gespielt), `competition` (Liga-Name), `isNext` (erstes Spiel ohne Ergebnis). Die `logoUrl` wird direkt konstruiert: `https://www.basketball-bund.net/media/team/{teamPermanentId}/logo` — kein zusätzlicher API-Aufruf. Ein Team, das nicht mehr in der aktuellen API-Team-Liste auftaucht, wird stattdessen unverändert aus dem vorherigen Lauf übernommen und mit `notCurrentlyListed: true` markiert (siehe ADR-014).
 . GitHub Actions führt danach `npm run generate-html` aus, das `index.html` aus `metadata.json` erzeugt (Tab-UI mit Logos, ARIA-Tab-Pattern, eingebettetem Keyboard-Nav-JS). Jeder Tab-Panel zeigt oben den gefilterten Spielplan (Alle/Heim/Auswärts) mit H/A-Badges und Wettbewerbs-Label, darunter die Kalender-Abo-Buttons.
 . Das `generated/`-Verzeichnis wird als GitHub Pages Artefakt hochgeladen und deployed.
 
@@ -740,6 +749,41 @@ Wenn Schritt 6 fehlschlägt (HTTP-Fehler oder Netzwerkfehler):
 . `cronUpdate.js` prüft: `fresh === null` → prüft ob `cached` (abgelaufener Cache) vorhanden.
 . Falls abgelaufener Cache vorhanden: Warnung wird geloggt, abgelaufene Teams werden als Fallback verwendet.
 . Falls kein Cache vorhanden: Fehlermeldung wird geloggt, `[]` wird zurückgegeben — kein ICS-Update in diesem Lauf.
+
+=== Szenario 3: Saison-Archivierung während des Saisonübergangs (Rolling-Update)
+
+Dieser Ablauf tritt pro Team bei jedem Update-Zyklus ein, sobald die API für ein Team Matches mehrerer Saisons gleichzeitig zurückliefert (Übergangsphase zwischen zwei Spielzeiten) oder eine zuvor noch mitgelieferte alte Saison erstmals nicht mehr auftaucht. Details zur Entscheidung siehe ADR-014.
+
+[source,mermaid]
+----
+sequenceDiagram
+    participant CU as cronUpdate.js
+    participant SA as seasonArchive.js
+    participant FS as generated/archive/
+    CU->>SA: updateArchiveForTeam(team, matches)
+    SA->>SA: groupBySeasonId(matches)
+    SA->>SA: currentSeasonId = höchste seasonId
+    loop fuer jede aeltere seasonId in matches
+        SA->>FS: loadArchive(seasonId)
+        SA->>SA: baut/aktualisiert Team-Eintrag
+        SA->>FS: saveArchive(seasonId, status: provisional)
+    end
+    loop fuer jede vorhandene Archiv-Datei ohne aktuelle Matches
+        SA->>FS: loadArchive(seasonId)
+        SA->>SA: prüft ob Team-Status provisional
+        SA->>FS: saveArchive(seasonId, status: final)
+    end
+----
+
+==== Ablauf als nummerierte Schritte
+
+. `cronUpdate.js` ruft für jedes Team `updateArchiveForTeam(teamMeta, groupedBySeason, currentSeasonId, ...)` auf, bevor die aktuelle Saison in `metadata.json` verarbeitet wird.
+. `groupBySeasonId(matches)` gruppiert die rohen API-Matches des Teams nach `ligaData.seasonId`.
+. Für jede Saison außer der aktuellen (`currentSeasonId`, siehe Szenario 1): `buildArchiveTeamEntry()` baut Matches und Wettbewerbe (Tabelle oder Turnierbaum) analog zur Live-Saison-Verarbeitung.
+. Der bestehende Archiv-Eintrag dieser Saison wird geladen (`loadArchive(seasonId)`, falls vorhanden), der Team-Eintrag mit dem neuen Stand überschrieben, `status: 'provisional'` gesetzt, `lastSeenAt` aktualisiert, und die Datei zurückgeschrieben (`saveArchive`).
+. Anschließend werden alle vorhandenen Archiv-Dateien durchsucht: Taucht die Saison eines Teams nicht mehr unter den aktuell von der API gelieferten Matches auf (und ist nicht die aktuelle Saison) und war ihr Status bisher `provisional`, wird sie auf `status: 'final'` gesetzt. Ab diesem Zeitpunkt wird dieser Eintrag nie wieder verändert.
+. `.github/workflows/deploy.yml` committet `generated/archive/**` nach jedem Lauf zurück auf `main` (Schritt „Commit season archive"), da `generated/` sonst als reines Build-Output verloren ginge.
+. `generateHTML.js` liest beim nächsten `npm run generate-html` alle vorhandenen `generated/archive/*.json`-Dateien pro Team (`loadTeamArchives`) und rendert sie als „Archiv"-Tab auf der jeweiligen Team-Seite.
 
 == Verteilungssicht
 
@@ -789,7 +833,7 @@ Der Workflow benötigt drei spezifische Permissions:
 | Permission | Zweck
 
 | `contents: write`
-| Checkout des Repository-Inhalts sowie Commit des `generated/archive/**`-Verzeichnisses zurück auf `main` (siehe Schritt „Commit season archive" unten). Ursprünglich `contents: read`; wurde auf `write` angehoben, als der Auto-Commit-Schritt für das Saison-Archiv eingeführt wurde (siehe ADR-013).
+| Checkout des Repository-Inhalts sowie Commit des `generated/archive/**`-Verzeichnisses zurück auf `main` (siehe Schritt „Commit season archive" unten). Ursprünglich `contents: read`; wurde auf `write` angehoben, als der Auto-Commit-Schritt für das Saison-Archiv eingeführt wurde (siehe ADR-014).
 
 | `pages: write`
 | Upload und Deployment auf GitHub Pages
@@ -800,7 +844,7 @@ Der Workflow benötigt drei spezifische Permissions:
 
 ==== Workflow-Schritte im Detail
 
-. *Checkout* (`actions/checkout@v4`): Klont den `main`-Branch in das Runner-Arbeitsverzeichnis. Enthält `src/`, `config.json`, `package.json`.
+. *Checkout* (`actions/checkout@v5`): Klont den `main`-Branch in das Runner-Arbeitsverzeichnis. Enthält `src/`, `config.json`, `package.json`.
 
 . *Setup Node.js* (`actions/setup-node@v5`, `node-version: '24'`): Installiert Node.js 24 LTS auf dem Ubuntu-Runner.
 
@@ -810,15 +854,15 @@ Der Workflow benötigt drei spezifische Permissions:
 
 . *Generate HTML* (`npm run generate-html` → `node src/generateHTML.js`): Erzeugt `generated/index.html` aus `metadata.json`.
 
-. *Commit season archive* (`stefanzweifel/git-auto-commit-action@v5`): Committet ausschließlich `generated/archive/**` zurück auf den `main`-Branch, mit Commit-Message `chore: update season archive [skip ci]` (das `[skip ci]`-Suffix verhindert, dass dieser Commit den Deploy-Workflow erneut auslöst — sonst würde jeder Lauf einen weiteren Lauf triggern). Autor ist `github-actions[bot]`. Hintergrund: `generated/` ist ansonsten vollständig `.gitignore`t und reines, flüchtiges Build-Output — auf GitHub-Actions-Runnern (ephemer) geht es nach jedem Lauf verloren. Das Saison-Archiv (`src/seasonArchive.js`) muss davon abweichend dauerhaft erhalten bleiben, da die Basketball-Bund-API Match- und Tabellendaten einer abgelaufenen Saison irgendwann endgültig nicht mehr zurückliefert — ohne diesen Commit-Schritt gäbe es keine Möglichkeit, diese Daten zwischen den 6-stündigen Läufen zu bewahren. Details zur Architekturentscheidung siehe ADR-013 in `09-decisions.adoc`. Voraussetzung ist die Permission `contents: write` (siehe oben).
+. *Commit season archive* (`stefanzweifel/git-auto-commit-action@v5`): Committet ausschließlich `generated/archive/**` zurück auf den `main`-Branch, mit Commit-Message `chore: update season archive [skip ci]` (das `[skip ci]`-Suffix verhindert, dass dieser Commit den Deploy-Workflow erneut auslöst — sonst würde jeder Lauf einen weiteren Lauf triggern). Autor ist `github-actions[bot]`. Hintergrund: `generated/` ist ansonsten vollständig `.gitignore`t und reines, flüchtiges Build-Output — auf GitHub-Actions-Runnern (ephemer) geht es nach jedem Lauf verloren. Das Saison-Archiv (`src/seasonArchive.js`) muss davon abweichend dauerhaft erhalten bleiben, da die Basketball-Bund-API Match- und Tabellendaten einer abgelaufenen Saison irgendwann endgültig nicht mehr zurückliefert — ohne diesen Commit-Schritt gäbe es keine Möglichkeit, diese Daten zwischen den 6-stündigen Läufen zu bewahren. Details zur Architekturentscheidung siehe ADR-014 in `09-decisions.adoc`. Voraussetzung ist die Permission `contents: write` (siehe oben).
 
 . *List generated files (debug)* (`ls -la generated/`, `find generated/ -name "*.ics" -ls`): Diagnostik-Schritt, listet alle erzeugten Dateien im Actions-Log.
 
-. *Setup Pages* (`actions/configure-pages@v4`): Konfiguriert GitHub Pages für den aktuellen Repository-Kontext.
+. *Setup Pages* (`actions/configure-pages@v5`): Konfiguriert GitHub Pages für den aktuellen Repository-Kontext.
 
 . *Upload artifact* (`actions/upload-pages-artifact@v3`, `path: ./generated`): Packt das `generated/`-Verzeichnis als Pages-Artefakt.
 
-. *Deploy to GitHub Pages* (`actions/deploy-pages@v4`): Deployed das Artefakt auf GitHub Pages. Gibt die öffentliche URL als Output `page_url` zurück.
+. *Deploy to GitHub Pages* (`actions/deploy-pages@v5`): Deployed das Artefakt auf GitHub Pages. Gibt die öffentliche URL als Output `page_url` zurück.
 
 ==== Concurrency-Steuerung
 
@@ -1291,6 +1335,37 @@ a|
 * Negative: Das Zeitfenster ist für alle Spiele gleich — Überstunden (Verlängerung, Overtime) werden nicht dynamisch erfasst. Die Kickoff-Zeit stammt aus der API; Zeitplanänderungen kurzfristig vor dem Spiel werden erst beim nächsten Update-Zyklus reflektiert.
 |===
 
+=== ADR-006: X-ALT-DESC für HTML-Beschreibungen (aktuell deaktiviert)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Deferred (vorläufig deaktiviert, Code vorhanden)
+
+| *Datum*
+| 2024
+
+| *Kontext*
+| ICS `DESCRIPTION` unterstützt nur Plain-Text. Microsoft Outlook und einige andere Clients unterstützen die nicht-standardisierte X-Property `X-ALT-DESC;FMTTYPE=text/html`, die eine HTML-Version der Beschreibung enthält und eine reichere Darstellung ermöglicht.
+
+| *Entscheidung*
+| Die Infrastruktur für `X-ALT-DESC` ist vollständig implementiert (`createHtmlDescription()`, Post-Processing-Logik in `generateICS()`), aber in der Event-Erzeugung temporär auskommentiert (`// htmlDescription`).
+
+| *Begründung*
+a|
+* `X-ALT-DESC` ist keine RFC-5545-Property — manche Clients ignorieren sie, andere verarbeiten sie fehlerhaft.
+* Debugging-Schwierigkeiten: HTML in ICS-Strings ist schwer zu verifizieren.
+* Implementierung ist fertig, Aktivierung erfordert Verifikation auf allen Zielclients.
+* Die Deaktivierung ist ein bewusstes temporäres Trade-off — Plain-Text DESCRIPTION ist universell kompatibel.
+
+| *Konsequenzen*
+a|
+* Aktuelle Konsequenz: Alle Clients zeigen Plain-Text-Beschreibungen. Funktionalität vollständig erhalten.
+* Zukünftige Aktivierung: Muss `buildEvent()` `htmlDescription` wieder befüllen und `createHtmlDescription()` testen. Besondere Sorgfalt bei Line-Folding (75-Zeichen-Limit) und HTML-in-ICS-Escaping erforderlich.
+|===
+
 === ADR-007: Tab-basierte UI statt Flat-Button-Liste
 
 [cols="2,5", options="header"]
@@ -1480,7 +1555,45 @@ a|
 * Negative: GB macht wenig Sinn bei sehr ungleicher Spielanzahl (unterschiedlich viele Spiele absolviert). Bei Gleichstand (GB = 0.5) wird `.toFixed(1)` angezeigt — leicht ungewohnt für deutsche Nutzer.
 |===
 
-=== ADR-013: Saison-Archivierung mit Rolling-Update-Mechanismus und Persistenz nicht gemeldeter Teams
+=== ADR-013: Outline-SVG-Icons statt Farbe für Sieg/Niederlage-Anzeige
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-04-21
+
+| *Kontext*
+| Vergangene Spielergebnisse sollen auf einen Blick als Sieg oder Niederlage erkennbar sein. Die ursprüngliche Lösung (fetter eigener Score) hob sich nicht genug ab. Alternativen wie Rot/Grün-Färbung scheiden wegen Farbenblindheit und Konflikt mit konfigurierbaren Teamfarben (`--color-primary`, `--color-accent`) aus. Opacity-/Dimming-Ansätze verletzen WCAG 2.1 AA (Kontrastverhältnis min. 4.5:1).
+
+| *Entscheidung*
+a|
+* Sieg: Outline-Pokal-SVG-Icon (`aria-label="Sieg"`, `role="img"`, `stroke="currentColor"`, 14×14px)
+* Niederlage: ✕-SVG-Icon (`aria-label="Niederlage"`, `role="img"`, `stroke="currentColor"`, 14×14px)
+* Kein Icon bei zukünftigen Spielen (kein `result`) und Unentschieden
+* Spielzeilen zweizeilig: Zeile 1 = Datum · Gegner + Icon + Ergebnis, Zeile 2 = Liganame
+
+| *Begründung*
+a|
+* `stroke="currentColor"` — keine fixen Farben, kein Konflikt mit konfigurierbaren Teamfarben
+* Form statt Farbe — farbenblinde Nutzer erkennen Sieg/Niederlage am Symbol, nicht an der Farbe
+* Kein Dimmen — kein Kontrastverlust, WCAG 2.1 AA bleibt gewahrt
+* `aria-label` auf SVGs — Screenreader-zugänglich
+* Zweizeiliges Layout löst das Mobilproblem mit langen Liganamen (keine Abschneidung mehr)
+
+| *Konsequenzen*
+a|
+* `isWin(match)` und `resultIcon(match)` als wiederverwendbare Hilfsfunktionen in `generateHTML.js`
+* Drei Render-Funktionen nutzen `resultIcon`: `buildScheduleRow`, `buildTeaserCard`, `buildSpotlightBlock`
+* `<strong>`-basierte Score-Hervorhebung in allen drei Bereichen entfernt
+* CSS: `.result-icon`, `.result-icon--win`, `.result-icon--loss` in `buildSharedStyles`
+|===
+
+=== ADR-014: Saison-Archivierung mit Rolling-Update-Mechanismus und Persistenz nicht gemeldeter Teams
 
 [cols="2,5", options="header"]
 |===
@@ -1520,45 +1633,7 @@ a|
 * Negative: Bot-Commits (`github-actions[bot]`) erscheinen regelmäßig in der Commit-Historie von `main`, zusätzlich zu echten Code-Änderungen. `generated/archive/` ist eine bewusste, hier dokumentierte Ausnahme vom sonst in diesem Repo geltenden Prinzip, dass `generated/` reines, unversioniertes Build-Output ist (vgl. `.gitignore` und ADR-Kontext an anderer Stelle) — diese Ausnahme muss bei zukünftigen Änderungen an der `.gitignore`-Strategie berücksichtigt werden.
 |===
 
-=== ADR-007: Outline-SVG-Icons statt Farbe für Sieg/Niederlage-Anzeige
-
-[cols="2,5", options="header"]
-|===
-| Aspekt | Inhalt
-
-| *Status*
-| Akzeptiert
-
-| *Datum*
-| 2026-04-21
-
-| *Kontext*
-| Vergangene Spielergebnisse sollen auf einen Blick als Sieg oder Niederlage erkennbar sein. Die ursprüngliche Lösung (fetter eigener Score) hob sich nicht genug ab. Alternativen wie Rot/Grün-Färbung scheiden wegen Farbenblindheit und Konflikt mit konfigurierbaren Teamfarben (`--color-primary`, `--color-accent`) aus. Opacity-/Dimming-Ansätze verletzen WCAG 2.1 AA (Kontrastverhältnis min. 4.5:1).
-
-| *Entscheidung*
-a|
-* Sieg: Outline-Pokal-SVG-Icon (`aria-label="Sieg"`, `role="img"`, `stroke="currentColor"`, 14×14px)
-* Niederlage: ✕-SVG-Icon (`aria-label="Niederlage"`, `role="img"`, `stroke="currentColor"`, 14×14px)
-* Kein Icon bei zukünftigen Spielen (kein `result`) und Unentschieden
-* Spielzeilen zweizeilig: Zeile 1 = Datum · Gegner + Icon + Ergebnis, Zeile 2 = Liganame
-
-| *Begründung*
-a|
-* `stroke="currentColor"` — keine fixen Farben, kein Konflikt mit konfigurierbaren Teamfarben
-* Form statt Farbe — farbenblinde Nutzer erkennen Sieg/Niederlage am Symbol, nicht an der Farbe
-* Kein Dimmen — kein Kontrastverlust, WCAG 2.1 AA bleibt gewahrt
-* `aria-label` auf SVGs — Screenreader-zugänglich
-* Zweizeiliges Layout löst das Mobilproblem mit langen Liganamen (keine Abschneidung mehr)
-
-| *Konsequenzen*
-a|
-* `isWin(match)` und `resultIcon(match)` als wiederverwendbare Hilfsfunktionen in `generateHTML.js`
-* Drei Render-Funktionen nutzen `resultIcon`: `buildScheduleRow`, `buildTeaserCard`, `buildSpotlightBlock`
-* `<strong>`-basierte Score-Hervorhebung in allen drei Bereichen entfernt
-* CSS: `.result-icon`, `.result-icon--win`, `.result-icon--loss` in `buildSharedStyles`
-|===
-
-=== ADR-013: Team-Label-Ableitung aus teamAkjId/teamNumber statt Array-Position
+=== ADR-015: Team-Label-Ableitung aus teamAkjId/teamNumber statt Array-Position
 
 [cols="2,5", options="header"]
 |===
@@ -1586,37 +1661,6 @@ a|
 a|
 * Positive: Korrekte, stabile Team-Labels unabhängig von Array-Reihenfolge; keine geratene Nummerierung mehr; einheitliche Formatierung ("Herren"/"Damen" bzw. "{Altersklasse}{m\|w}") über alle Aufrufer hinweg.
 * Negative: Für alte oder unvollständige `metadata.json`-Einträge (geschrieben vor diesem Fix, ohne `teamAkjId`/`teamNumber`) greift ein weniger präziser Fallback (`teamLabel()`, rohe API-Teamname + Altersgruppe ohne Nummerierung), bis der nächste Update-Zyklus die Felder nachliefert.
-|===
-
-=== ADR-006: X-ALT-DESC für HTML-Beschreibungen (aktuell deaktiviert)
-
-[cols="2,5", options="header"]
-|===
-| Aspekt | Inhalt
-
-| *Status*
-| Deferred (vorläufig deaktiviert, Code vorhanden)
-
-| *Datum*
-| 2024
-
-| *Kontext*
-| ICS `DESCRIPTION` unterstützt nur Plain-Text. Microsoft Outlook und einige andere Clients unterstützen die nicht-standardisierte X-Property `X-ALT-DESC;FMTTYPE=text/html`, die eine HTML-Version der Beschreibung enthält und eine reichere Darstellung ermöglicht.
-
-| *Entscheidung*
-| Die Infrastruktur für `X-ALT-DESC` ist vollständig implementiert (`createHtmlDescription()`, Post-Processing-Logik in `generateICS()`), aber in der Event-Erzeugung temporär auskommentiert (`// htmlDescription`).
-
-| *Begründung*
-a|
-* `X-ALT-DESC` ist keine RFC-5545-Property — manche Clients ignorieren sie, andere verarbeiten sie fehlerhaft.
-* Debugging-Schwierigkeiten: HTML in ICS-Strings ist schwer zu verifizieren.
-* Implementierung ist fertig, Aktivierung erfordert Verifikation auf allen Zielclients.
-* Die Deaktivierung ist ein bewusstes temporäres Trade-off — Plain-Text DESCRIPTION ist universell kompatibel.
-
-| *Konsequenzen*
-a|
-* Aktuelle Konsequenz: Alle Clients zeigen Plain-Text-Beschreibungen. Funktionalität vollständig erhalten.
-* Zukünftige Aktivierung: Muss `buildEvent()` `htmlDescription` wieder befüllen und `createHtmlDescription()` testen. Besondere Sorgfalt bei Line-Folding (75-Zeichen-Limit) und HTML-in-ICS-Escaping erforderlich.
 |===
 
 == Qualitätsanforderungen
@@ -1818,9 +1862,9 @@ BBB ICS Generator — Qualitätsanforderungen
 | ID | Technische Schuld | Schweregrad | Empfohlene Maßnahme
 
 | TD-01
-| *Keine automatisierten Tests*: Es existieren weder Unit- noch Integrationstests für `icsGenerator.js`, `apiClient.js`, `storage.js` oder `cronUpdate.js`.
-| Hoch
-| Einführung von Unit-Tests (z. B. mit Jest oder Node's eingebautem `node:test`). Priorität: `icsGenerator.js` (RFC-5545-Validierung), `storage.js` (Path-Traversal-Schutz). Integrationstests mit gemockten API-Antworten für `cronUpdate.js`.
+| *Erledigt — ursprünglich „Keine automatisierten Tests"*: Zum Zeitpunkt der ersten Risikoanalyse existierten weder Unit- noch Integrationstests. Mittlerweile deckt `node:test` alle Kernmodule ab (`icsGenerator.js`, `apiClient.js`, `storage.js`, `cronUpdate.js`, `generateHTML.js`, `seasonArchive.js`), ergänzt um Playwright-Suiten für UI-Verhalten (`npm run test:ui`) und WCAG-2.1-AA-Konformität (`npm run test:a11y`).
+| Erledigt
+| Keine weitere Maßnahme nötig. Neue Features benötigen laut Projektkonvention (CLAUDE.md) weiterhin Tests als Teil der Implementierung, kein optionaler Nachschritt.
 
 | TD-02
 | *geocode.js nicht genutzt*: Das Modul `src/geocode.js` ist vorhanden, aber wird von keinem anderen Modul importiert oder aufgerufen (Dead Code).
@@ -1856,6 +1900,11 @@ BBB ICS Generator — Qualitätsanforderungen
 | *Keine Versionierung der API-Responses*: `apiClient.js` geht von einer stabilen JSON-Struktur aus. Abweichungen führen zu stillen Fehlern (z. B. `undefined` in Feldern).
 | Mittel
 | Schema-Validierung der API-Antworten (z. B. mit `zod` oder `joi`) einführen. Explizite Fehlermeldung wenn erwartete Felder fehlen. Verhindert stille Datenverluste bei API-Änderungen.
+
+| TD-09
+| *Bot-Commits in der main-Historie*: Der „Commit season archive"-Schritt (siehe ADR-014) committet bei Änderungen an `generated/archive/**` automatisiert als `github-actions[bot]` zurück auf `main`. Zusätzlich zu echten Code-Änderungen erscheinen dadurch regelmäßig automatisierte Commits in der Historie, was `git log`/`git blame` unübersichtlicher macht. `generated/archive/` ist zudem eine bewusste, dokumentierte Ausnahme vom sonst geltenden Prinzip, dass `generated/` reines, unversioniertes Build-Output ist (vgl. `.gitignore`).
+| Niedrig
+| Akzeptiertes Trade-off (siehe ADR-014, Abschnitt „Konsequenzen") — die Alternative (Datenverlust der Saison-Historie) wiegt schwerer. Falls die Historie zu unübersichtlich wird: `git log --invert-grep --author="github-actions"` oder ein `.mailmap`/`git log`-Alias zur Filterung dokumentieren.
 |===
 
 == Glossar
