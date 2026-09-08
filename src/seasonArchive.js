@@ -1,5 +1,8 @@
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
+
 function groupBySeasonId(matches) {
   const grouped = {};
   for (const m of matches) {
@@ -86,4 +89,30 @@ async function buildArchiveTeamEntry(teamMeta, seasonMatches, details, apiFns) {
   };
 }
 
-module.exports = { groupBySeasonId, buildArchiveTeamEntry };
+function archiveDir() {
+  const base = process.env.BBB_ICS_DIR || path.resolve(__dirname, '../generated');
+  const dir = path.join(base, 'archive');
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function assertValidSeason(season) {
+  if (!/^\d{4}$/.test(String(season))) {
+    throw new Error(`Ungültige season: ${season}`);
+  }
+}
+
+function saveArchive(season, data) {
+  assertValidSeason(season);
+  const filepath = path.join(archiveDir(), `${season}.json`);
+  fs.writeFileSync(filepath, JSON.stringify(data, null, 2), 'utf8');
+  return filepath;
+}
+
+function loadArchive(season) {
+  assertValidSeason(season);
+  const filepath = path.join(archiveDir(), `${season}.json`);
+  return fs.existsSync(filepath) ? JSON.parse(fs.readFileSync(filepath, 'utf8')) : null;
+}
+
+module.exports = { groupBySeasonId, buildArchiveTeamEntry, saveArchive, loadArchive };

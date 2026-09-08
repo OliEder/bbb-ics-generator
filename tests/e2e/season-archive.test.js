@@ -84,3 +84,47 @@ test('buildArchiveTeamEntry: Pokal-Wettbewerb bekommt bracket statt table', asyn
   assert.equal(entry.competitions[0].table, null);
   assert.ok(entry.competitions[0].bracket);
 });
+
+const { mkdtempSync, rmSync } = require('node:fs');
+const { tmpdir } = require('node:os');
+const { join } = require('node:path');
+
+function withTempDir(fn) {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-archive-'));
+  const modPath = require.resolve('../../src/seasonArchive');
+  delete require.cache[modPath];
+  process.env.BBB_ICS_DIR = dir;
+  try {
+    return fn(require('../../src/seasonArchive'), dir);
+  } finally {
+    delete process.env.BBB_ICS_DIR;
+    rmSync(dir, { recursive: true });
+  }
+}
+
+test('saveArchive/loadArchive: Round-trip', () => {
+  withTempDir(({ saveArchive, loadArchive }) => {
+    const data = { season: 2025, teams: { '100': { status: 'provisional', teams: [] } } };
+    saveArchive(2025, data);
+    const loaded = loadArchive(2025);
+    assert.deepEqual(loaded, data);
+  });
+});
+
+test('loadArchive: gibt null zurück wenn Datei nicht existiert', () => {
+  withTempDir(({ loadArchive }) => {
+    assert.equal(loadArchive(2099), null);
+  });
+});
+
+test('loadArchive: wirft bei ungültiger season (Path-Traversal-Schutz)', () => {
+  withTempDir(({ loadArchive }) => {
+    assert.throws(() => loadArchive('../../etc/passwd'), /Ungültige season/);
+  });
+});
+
+test('saveArchive: wirft bei ungültiger season', () => {
+  withTempDir(({ saveArchive }) => {
+    assert.throws(() => saveArchive('2025; rm -rf', {}), /Ungültige season/);
+  });
+});
