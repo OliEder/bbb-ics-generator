@@ -421,6 +421,36 @@ a|
 * CSS: `.result-icon`, `.result-icon--win`, `.result-icon--loss` in `buildSharedStyles`
 |===
 
+=== ADR-013: Team-Label-Ableitung aus teamAkjId/teamNumber statt Array-Position
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-08
+
+| *Kontext*
+| Auf der Live-Seite wurden Team-Labels teils falsch angezeigt (per Nutzer-Screenshot bestätigt): Senioren-Teams erschienen als "Senioren 1"/"Senioren 2"/"Senioren 3" — Herren- und Damen-Mannschaften wurden dabei in derselben Nummerierung vermischt, statt getrennt als "Herren"/"Damen" zu erscheinen. Jugend-Teams erschienen als "U14 1"/"U14 2" statt "U14m"/"U14w". Ursache: `spotlightTeamLabel()` nummerierte Teams anhand ihrer Position im `allTeams`-Array (bzw. der Iterationsreihenfolge), nicht anhand einer echten, stabilen Team-Kennung. Senioren-Teams erhielten zudem gar kein Kategorie-Präfix, sondern nur den rohen API-Teamnamen.
+
+| *Entscheidung*
+| Team-Labels werden aus den echten API-Feldern `teamAkjId` (Altersklassen-ID; `1` = Senioren), `teamGenderId` (als `gender` bereits vorhanden) und `teamNumber` (reale Team-Laufnummer) abgeleitet, die der bereits für Spieldaten aufgerufene Endpunkt `team/id/{id}/matches` liefert — kein zusätzlicher API-Aufruf nötig. Neue Funktion `buildTeamLabel(team, includeIcon = true)` in `generateHTML.js` kapselt die Ableitungslogik; `spotlightTeamLabel()` delegiert nun vollständig an sie, statt selbst zu nummerieren.
+
+| *Begründung*
+a|
+* Echte API-Daten (`teamAkjId`, `teamNumber`) sind stabil und korrekt unabhängig von Iterations- oder Sortierreihenfolge — im Gegensatz zur array-positionsbasierten Nummerierung, die von zufälliger/inzidenteller Ordnung abhing und Herren- und Damen-Teams derselben Altersklasse vermischte.
+* Der Endpunkt wird ohnehin für Spieldaten aufgerufen (`fetchTeamMatches`) — die zusätzlichen Felder sind ohne Mehrkosten verfügbar.
+* Eine zentrale Label-Funktion (`buildTeamLabel`) statt verstreuter Nummerierungslogik in mehreren Aufrufern reduziert das Risiko künftiger Inkonsistenzen zwischen Startseite, Team-Seite und Spotlight-Block.
+
+| *Konsequenzen*
+a|
+* Positive: Korrekte, stabile Team-Labels unabhängig von Array-Reihenfolge; keine geratene Nummerierung mehr; einheitliche Formatierung ("Herren"/"Damen" bzw. "{Altersklasse}{m\|w}") über alle Aufrufer hinweg.
+* Negative: Für alte oder unvollständige `metadata.json`-Einträge (geschrieben vor diesem Fix, ohne `teamAkjId`/`teamNumber`) greift ein weniger präziser Fallback (`teamLabel()`, rohe API-Teamname + Altersgruppe ohne Nummerierung), bis der nächste Update-Zyklus die Felder nachliefert.
+|===
+
 === ADR-006: X-ALT-DESC für HTML-Beschreibungen (aktuell deaktiviert)
 
 [cols="2,5", options="header"]
