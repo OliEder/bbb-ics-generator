@@ -154,6 +154,37 @@ a|
 * Negative: Das Zeitfenster ist für alle Spiele gleich — Überstunden (Verlängerung, Overtime) werden nicht dynamisch erfasst. Die Kickoff-Zeit stammt aus der API; Zeitplanänderungen kurzfristig vor dem Spiel werden erst beim nächsten Update-Zyklus reflektiert.
 |===
 
+=== ADR-006: X-ALT-DESC für HTML-Beschreibungen (aktuell deaktiviert)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Deferred (vorläufig deaktiviert, Code vorhanden)
+
+| *Datum*
+| 2024
+
+| *Kontext*
+| ICS `DESCRIPTION` unterstützt nur Plain-Text. Microsoft Outlook und einige andere Clients unterstützen die nicht-standardisierte X-Property `X-ALT-DESC;FMTTYPE=text/html`, die eine HTML-Version der Beschreibung enthält und eine reichere Darstellung ermöglicht.
+
+| *Entscheidung*
+| Die Infrastruktur für `X-ALT-DESC` ist vollständig implementiert (`createHtmlDescription()`, Post-Processing-Logik in `generateICS()`), aber in der Event-Erzeugung temporär auskommentiert (`// htmlDescription`).
+
+| *Begründung*
+a|
+* `X-ALT-DESC` ist keine RFC-5545-Property — manche Clients ignorieren sie, andere verarbeiten sie fehlerhaft.
+* Debugging-Schwierigkeiten: HTML in ICS-Strings ist schwer zu verifizieren.
+* Implementierung ist fertig, Aktivierung erfordert Verifikation auf allen Zielclients.
+* Die Deaktivierung ist ein bewusstes temporäres Trade-off — Plain-Text DESCRIPTION ist universell kompatibel.
+
+| *Konsequenzen*
+a|
+* Aktuelle Konsequenz: Alle Clients zeigen Plain-Text-Beschreibungen. Funktionalität vollständig erhalten.
+* Zukünftige Aktivierung: Muss `buildEvent()` `htmlDescription` wieder befüllen und `createHtmlDescription()` testen. Besondere Sorgfalt bei Line-Folding (75-Zeichen-Limit) und HTML-in-ICS-Escaping erforderlich.
+|===
+
 === ADR-007: Tab-basierte UI statt Flat-Button-Liste
 
 [cols="2,5", options="header"]
@@ -343,7 +374,45 @@ a|
 * Negative: GB macht wenig Sinn bei sehr ungleicher Spielanzahl (unterschiedlich viele Spiele absolviert). Bei Gleichstand (GB = 0.5) wird `.toFixed(1)` angezeigt — leicht ungewohnt für deutsche Nutzer.
 |===
 
-=== ADR-013: Saison-Archivierung mit Rolling-Update-Mechanismus und Persistenz nicht gemeldeter Teams
+=== ADR-013: Outline-SVG-Icons statt Farbe für Sieg/Niederlage-Anzeige
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-04-21
+
+| *Kontext*
+| Vergangene Spielergebnisse sollen auf einen Blick als Sieg oder Niederlage erkennbar sein. Die ursprüngliche Lösung (fetter eigener Score) hob sich nicht genug ab. Alternativen wie Rot/Grün-Färbung scheiden wegen Farbenblindheit und Konflikt mit konfigurierbaren Teamfarben (`--color-primary`, `--color-accent`) aus. Opacity-/Dimming-Ansätze verletzen WCAG 2.1 AA (Kontrastverhältnis min. 4.5:1).
+
+| *Entscheidung*
+a|
+* Sieg: Outline-Pokal-SVG-Icon (`aria-label="Sieg"`, `role="img"`, `stroke="currentColor"`, 14×14px)
+* Niederlage: ✕-SVG-Icon (`aria-label="Niederlage"`, `role="img"`, `stroke="currentColor"`, 14×14px)
+* Kein Icon bei zukünftigen Spielen (kein `result`) und Unentschieden
+* Spielzeilen zweizeilig: Zeile 1 = Datum · Gegner + Icon + Ergebnis, Zeile 2 = Liganame
+
+| *Begründung*
+a|
+* `stroke="currentColor"` — keine fixen Farben, kein Konflikt mit konfigurierbaren Teamfarben
+* Form statt Farbe — farbenblinde Nutzer erkennen Sieg/Niederlage am Symbol, nicht an der Farbe
+* Kein Dimmen — kein Kontrastverlust, WCAG 2.1 AA bleibt gewahrt
+* `aria-label` auf SVGs — Screenreader-zugänglich
+* Zweizeiliges Layout löst das Mobilproblem mit langen Liganamen (keine Abschneidung mehr)
+
+| *Konsequenzen*
+a|
+* `isWin(match)` und `resultIcon(match)` als wiederverwendbare Hilfsfunktionen in `generateHTML.js`
+* Drei Render-Funktionen nutzen `resultIcon`: `buildScheduleRow`, `buildTeaserCard`, `buildSpotlightBlock`
+* `<strong>`-basierte Score-Hervorhebung in allen drei Bereichen entfernt
+* CSS: `.result-icon`, `.result-icon--win`, `.result-icon--loss` in `buildSharedStyles`
+|===
+
+=== ADR-014: Saison-Archivierung mit Rolling-Update-Mechanismus und Persistenz nicht gemeldeter Teams
 
 [cols="2,5", options="header"]
 |===
@@ -383,45 +452,7 @@ a|
 * Negative: Bot-Commits (`github-actions[bot]`) erscheinen regelmäßig in der Commit-Historie von `main`, zusätzlich zu echten Code-Änderungen. `generated/archive/` ist eine bewusste, hier dokumentierte Ausnahme vom sonst in diesem Repo geltenden Prinzip, dass `generated/` reines, unversioniertes Build-Output ist (vgl. `.gitignore` und ADR-Kontext an anderer Stelle) — diese Ausnahme muss bei zukünftigen Änderungen an der `.gitignore`-Strategie berücksichtigt werden.
 |===
 
-=== ADR-007: Outline-SVG-Icons statt Farbe für Sieg/Niederlage-Anzeige
-
-[cols="2,5", options="header"]
-|===
-| Aspekt | Inhalt
-
-| *Status*
-| Akzeptiert
-
-| *Datum*
-| 2026-04-21
-
-| *Kontext*
-| Vergangene Spielergebnisse sollen auf einen Blick als Sieg oder Niederlage erkennbar sein. Die ursprüngliche Lösung (fetter eigener Score) hob sich nicht genug ab. Alternativen wie Rot/Grün-Färbung scheiden wegen Farbenblindheit und Konflikt mit konfigurierbaren Teamfarben (`--color-primary`, `--color-accent`) aus. Opacity-/Dimming-Ansätze verletzen WCAG 2.1 AA (Kontrastverhältnis min. 4.5:1).
-
-| *Entscheidung*
-a|
-* Sieg: Outline-Pokal-SVG-Icon (`aria-label="Sieg"`, `role="img"`, `stroke="currentColor"`, 14×14px)
-* Niederlage: ✕-SVG-Icon (`aria-label="Niederlage"`, `role="img"`, `stroke="currentColor"`, 14×14px)
-* Kein Icon bei zukünftigen Spielen (kein `result`) und Unentschieden
-* Spielzeilen zweizeilig: Zeile 1 = Datum · Gegner + Icon + Ergebnis, Zeile 2 = Liganame
-
-| *Begründung*
-a|
-* `stroke="currentColor"` — keine fixen Farben, kein Konflikt mit konfigurierbaren Teamfarben
-* Form statt Farbe — farbenblinde Nutzer erkennen Sieg/Niederlage am Symbol, nicht an der Farbe
-* Kein Dimmen — kein Kontrastverlust, WCAG 2.1 AA bleibt gewahrt
-* `aria-label` auf SVGs — Screenreader-zugänglich
-* Zweizeiliges Layout löst das Mobilproblem mit langen Liganamen (keine Abschneidung mehr)
-
-| *Konsequenzen*
-a|
-* `isWin(match)` und `resultIcon(match)` als wiederverwendbare Hilfsfunktionen in `generateHTML.js`
-* Drei Render-Funktionen nutzen `resultIcon`: `buildScheduleRow`, `buildTeaserCard`, `buildSpotlightBlock`
-* `<strong>`-basierte Score-Hervorhebung in allen drei Bereichen entfernt
-* CSS: `.result-icon`, `.result-icon--win`, `.result-icon--loss` in `buildSharedStyles`
-|===
-
-=== ADR-013: Team-Label-Ableitung aus teamAkjId/teamNumber statt Array-Position
+=== ADR-015: Team-Label-Ableitung aus teamAkjId/teamNumber statt Array-Position
 
 [cols="2,5", options="header"]
 |===
@@ -449,35 +480,4 @@ a|
 a|
 * Positive: Korrekte, stabile Team-Labels unabhängig von Array-Reihenfolge; keine geratene Nummerierung mehr; einheitliche Formatierung ("Herren"/"Damen" bzw. "{Altersklasse}{m\|w}") über alle Aufrufer hinweg.
 * Negative: Für alte oder unvollständige `metadata.json`-Einträge (geschrieben vor diesem Fix, ohne `teamAkjId`/`teamNumber`) greift ein weniger präziser Fallback (`teamLabel()`, rohe API-Teamname + Altersgruppe ohne Nummerierung), bis der nächste Update-Zyklus die Felder nachliefert.
-|===
-
-=== ADR-006: X-ALT-DESC für HTML-Beschreibungen (aktuell deaktiviert)
-
-[cols="2,5", options="header"]
-|===
-| Aspekt | Inhalt
-
-| *Status*
-| Deferred (vorläufig deaktiviert, Code vorhanden)
-
-| *Datum*
-| 2024
-
-| *Kontext*
-| ICS `DESCRIPTION` unterstützt nur Plain-Text. Microsoft Outlook und einige andere Clients unterstützen die nicht-standardisierte X-Property `X-ALT-DESC;FMTTYPE=text/html`, die eine HTML-Version der Beschreibung enthält und eine reichere Darstellung ermöglicht.
-
-| *Entscheidung*
-| Die Infrastruktur für `X-ALT-DESC` ist vollständig implementiert (`createHtmlDescription()`, Post-Processing-Logik in `generateICS()`), aber in der Event-Erzeugung temporär auskommentiert (`// htmlDescription`).
-
-| *Begründung*
-a|
-* `X-ALT-DESC` ist keine RFC-5545-Property — manche Clients ignorieren sie, andere verarbeiten sie fehlerhaft.
-* Debugging-Schwierigkeiten: HTML in ICS-Strings ist schwer zu verifizieren.
-* Implementierung ist fertig, Aktivierung erfordert Verifikation auf allen Zielclients.
-* Die Deaktivierung ist ein bewusstes temporäres Trade-off — Plain-Text DESCRIPTION ist universell kompatibel.
-
-| *Konsequenzen*
-a|
-* Aktuelle Konsequenz: Alle Clients zeigen Plain-Text-Beschreibungen. Funktionalität vollständig erhalten.
-* Zukünftige Aktivierung: Muss `buildEvent()` `htmlDescription` wieder befüllen und `createHtmlDescription()` testen. Besondere Sorgfalt bei Line-Folding (75-Zeichen-Limit) und HTML-in-ICS-Escaping erforderlich.
 |===
