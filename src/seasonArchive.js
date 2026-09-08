@@ -115,4 +115,37 @@ function loadArchive(season) {
   return fs.existsSync(filepath) ? JSON.parse(fs.readFileSync(filepath, 'utf8')) : null;
 }
 
-module.exports = { groupBySeasonId, buildArchiveTeamEntry, saveArchive, loadArchive };
+async function updateArchiveForTeam(teamMeta, groupedBySeason, currentSeasonId, details, apiFns) {
+  const seasonIds = Object.keys(groupedBySeason).map(Number);
+  const olderSeasonIds = seasonIds.filter(id => id !== currentSeasonId);
+
+  for (const seasonId of olderSeasonIds) {
+    const seasonMatches = groupedBySeason[seasonId];
+    const entry = await buildArchiveTeamEntry(teamMeta, seasonMatches, details, apiFns);
+    const archive = loadArchive(seasonId) || { season: seasonId, teams: {} };
+    archive.teams[teamMeta.id] = {
+      ...entry,
+      status: 'provisional',
+      lastSeenAt: new Date().toISOString(),
+    };
+    saveArchive(seasonId, archive);
+  }
+
+  // Saisons, die vorher provisional waren, aber jetzt nicht mehr in den
+  // Rohdaten auftauchen, gelten als final — der zuletzt gespeicherte Stand
+  // bleibt unverändert stehen.
+  const seenSeasonIds = new Set(olderSeasonIds);
+  const archiveFiles = fs.readdirSync(archiveDir()).filter(f => f.endsWith('.json'));
+  for (const file of archiveFiles) {
+    const seasonId = Number(file.replace('.json', ''));
+    if (seenSeasonIds.has(seasonId) || seasonId === currentSeasonId) continue;
+    const archive = loadArchive(seasonId);
+    const teamEntry = archive?.teams?.[teamMeta.id];
+    if (teamEntry && teamEntry.status === 'provisional') {
+      teamEntry.status = 'final';
+      saveArchive(seasonId, archive);
+    }
+  }
+}
+
+module.exports = { groupBySeasonId, buildArchiveTeamEntry, saveArchive, loadArchive, updateArchiveForTeam };

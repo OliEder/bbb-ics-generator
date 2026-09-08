@@ -128,3 +128,111 @@ test('saveArchive: wirft bei ungültiger season', () => {
     assert.throws(() => saveArchive('2025; rm -rf', {}), /Ungültige season/);
   });
 });
+
+const { updateArchiveForTeam } = require('../../src/seasonArchive');
+
+const noopApiFns = {
+  fetchLeagueTable: async () => null,
+  fetchTournamentRounds: async () => null,
+};
+
+async function withTempDirAsync(fn) {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-archive-'));
+  const modPath = require.resolve('../../src/seasonArchive');
+  delete require.cache[modPath];
+  process.env.BBB_ICS_DIR = dir;
+  try {
+    return await fn(require('../../src/seasonArchive'), dir);
+  } finally {
+    delete process.env.BBB_ICS_DIR;
+    rmSync(dir, { recursive: true });
+  }
+}
+
+test('updateArchiveForTeam: neue Saison und alte Saison gleichzeitig → alte Saison wird provisional archiviert', async () => {
+  await withTempDirAsync(async ({ updateArchiveForTeam, loadArchive }) => {
+    const groupedBySeason = {
+      2025: [makeMatch({ matchId: 1, seasonId: 2025, result: '80:70' })],
+      2026: [makeMatch({ matchId: 2, seasonId: 2026, result: null })],
+    };
+    const teamMeta = { id: '100', name: 'Eigenes Team', ageGroup: 'U18', gender: 'männlich' };
+
+    await updateArchiveForTeam(teamMeta, groupedBySeason, 2026, {}, noopApiFns);
+
+    const archive2025 = loadArchive(2025);
+    assert.ok(archive2025, 'Archiv für 2025 wurde angelegt');
+    assert.equal(archive2025.teams['100'].status, 'provisional');
+    assert.equal(archive2025.teams['100'].matches.length, 1);
+
+    assert.equal(loadArchive(2026), null, 'Aktuelle Saison wird nicht archiviert');
+  });
+});
+
+test('updateArchiveForTeam: alte Saison verschwindet → status wird final, Daten bleiben erhalten', async () => {
+  await withTempDirAsync(async ({ updateArchiveForTeam, loadArchive, saveArchive }) => {
+    saveArchive(2025, {
+      season: 2025,
+      teams: {
+        '100': { teamName: 'Eigenes Team', ageGroup: 'U18', gender: 'männlich', status: 'provisional', lastSeenAt: '2026-09-01T00:00:00.000Z', matches: [{ result: '80:70' }], competitions: [] },
+      },
+    });
+    const teamMeta = { id: '100', name: 'Eigenes Team', ageGroup: 'U18', gender: 'männlich' };
+    const groupedBySeason = { 2026: [makeMatch({ matchId: 2, seasonId: 2026, result: null })] };
+
+    await updateArchiveForTeam(teamMeta, groupedBySeason, 2026, {}, noopApiFns);
+
+    const archive2025 = loadArchive(2025);
+    assert.equal(archive2025.teams['100'].status, 'final');
+    assert.equal(archive2025.teams['100'].matches.length, 1, 'letzter bekannter Stand bleibt erhalten');
+  });
+});
+
+test('updateArchiveForTeam: nur eine Saison vorhanden → kein Archiv-Eintrag', async () => {
+  await withTempDirAsync(async ({ updateArchiveForTeam, loadArchive }) => {
+    const teamMeta = { id: '100', name: 'Eigenes Team', ageGroup: 'U18', gender: 'männlich' };
+    const groupedBySeason = { 2026: [makeMatch({ matchId: 1, seasonId: 2026 })] };
+
+    await updateArchiveForTeam(teamMeta, groupedBySeason, 2026, {}, noopApiFns);
+
+    assert.equal(loadArchive(2026), null);
+  });
+});
+
+test('updateArchiveForTeam: final gewordene Saison wird nicht erneut überschrieben, wenn sie weiterhin fehlt', async () => {
+  await withTempDirAsync(async ({ updateArchiveForTeam, loadArchive, saveArchive }) => {
+    saveArchive(2025, {
+      season: 2025,
+      teams: {
+        '100': { teamName: 'Eigenes Team', ageGroup: 'U18', gender: 'männlich', status: 'final', lastSeenAt: '2026-09-01T00:00:00.000Z', matches: [{ result: '80:70' }], competitions: [] },
+      },
+    });
+    const teamMeta = { id: '100', name: 'Eigenes Team', ageGroup: 'U18', gender: 'männlich' };
+    const groupedBySeason = { 2026: [makeMatch({ matchId: 2, seasonId: 2026 })] };
+
+    await updateArchiveForTeam(teamMeta, groupedBySeason, 2026, {}, noopApiFns);
+
+    const archive2025 = loadArchive(2025);
+    assert.equal(archive2025.teams['100'].status, 'final');
+    assert.equal(archive2025.teams['100'].lastSeenAt, '2026-09-01T00:00:00.000Z', 'final-Eintrag wird nicht erneut angefasst');
+  });
+});
+
+test('updateArchiveForTeam: Archiv-Eintrag eines anderen Teams bleibt unangetastet (kein aktives Löschen)', async () => {
+  await withTempDirAsync(async ({ updateArchiveForTeam, loadArchive, saveArchive }) => {
+    saveArchive(2025, {
+      season: 2025,
+      teams: {
+        '999': { teamName: 'Anderes Team', ageGroup: 'U16', gender: 'weiblich', status: 'final', lastSeenAt: '2026-08-01T00:00:00.000Z', matches: [{ result: '60:55' }], competitions: [] },
+      },
+    });
+    const teamMeta = { id: '100', name: 'Eigenes Team', ageGroup: 'U18', gender: 'männlich' };
+    const groupedBySeason = { 2026: [makeMatch({ matchId: 1, seasonId: 2026 })] };
+
+    await updateArchiveForTeam(teamMeta, groupedBySeason, 2026, {}, noopApiFns);
+
+    const archive2025 = loadArchive(2025);
+    assert.ok(archive2025.teams['999'], 'Archiv-Eintrag eines anderen Teams darf nicht verschwinden');
+    assert.equal(archive2025.teams['999'].status, 'final');
+    assert.equal(archive2025.teams['100'], undefined, 'Team ohne Vorsaison-Daten bekommt keinen Archiv-Eintrag');
+  });
+});
