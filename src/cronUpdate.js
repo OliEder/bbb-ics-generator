@@ -180,8 +180,8 @@ async function updateAll() {
         { fetchLeagueTable, fetchTournamentRounds }
       );
 
-      const seasonMatches = matches
-        .filter(m => m.ligaData?.seasonId === seasonId)
+      const seasonMatches = (groupedBySeason[seasonId] || [])
+        .slice()
         .sort((a, b) => {
           const da = (a.kickoffDate || '') + (a.kickoffTime || '');
           const db = (b.kickoffDate || '') + (b.kickoffTime || '');
