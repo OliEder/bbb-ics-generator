@@ -1305,6 +1305,24 @@ test('buildTabScript: enthält Clipboard-Handler für btn--copy', () => {
     assert.ok(!label.includes('<script>'), 'Roher <script>-Tag darf nicht im Output landen');
     assert.ok(label.includes('&lt;script&gt;'), 'teamName muss escaped sein');
   });
+
+  test('buildTeamLabel: includeIcon=false liefert reinen Text ohne Gender-Icon-Span', () => {
+    const label = buildTeamLabel({ teamName: 'Fibalon Baskets Neumarkt', ageGroup: 'U16', gender: 'männlich', teamAkjId: 16, teamNumber: 1 }, false);
+    assert.ok(!label.includes('gender-sym'), 'Kein eingebettetes Icon-Span wenn includeIcon=false');
+    assert.equal(label, 'U16m');
+  });
+
+  test('buildTeamLabel: includeIcon=false im Fallback-Pfad liefert ebenfalls reinen Text ohne Icon', () => {
+    const label = buildTeamLabel({ teamName: 'Fibalon Baskets Neumarkt', ageGroup: 'U16', gender: 'männlich' }, false);
+    assert.ok(!label.includes('gender-sym'), 'Kein eingebettetes Icon-Span im Fallback-Pfad');
+    assert.ok(label.includes('Fibalon Baskets Neumarkt'));
+  });
+
+  test('spotlightTeamLabel: liefert reinen Text ohne eingebettetes Icon (kein Doppel-Escaping am Spotlight-Aufrufer)', () => {
+    const { spotlightTeamLabel } = require('../../src/generateHTML.js')._testExports;
+    const label = spotlightTeamLabel({ teamName: 'Fibalon Baskets Neumarkt 2', ageGroup: 'Senioren', gender: 'männlich', teamAkjId: 1, teamNumber: 2 }, []);
+    assert.equal(label, 'Herren 2', 'spotlightTeamLabel darf kein Icon-HTML einbetten, da buildSpotlightBlock es separat rendert und escaped');
+  });
 }
 
 // --- buildSpotlightBlock: result icons ---

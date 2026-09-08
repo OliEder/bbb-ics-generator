@@ -32,13 +32,19 @@ function teamLabel(teamName, ageGroup, gender) {
 // bekommen "Herren"/"Damen", Jugend-Teams "{Altersklasse}{m|w}" (z.B. "U16m").
 // Bei teamNumber > 1 wird die Nummer angehängt. Fällt auf teamLabel() zurück,
 // wenn teamAkjId/teamNumber fehlen (z.B. alte metadata.json-Einträge).
-function buildTeamLabel(team) {
+// includeIcon: false liefert reinen Text ohne eingebettetes Gender-Icon-Span —
+// nötig für Aufrufer wie buildSpotlightBlock, die das Icon bereits separat
+// rendern und den Rückgabewert selbst durch escapeHtml() schicken (ein
+// eingebettetes <i>-Tag würde dort doppelt escaped statt gerendert).
+function buildTeamLabel(team, includeIcon = true) {
   if (team.teamAkjId == null || team.teamNumber == null) {
-    return teamLabel(team.teamName, team.ageGroup, team.gender);
+    if (includeIcon) return teamLabel(team.teamName, team.ageGroup, team.gender);
+    const ag = String(team.ageGroup || '').trim().toUpperCase();
+    const isSenioren = ag === 'SENIOREN' || ag === 'HERREN' || !ag;
+    const agPart = (!isSenioren && team.ageGroup) ? ` ${escapeHtml(team.ageGroup)}` : '';
+    return `${escapeHtml(team.teamName || '')}${agPart}`;
   }
 
-  const sym = genderSpan(team.gender);
-  const symPart = sym ? ` ${sym}` : '';
   const isSeniors = team.teamAkjId === 1;
   const genderLetter = team.gender === 'weiblich' ? 'w' : 'm';
   const numberSuffix = team.teamNumber > 1 ? ` ${team.teamNumber}` : '';
@@ -51,6 +57,10 @@ function buildTeamLabel(team) {
     base = `${ag}${genderLetter}`;
   }
 
+  if (!includeIcon) return `${escapeHtml(base)}${numberSuffix}`;
+
+  const sym = genderSpan(team.gender);
+  const symPart = sym ? ` ${sym}` : '';
   return `${escapeHtml(base)}${numberSuffix}${symPart}`;
 }
 
@@ -927,7 +937,7 @@ function buildNextGameTeaser(team) {
 // array position (previous bug: "Senioren 1"/"Senioren 2" for men's/women's
 // senior teams lumped together, "U14 1"/"U14 2" instead of "U14m"/"U14w").
 function spotlightTeamLabel(team, allTeams) {
-  return buildTeamLabel(team);
+  return buildTeamLabel(team, false);
 }
 
 function buildSpotlightBlock(teams, cupColor) {
