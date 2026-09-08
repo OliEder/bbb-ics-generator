@@ -13,7 +13,12 @@ async function fetchTeamMatches(teamId) {
     if (genderId === 1) gender = 'männlich';
     else if (genderId === 2) gender = 'weiblich';
     else if (genderId === 3) gender = 'mix';
-    return { matches: data.matches || [], gender };
+    return {
+      matches: data.matches || [],
+      gender,
+      teamAkjId: data.team?.teamAkjId,
+      teamNumber: data.team?.teamNumber,
+    };
   } catch (err) {
     console.error('API error for matches', teamId, err.response ? err.response.status : err.message);
     return { matches: [], gender: '' };

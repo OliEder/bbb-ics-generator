@@ -146,7 +146,7 @@ async function updateAll() {
       console.log(`[DEBUG] Starte Update für Team ${t.id} (${t.name})`);
 
       // Matches abrufen
-      const { matches, gender: teamGender } = await fetchTeamMatches(t.id);
+      const { matches, gender: teamGender, teamAkjId, teamNumber } = await fetchTeamMatches(t.id);
       console.log(`[DEBUG] API-Matches: ${matches.length}`);
 
       if (!Array.isArray(matches) || matches.length === 0) {
@@ -235,6 +235,8 @@ async function updateAll() {
         teamName:       t.name,
         ageGroup:       t.ageGroup,
         gender:         teamGender || t.gender,
+        teamAkjId,
+        teamNumber,
         lastUpdate:     new Date().toISOString(),
         matchCount:     matches.length,
         homeMatchCount: homeMatches.length,
