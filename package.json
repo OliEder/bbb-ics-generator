@@ -17,7 +17,7 @@
     "test:ui:report": "PLAYWRIGHT_JSON_OUTPUT_NAME=test-results.json playwright test --project=chromium-ui --reporter=json,html && node scripts/analyze-report.js"
   },
   "dependencies": {
-    "axios": "^1.7.9",
+    "axios": "^1.18.0",
     "express": "^4.21.2",
     "ics": "^3.8.1",
     "node-cron": "^3.0.3"
