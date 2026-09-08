@@ -6,7 +6,7 @@ const config = require('../config.json');
 const fs = require('fs');
 const path = require('path');
 
-const CURRENT_SEASON = 2025; // Saison 2025/26
+const CURRENT_SEASON = 2026; // Saison 2025/26
 const BBB_MEDIA_BASE = 'https://www.basketball-bund.net/media/team';
 
 function isLiga(liganame) {
