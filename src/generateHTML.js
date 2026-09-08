@@ -969,7 +969,10 @@ function buildSpotlightBlock(teams, cupColor) {
         rows.push(`<div class="spotlight-date-heading">${heading}</div>`);
       }
 
-      const shortLabel = escapeHtml(spotlightTeamLabel(team, teams));
+      // spotlightTeamLabel() bereits selbst escaped (via buildTeamLabel) — kein
+      // zusätzliches escapeHtml() hier, sonst würden Sonderzeichen in Team-/
+      // Altersklassennamen doppelt escaped (z.B. "&amp;" statt "&").
+      const shortLabel = spotlightTeamLabel(team, teams);
       const genderHtml = genderSpan(team.gender);
       const opponent = escapeHtml(m.opponent || (m.opponentShort || ''));
       const vsPrefix = m.isHome ? 'vs.' : '@';

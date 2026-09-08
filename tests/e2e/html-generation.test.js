@@ -921,6 +921,22 @@ test('buildSpotlightBlock: rendert Spiele aller Teams chronologisch', () => {
   assert.ok(html.includes('Roth'), 'Gegner fehlt');
 });
 
+test('buildSpotlightBlock: Sonderzeichen in ageGroup/teamName werden nicht doppelt escaped', () => {
+  const { buildSpotlightBlock } = require('../../src/generateHTML.js')._testExports;
+  const teams = [
+    {
+      teamId: 'T1', teamName: 'TV Bar & Ball', ageGroup: 'U16', gender: 'männlich',
+      teamAkjId: 16, teamNumber: 1,
+      spotlightMatches: [
+        { date: '2026-04-20', time: '18:00', isHome: true, opponent: 'Gegner', opponentShort: 'GG', ownShort: 'NM', result: null, competition: 'Bezirksliga', isNext: true },
+      ],
+    },
+  ];
+  const html = buildSpotlightBlock(teams, '#7c3aed');
+  assert.ok(!html.includes('&amp;amp;'), 'Kein doppelt escaptes "&" im spotlight-team-Label');
+  assert.ok(html.includes('U16m'), 'Label sollte "U16m" enthalten (einfach escaped)');
+});
+
 test('buildSpotlightBlock: Heim-Tab enthält nur Heimspiele', () => {
   const { buildSpotlightBlock } = require('../../src/generateHTML.js')._testExports;
   const teams = [
@@ -1324,10 +1340,10 @@ test('buildTabScript: enthält Clipboard-Handler für btn--copy', () => {
     assert.ok(label.includes('&lt;script&gt;'), 'teamName muss escaped sein');
   });
 
-  test('spotlightTeamLabel: liefert reinen Text ohne eingebettetes Icon (kein Doppel-Escaping am Spotlight-Aufrufer)', () => {
+  test('spotlightTeamLabel: liefert reinen Text ohne eingebettetes Icon', () => {
     const { spotlightTeamLabel } = require('../../src/generateHTML.js')._testExports;
     const label = spotlightTeamLabel({ teamName: 'Fibalon Baskets Neumarkt 2', ageGroup: 'Senioren', gender: 'männlich', teamAkjId: 1, teamNumber: 2 }, []);
-    assert.equal(label, 'Herren 2', 'spotlightTeamLabel darf kein Icon-HTML einbetten, da buildSpotlightBlock es separat rendert und escaped');
+    assert.equal(label, 'Herren 2', 'spotlightTeamLabel darf kein Icon-HTML einbetten, da buildSpotlightBlock es separat rendert');
   });
 }
 
