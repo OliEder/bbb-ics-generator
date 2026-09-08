@@ -403,3 +403,48 @@ test('updateAll: Team, das wieder in der API-Team-Liste auftaucht, verliert notC
     }
   }
 });
+
+test('updateAll: übernimmt teamAkjId und teamNumber in metadata.json', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-cron-label-'));
+  const originalIcsDir = process.env.BBB_ICS_DIR;
+  process.env.BBB_ICS_DIR = dir;
+
+  for (const mod of ['../../src/cronUpdate', '../../src/storage', '../../src/seasonArchive', '../../src/apiClient', '../../src/generateHTML']) {
+    delete require.cache[require.resolve(mod)];
+  }
+
+  const seniorsMatch = makeMatch({ matchId: 1, teamId: 167890, result: null, date: '2026-10-01' });
+
+  t.mock.method(axios, 'get', (url) => {
+    if (url.includes('/club/id/')) {
+      return Promise.resolve({ data: { data: { matches: [
+        { homeTeam: { teamPermanentId: 167890, clubId: 4468, teamname: 'Fibalon Baskets Neumarkt 2' }, guestTeam: { teamPermanentId: 999999, clubId: 1, teamname: 'Gegner' }, ligaData: { akName: 'Senioren', geschlecht: 'männlich' } },
+      ] } } });
+    }
+    if (url.includes('/team/id/')) {
+      return Promise.resolve({ data: { data: { team: { teamGenderId: 1, teamAkjId: 1, teamNumber: 2 }, matches: [seniorsMatch] } } });
+    }
+    if (url.includes('/match/id/')) return Promise.resolve({ data: { data: {} } });
+    if (url.includes('/competition/table/')) return Promise.resolve({ data: { data: { tabelle: { entries: [] } } } });
+    if (url.includes('/competition/spielplan/')) return Promise.resolve({ data: { data: { spieltage: [] } } });
+    return Promise.reject(new Error(`Unerwarteter Request in Test: ${url}`));
+  });
+
+  try {
+    const cronUpdate = require('../../src/cronUpdate');
+    await cronUpdate.updateAll();
+
+    const meta = JSON.parse(readFileSync(join(dir, 'metadata.json'), 'utf8'));
+    const team = meta.find(t => t.teamId === '167890');
+    assert.ok(team, 'Team wurde verarbeitet');
+    assert.equal(team.teamAkjId, 1);
+    assert.equal(team.teamNumber, 2);
+  } finally {
+    if (originalIcsDir === undefined) delete process.env.BBB_ICS_DIR;
+    else process.env.BBB_ICS_DIR = originalIcsDir;
+    rmSync(dir, { recursive: true });
+    for (const mod of ['../../src/cronUpdate', '../../src/storage', '../../src/seasonArchive', '../../src/apiClient', '../../src/generateHTML']) {
+      delete require.cache[require.resolve(mod)];
+    }
+  }
+});
