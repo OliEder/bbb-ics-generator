@@ -1257,6 +1257,56 @@ test('buildTabScript: enthält Clipboard-Handler für btn--copy', () => {
   });
 }
 
+// --- buildTeamLabel ---
+{
+  const { _testExports } = require('../../src/generateHTML.js');
+  const { buildTeamLabel } = _testExports;
+
+  test('buildTeamLabel: Herren ohne Nummer', () => {
+    const label = buildTeamLabel({ teamName: 'Fibalon Baskets Neumarkt', ageGroup: 'Senioren', gender: 'männlich', teamAkjId: 1, teamNumber: 1 });
+    assert.match(label, /^Herren($| )/);
+    assert.ok(!label.includes('Herren 1'), 'Bei teamNumber 1 keine Nummer anhängen');
+  });
+
+  test('buildTeamLabel: Herren mit Nummer', () => {
+    const label = buildTeamLabel({ teamName: 'Fibalon Baskets Neumarkt 2', ageGroup: 'Senioren', gender: 'männlich', teamAkjId: 1, teamNumber: 2 });
+    assert.ok(label.startsWith('Herren 2'), `Erwartet "Herren 2..." bekommen: ${label}`);
+  });
+
+  test('buildTeamLabel: Damen ohne Nummer', () => {
+    const label = buildTeamLabel({ teamName: 'Fibalon Baskets Neumarkt', ageGroup: 'Senioren', gender: 'weiblich', teamAkjId: 1, teamNumber: 1 });
+    assert.ok(label.startsWith('Damen'), `Erwartet "Damen..." bekommen: ${label}`);
+    assert.ok(!label.includes('Damen 1'));
+  });
+
+  test('buildTeamLabel: Jugend männlich ohne Nummer (U16m)', () => {
+    const label = buildTeamLabel({ teamName: 'Fibalon Baskets Neumarkt', ageGroup: 'U16', gender: 'männlich', teamAkjId: 16, teamNumber: 1 });
+    assert.ok(label.startsWith('U16m'), `Erwartet "U16m..." bekommen: ${label}`);
+  });
+
+  test('buildTeamLabel: Jugend weiblich mit Nummer (U14w 2)', () => {
+    const label = buildTeamLabel({ teamName: 'Fibalon Baskets Neumarkt', ageGroup: 'U14', gender: 'weiblich', teamAkjId: 14, teamNumber: 2 });
+    assert.ok(label.startsWith('U14w 2'), `Erwartet "U14w 2..." bekommen: ${label}`);
+  });
+
+  test('buildTeamLabel: Fallback auf alten Vereinsnamen wenn teamAkjId/teamNumber fehlen', () => {
+    const label = buildTeamLabel({ teamName: 'Fibalon Baskets Neumarkt', ageGroup: 'U16', gender: 'männlich' });
+    assert.ok(label.includes('Fibalon Baskets Neumarkt'), `Fallback sollte teamName enthalten, bekommen: ${label}`);
+    assert.ok(label.includes('U16'), `Fallback sollte Altersklasse enthalten, bekommen: ${label}`);
+  });
+
+  test('buildTeamLabel: enthält weiterhin das Gender-Icon', () => {
+    const label = buildTeamLabel({ teamName: 'Fibalon Baskets Neumarkt', ageGroup: 'U16', gender: 'männlich', teamAkjId: 16, teamNumber: 1 });
+    assert.ok(label.includes('gender-sym'), 'Gender-Icon-Span sollte weiterhin enthalten sein');
+  });
+
+  test('buildTeamLabel: escaped teamName im Fallback-Pfad', () => {
+    const label = buildTeamLabel({ teamName: '<script>alert(1)</script>', ageGroup: 'U16', gender: 'männlich' });
+    assert.ok(!label.includes('<script>'), 'Roher <script>-Tag darf nicht im Output landen');
+    assert.ok(label.includes('&lt;script&gt;'), 'teamName muss escaped sein');
+  });
+}
+
 // --- buildSpotlightBlock: result icons ---
 {
   const { _testExports } = require('../../src/generateHTML.js');

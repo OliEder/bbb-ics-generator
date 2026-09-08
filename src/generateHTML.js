@@ -26,6 +26,34 @@ function teamLabel(teamName, ageGroup, gender) {
   return `${escapeHtml(teamName || '')}${agPart}${sym ? ` ${sym}` : ''}`;
 }
 
+// Baut das Team-Label aus echten API-Feldern (teamAkjId, gender, teamNumber),
+// statt Team-Nummern anhand der Array-Position zu erraten (bisheriger Bug:
+// "Senioren 1"/"Senioren 2" statt "Herren"/"Damen"). Senioren (teamAkjId === 1)
+// bekommen "Herren"/"Damen", Jugend-Teams "{Altersklasse}{m|w}" (z.B. "U16m").
+// Bei teamNumber > 1 wird die Nummer angehängt. Fällt auf teamLabel() zurück,
+// wenn teamAkjId/teamNumber fehlen (z.B. alte metadata.json-Einträge).
+function buildTeamLabel(team) {
+  if (team.teamAkjId == null || team.teamNumber == null) {
+    return teamLabel(team.teamName, team.ageGroup, team.gender);
+  }
+
+  const sym = genderSpan(team.gender);
+  const symPart = sym ? ` ${sym}` : '';
+  const isSeniors = team.teamAkjId === 1;
+  const genderLetter = team.gender === 'weiblich' ? 'w' : 'm';
+  const numberSuffix = team.teamNumber > 1 ? ` ${team.teamNumber}` : '';
+
+  let base;
+  if (isSeniors) {
+    base = team.gender === 'weiblich' ? 'Damen' : 'Herren';
+  } else {
+    const ag = String(team.ageGroup || '').trim();
+    base = `${ag}${genderLetter}`;
+  }
+
+  return `${escapeHtml(base)}${numberSuffix}${symPart}`;
+}
+
 function genderSpan(gender) {
   if (!gender) return '';
   const g = String(gender).toLowerCase().trim();
@@ -263,7 +291,7 @@ function buildNavigation(teams, activePage) {
     const href = homeActive
       ? `teams/${escapeHtml(t.teamId)}.html`
       : `${escapeHtml(t.teamId)}.html`;
-    const label = teamLabel(t.teamName, t.ageGroup, t.gender);
+    const label = buildTeamLabel(t);
     return `<a href="${href}"${active ? ' aria-current="page"' : ''}>${label}</a>`;
   }).join('');
 
@@ -360,7 +388,7 @@ function buildTeaserCard(team) {
   return `<div class="teaser-card">
   <div class="teaser-header">
     ${logoHtml}
-    <span class="teaser-team-name">${teamLabel(team.teamName, team.ageGroup, team.gender)}</span>
+    <span class="teaser-team-name">${buildTeamLabel(team)}</span>
   </div>
   ${streakText ? `<div class="teaser-streak-info"><span class="teaser-streak-label">Serie:</span> ${escapeHtml(streakText)}</div>` : ''}
   <div class="teaser-results">${resultRows}${upcomingRows}</div>
@@ -894,15 +922,12 @@ function buildNextGameTeaser(team) {
 </section>`;
 }
 
-// Short label for a team in the spotlight: age group only, with suffix for duplicates.
-// E.g. "U16", "U16 2" when two U16 teams exist.
+// Short label for a team in the spotlight. Delegates to buildTeamLabel so
+// spotlight labels use the real API team number instead of guessing from
+// array position (previous bug: "Senioren 1"/"Senioren 2" for men's/women's
+// senior teams lumped together, "U14 1"/"U14 2" instead of "U14m"/"U14w").
 function spotlightTeamLabel(team, allTeams) {
-  const ag = String(team.ageGroup || '').trim() || 'Senioren';
-  const sameAg = allTeams.filter(t => String(t.ageGroup || '').trim() === ag);
-  if (sameAg.length <= 1) return ag;
-  // Number them by their order in the sorted list
-  const idx = sameAg.findIndex(t => t.teamId === team.teamId);
-  return `${ag} ${idx + 1}`;
+  return buildTeamLabel(team);
 }
 
 function buildSpotlightBlock(teams, cupColor) {
@@ -1062,7 +1087,7 @@ function buildTeamPage(team, allTeams, theme, legal = {}, archives = []) {
     <div class="team-page-header">
       ${logoHtml}
       <div>
-        <h1 class="team-page-title">${teamLabel(team.teamName, team.ageGroup, team.gender)}</h1>
+        <h1 class="team-page-title">${buildTeamLabel(team)}</h1>
         <p class="team-page-meta">Stand: ${lastUpdate}</p>
       </div>
     </div>
@@ -1271,7 +1296,7 @@ function genHTML(theme = {}, legal = {}) {
 }
 
 module.exports = { genHTML };
-module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket, buildNavScript, buildSharedStyles, buildTabScript, buildTeamPage, buildIndexPage, buildNextGameTeaser, buildSpotlightBlock, spotlightTeamLabel, buildFooter, buildImpressum, buildDatenschutz, buildBarrierefreiheit, buildCalHelp, buildTabPanel, isWin, resultIcon, loadTeamArchives, buildArchiveSeasonBlock, buildArchiveTab };
+module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket, buildNavScript, buildSharedStyles, buildTabScript, buildTeamPage, buildIndexPage, buildNextGameTeaser, buildSpotlightBlock, spotlightTeamLabel, buildTeamLabel, buildFooter, buildImpressum, buildDatenschutz, buildBarrierefreiheit, buildCalHelp, buildTabPanel, isWin, resultIcon, loadTeamArchives, buildArchiveSeasonBlock, buildArchiveTab };
 
 if (require.main === module) {
   const config = require('../config.json');
