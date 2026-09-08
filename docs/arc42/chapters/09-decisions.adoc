@@ -343,6 +343,46 @@ a|
 * Negative: GB macht wenig Sinn bei sehr ungleicher Spielanzahl (unterschiedlich viele Spiele absolviert). Bei Gleichstand (GB = 0.5) wird `.toFixed(1)` angezeigt — leicht ungewohnt für deutsche Nutzer.
 |===
 
+=== ADR-013: Saison-Archivierung mit Rolling-Update-Mechanismus und Persistenz nicht gemeldeter Teams
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-08
+
+| *Kontext*
+a|
+* Die Basketball-Bund-API liefert Match-, Tabellen- und Turnierbaumdaten nur für einen begrenzten Zeitraum zurück. Ist eine Saison einmal abgeschlossen und eine neue begonnen, verschwinden die Daten der alten Saison irgendwann vollständig aus der API-Antwort — unwiederbringlich, da es keinen separaten „Historie"-Endpunkt gibt.
+* Der genaue Zeitpunkt, ab dem eine Saison aus der API verschwindet, ist nicht exakt vorhersagbar: Während der Übergangsphase liefert die API teilweise noch Matches der alten Saison zusätzlich zu denen der neuen (siehe auch ADR-009-Update zu `currentSeasonId()`).
+* Separat, aber verwandt: `fetchClubTeams()` liefert nur Teams, die aktuell für die laufende Saison gemeldet sind. Ein Team, das saisonbedingt vorübergehend nicht gemeldet ist (z. B. Sommerpause, Neuanmeldung verzögert), verschwindet dadurch komplett aus `metadata.json` und somit von der generierten Website — obwohl es keine dauerhafte Abmeldung ist.
+
+| *Entscheidung*
+a|
+* Neues Modul `src/seasonArchive.js`: Für jede in den rohen API-Matches eines Teams vorkommende Saison außer der aktuellen wird bei jedem Lauf ein Archiv-Eintrag in `generated/archive/{seasonId}.json` geschrieben (ein File pro Saison, alle Teams darin) — mit `status: 'provisional'` und aktualisiertem `lastSeenAt`-Zeitstempel.
+* Rolling-Update-Mechanismus: Solange eine Saison noch in den API-Rohdaten eines Teams auftaucht, wird ihr Archiv-Eintrag bei jedem Lauf neu überschrieben (`provisional`). Taucht sie in einem Lauf erstmals nicht mehr auf, wird der zuletzt gespeicherte Stand auf `status: 'final'` gesetzt und danach nie wieder verändert (eingefroren).
+* `cronUpdate.js` ruft die Archivierung pro Team auf, bevor die aktuelle Saison verarbeitet wird.
+* CI-Persistenz: `.github/workflows/deploy.yml` committet nach jedem Lauf `generated/archive/**` per `stefanzweifel/git-auto-commit-action@v5` zurück auf `main` (Commit-Message mit `[skip ci]`), da `generated/` sonst vollständig `.gitignore`t ist und auf den ephemeren GitHub-Actions-Runnern nach jedem Lauf verloren ginge.
+* Separater, aber verwandter Mechanismus in `cronUpdate.js`: Vor der Verarbeitung wird die `metadata.json` des vorherigen Laufs mit der aktuellen Team-Liste (`fetchClubTeams()`) verglichen. Teams, die darin nicht mehr auftauchen, werden unverändert aus dem alten Lauf übernommen und mit `notCurrentlyListed: true` markiert, statt aus der Ausgabe zu verschwinden. Das Flag wird bei jedem Lauf frisch aus diesem Vergleich abgeleitet — es gibt keinen expliziten „Clear"-Schritt: Taucht das Team wieder in der Team-Liste auf, durchläuft es einfach wieder den normalen Update-Pfad und das Flag wird schlicht nicht mehr gesetzt.
+
+| *Begründung*
+a|
+* Der Rolling-Update-Mechanismus ist robust gegenüber Teams, die zu unterschiedlichen Zeitpunkten in die neue Saison wechseln — es gibt keinen global synchronisierten „Saisonende"-Zeitpunkt, den man hart codieren könnte.
+* `status: 'provisional'` vermeidet, einen unvollständigen oder verfrühten Zwischenstand (z. B. Tabelle vor dem letzten Spieltag) fälschlich als endgültig einzufrieren.
+* Kein jährlicher manueller Eingriff nötig — vergleichbar mit der Motivation hinter ADR-009s `currentSeasonId()`-Fix.
+* Kein Datenverlust weder auf Saison-Ebene (Archiv) noch auf Team-Listen-Ebene (`notCurrentlyListed`) — beide Mechanismen verhindern, dass Nutzer beim Öffnen der Website plötzlich fehlende Inhalte vorfinden.
+* Der `notCurrentlyListed`-Ansatz ohne expliziten Clear-Schritt ist einfacher und weniger fehleranfällig als eine manuell zu pflegende Zustandsmaschine — die normale Verarbeitung eines wieder gemeldeten Teams setzt implizit den korrekten Zustand her.
+
+| *Konsequenzen*
+a|
+* Positive: Historische Saison-Daten (Tabellen, Turnierbäume, Spielpläne) bleiben dauerhaft über den „Archiv"-Tab auf der Team-Seite abrufbar, auch nachdem die API sie nicht mehr liefert. Team-Seiten verschwinden nicht kommentarlos, wenn ein Team saisonbedingt vorübergehend nicht in der API-Teamliste gelistet ist — stattdessen erscheint der Hinweis „Team aktuell nicht gemeldet".
+* Negative: Bot-Commits (`github-actions[bot]`) erscheinen regelmäßig in der Commit-Historie von `main`, zusätzlich zu echten Code-Änderungen. `generated/archive/` ist eine bewusste, hier dokumentierte Ausnahme vom sonst in diesem Repo geltenden Prinzip, dass `generated/` reines, unversioniertes Build-Output ist (vgl. `.gitignore` und ADR-Kontext an anderer Stelle) — diese Ausnahme muss bei zukünftigen Änderungen an der `.gitignore`-Strategie berücksichtigt werden.
+|===
+
 === ADR-007: Outline-SVG-Icons statt Farbe für Sieg/Niederlage-Anzeige
 
 [cols="2,5", options="header"]

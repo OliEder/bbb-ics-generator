@@ -45,8 +45,8 @@ Der Workflow benötigt drei spezifische Permissions:
 |===
 | Permission | Zweck
 
-| `contents: read`
-| Checkout des Repository-Inhalts
+| `contents: write`
+| Checkout des Repository-Inhalts sowie Commit des `generated/archive/**`-Verzeichnisses zurück auf `main` (siehe Schritt „Commit season archive" unten). Ursprünglich `contents: read`; wurde auf `write` angehoben, als der Auto-Commit-Schritt für das Saison-Archiv eingeführt wurde (siehe ADR-013).
 
 | `pages: write`
 | Upload und Deployment auf GitHub Pages
@@ -66,6 +66,8 @@ Der Workflow benötigt drei spezifische Permissions:
 . *Generate ICS files* (`npm run update` → `node src/cronUpdate.js`): Hauptschritt. Ruft die Basketball-Bund-API ab, erzeugt alle ICS-Dateien und schreibt `metadata.json` in `generated/`.
 
 . *Generate HTML* (`npm run generate-html` → `node src/generateHTML.js`): Erzeugt `generated/index.html` aus `metadata.json`.
+
+. *Commit season archive* (`stefanzweifel/git-auto-commit-action@v5`): Committet ausschließlich `generated/archive/**` zurück auf den `main`-Branch, mit Commit-Message `chore: update season archive [skip ci]` (das `[skip ci]`-Suffix verhindert, dass dieser Commit den Deploy-Workflow erneut auslöst — sonst würde jeder Lauf einen weiteren Lauf triggern). Autor ist `github-actions[bot]`. Hintergrund: `generated/` ist ansonsten vollständig `.gitignore`t und reines, flüchtiges Build-Output — auf GitHub-Actions-Runnern (ephemer) geht es nach jedem Lauf verloren. Das Saison-Archiv (`src/seasonArchive.js`) muss davon abweichend dauerhaft erhalten bleiben, da die Basketball-Bund-API Match- und Tabellendaten einer abgelaufenen Saison irgendwann endgültig nicht mehr zurückliefert — ohne diesen Commit-Schritt gäbe es keine Möglichkeit, diese Daten zwischen den 6-stündigen Läufen zu bewahren. Details zur Architekturentscheidung siehe ADR-013 in `09-decisions.adoc`. Voraussetzung ist die Permission `contents: write` (siehe oben).
 
 . *List generated files (debug)* (`ls -la generated/`, `find generated/ -name "*.ics" -ls`): Diagnostik-Schritt, listet alle erzeugten Dateien im Actions-Log.
 
@@ -144,7 +146,9 @@ generated/
 ├── ... (3 Dateien pro Team)
 ├── metadata.json          # Update-Metadaten für HTML-Generator
 ├── teams-cache.json       # Team-Cache (effektiv nur lokal relevant)
-└── index.html             # Übersichtsseite mit Subscription-Links
+├── archive/                # Archivierte Vorjahres-Saisons (persistiert via Git-Commit, siehe oben)
+│   └── {seasonId}.json     # Ein File pro Saison, alle Teams enthalten
+└── index.html              # Übersichtsseite mit Subscription-Links
 ....
 
 === Nutzer-Subscription
