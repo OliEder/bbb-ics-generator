@@ -9,6 +9,14 @@ class TeamPage {
     return this.page.getByRole('tab', { name: new RegExp(name) });
   }
 
+  archiveTab() {
+    return this.page.getByRole('tab', { name: 'Archiv' });
+  }
+
+  archivePanel(teamId) {
+    return this.page.locator(`#panel-${teamId}-archive`);
+  }
+
   badges() {
     return this.page.locator('.badge');
   }

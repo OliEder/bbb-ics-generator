@@ -2,15 +2,28 @@ const { fetchTeamMatches, fetchMatchInfo, fetchClubTeams, fetchLeagueTable, fetc
 const { generateICS } = require('./icsGenerator');
 const { saveICS, saveTeamsCache, loadTeamsCache } = require('./storage');
 const { genHTML } = require('./generateHTML');
+const { groupBySeasonId, updateArchiveForTeam } = require('./seasonArchive');
 const config = require('../config.json');
 const fs = require('fs');
 const path = require('path');
 
-const CURRENT_SEASON = 2026; // Saison 2025/26
 const BBB_MEDIA_BASE = 'https://www.basketball-bund.net/media/team';
 
 function isLiga(liganame) {
   return String(liganame || '').toLowerCase().includes('liga');
+}
+
+// Die API liefert Spiele mehrerer Saisons gemischt zurück (z.B. laufende Vorbereitung
+// der Folgesaison). Statt eines hartcodierten Jahres wird die aktuelle Saison pro Team
+// aus der höchsten vorkommenden seasonId bestimmt — funktioniert saisonübergreifend
+// ohne jährliche manuelle Anpassung.
+function currentSeasonId(matches) {
+  let max = null;
+  for (const m of matches) {
+    const id = m.ligaData?.seasonId;
+    if (typeof id === 'number' && (max === null || id > max)) max = id;
+  }
+  return max;
 }
 
 async function getTeams() {
@@ -100,6 +113,21 @@ async function updateAll() {
   const meta = [];
   const teams = await getTeams();
 
+  const generatedDir = process.env.BBB_ICS_DIR || path.resolve(__dirname, '../generated');
+
+  // Ein Team kann vorübergehend oder dauerhaft aus der API-Team-Liste verschwinden
+  // (z.B. noch nicht für die neue Saison gemeldet, Saisonpause, selten: aufgelöst).
+  // Damit es nicht komplett aus metadata.json fällt, wird der alte Stand aus dem
+  // vorherigen Lauf für solche Teams unverändert übernommen und mit
+  // notCurrentlyListed:true markiert. Taucht das Team später wieder in der
+  // API-Team-Liste auf, durchläuft es wieder den normalen Update-Pfad unten,
+  // der das Flag nie setzt — es verschwindet also automatisch wieder.
+  const previousMeta = fs.existsSync(path.join(generatedDir, 'metadata.json'))
+    ? JSON.parse(fs.readFileSync(path.join(generatedDir, 'metadata.json'), 'utf8'))
+    : [];
+  const activeTeamIds = new Set(teams.map(t => String(t.id)));
+  const missingTeams = previousMeta.filter(m => !activeTeamIds.has(String(m.teamId)));
+
   // All teamPermanentIds for this club share the same club logo at this endpoint.
   // Using teams[0] is safe; any team ID resolves to the club crest.
   const firstTeamLogoUrl = teams.length > 0
@@ -156,8 +184,19 @@ async function updateAll() {
         }
       }
 
-      const seasonMatches = matches
-        .filter(m => m.ligaData?.seasonId === CURRENT_SEASON)
+      const seasonId = currentSeasonId(matches);
+      const groupedBySeason = groupBySeasonId(matches);
+
+      await updateArchiveForTeam(
+        { id: t.id, name: t.name, ageGroup: t.ageGroup, gender: teamGender || t.gender },
+        groupedBySeason,
+        seasonId,
+        details,
+        { fetchLeagueTable, fetchTournamentRounds }
+      );
+
+      const seasonMatches = (groupedBySeason[seasonId] || [])
+        .slice()
         .sort((a, b) => {
           const da = (a.kickoffDate || '') + (a.kickoffTime || '');
           const db = (b.kickoffDate || '') + (b.kickoffTime || '');
@@ -210,13 +249,16 @@ async function updateAll() {
     }
   }
 
-  const generatedDir = process.env.BBB_ICS_DIR || path.resolve(__dirname, '../generated');
+  for (const m of missingTeams) {
+    meta.push({ ...m, notCurrentlyListed: true });
+  }
+
   fs.writeFileSync(path.join(generatedDir, 'metadata.json'), JSON.stringify(meta, null, 2));
   const legal = config.legal || {};
   genHTML(theme, legal);
 }
 
-module.exports = { getTeams, updateAll, mapMatches, computeSpotlight };
+module.exports = { getTeams, updateAll, mapMatches, computeSpotlight, currentSeasonId };
 
 if (require.main === module) {
   updateAll();

@@ -21,6 +21,7 @@ Automatisch generiertes Vereinsportal für die Fibalon Baskets Neumarkt. Ruft al
 - **Tabelle** — offizielle Tabelle + Games-Behind-Variante (NBA-Logik)
 - **Turnierklammer** — für Pokalwettbewerbe mit Vorschau zukünftiger Runden
 - **Spielplan** — alle/Heim/Auswärts-Tabs mit ICS-Kalender-Links
+- **Archiv** — abgelaufene Saisons werden automatisch archiviert und bleiben als eigener Tab mit Endtabelle und Ergebnissen einsehbar. Ist ein Team gerade nicht in den aktuellen Daten des Vereins gelistet (z.B. zwischen zwei Saisons), bleibt seine Teamseite mit einem kurzen Hinweis erhalten, statt zu verschwinden.
 
 ### Kalender-Abonnement
 Jedes Team bietet drei ICS-Feeds:

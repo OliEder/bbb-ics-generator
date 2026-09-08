@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -42,6 +42,14 @@ jobs:
         
       - name: Generate HTML
         run: npm run generate-html
+
+      - name: Commit season archive
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: update season archive [skip ci]"
+          commit_user_name: "github-actions[bot]"
+          commit_user_email: "41898282+github-actions[bot]@users.noreply.github.com"
+          file_pattern: 'generated/archive/**'
 
       - name: List generated files (debug)
         run: |

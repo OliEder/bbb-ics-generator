@@ -2,7 +2,7 @@
 
 === Whitebox-Gesamtsystem
 
-Das System besteht aus fünf aktiven Modulen. Die Module sind lose gekoppelt und kommunizieren ausschließlich über Funktionsaufrufe (CommonJS `require`).
+Das System besteht aus sechs aktiven Modulen. Die Module sind lose gekoppelt und kommunizieren ausschließlich über Funktionsaufrufe (CommonJS `require`).
 
 [source,mermaid]
 ----
@@ -10,6 +10,7 @@ graph LR
     CU["cronUpdate.js\nOrchestrator"] --> AC["apiClient.js\nAPI-Facade"]
     CU --> IG["icsGenerator.js\nRFC 5545 Renderer"]
     CU --> ST["storage.js\nPersistenz"]
+    CU --> SA["seasonArchive.js\nSaison-Archivierung"]
     CU --> GH["generateHTML.js\nPortal-Generator"]
     GH --> ST
     SV["server.js\nDev-Server"] -.->|nur lokal| ST
@@ -31,16 +32,17 @@ graph LR
 | `apiClient.js`: `fetchTeamMatches(teamId)`, `fetchMatchInfo(matchId)`, `fetchClubTeams(clubId)` +
 `icsGenerator.js`: `generateICS(matches, details, teamId, kind, teamName)` +
 `storage.js`: `saveICS(teamId, type, data)`, `saveTeamsCache(teams)`, `loadTeamsCache()` +
+`seasonArchive.js`: `groupBySeasonId(matches)`, `updateArchiveForTeam(teamMeta, groupedBySeason, currentSeasonId, details, apiFns)` +
 `config.json`: `clubId`
 
 | *Wichtige Logik*
-| Zweistufige Strategie für Team-Ermittlung: (1) Cache-HIT → sofortige Nutzung, (2) Cache-MISS → API-Aufruf + Cache-Befüllung, (3) API-Fehler + abgelaufener Cache → Fallback auf alten Cache. Pro Team werden drei ICS-Varianten erzeugt: `all`, `home`, `away`. Pro Team werden zusätzlich `spotlightMatches` (0–2 Einträge) berechnet via `computeSpotlight`: letztes Ergebnis + nächstes Spiel, oder letzte 2 Ergebnisse, oder erste 2 zukünftige.
+| Zweistufige Strategie für Team-Ermittlung: (1) Cache-HIT → sofortige Nutzung, (2) Cache-MISS → API-Aufruf + Cache-Befüllung, (3) API-Fehler + abgelaufener Cache → Fallback auf alten Cache. Pro Team werden drei ICS-Varianten erzeugt: `all`, `home`, `away`. Pro Team werden zusätzlich `spotlightMatches` (0–2 Einträge) berechnet via `computeSpotlight`: letztes Ergebnis + nächstes Spiel, oder letzte 2 Ergebnisse, oder erste 2 zukünftige. Vor der Verarbeitung wird die bestehende `metadata.json` des vorherigen Laufs gelesen und mit der aktuellen Team-Liste (`getTeams()`) verglichen: Teams, die darin nicht mehr auftauchen (z.B. noch nicht für die neue Saison gemeldet, Saisonpause), werden unverändert mit `notCurrentlyListed: true` übernommen, statt komplett aus der Ausgabe zu verschwinden. Taucht ein Team später wieder in der Team-Liste auf, durchläuft es wieder den normalen Update-Pfad und das Flag entfällt automatisch.
 
 | *Fehlerbehandlung*
 | Fehler pro Team werden geloggt, aber der Gesamtprozess wird für die verbleibenden Teams fortgesetzt (Fail-Graceful per Team-Isolation in try/catch).
 
 | *Abhängigkeiten*
-| `./apiClient`, `./icsGenerator`, `./storage`, `../config.json`, `fs`, `path`
+| `./apiClient`, `./icsGenerator`, `./storage`, `./seasonArchive`, `../config.json`, `fs`, `path`
 |===
 
 === Modul: apiClient.js (API-Facade)
@@ -141,6 +143,39 @@ a|
 | `fs`, `path` (Node.js Stdlib)
 |===
 
+=== Modul: seasonArchive.js (Saison-Archivierung)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *Verantwortlichkeit*
+| Archiviert die Match- und Wettbewerbsdaten abgelaufener Saisons pro Team, bevor die Basketball-Bund-API sie endgültig nicht mehr zurückliefert. Wird von `cronUpdate.js` vor der Verarbeitung der aktuellen Saison pro Team aufgerufen.
+
+| *Exportierte Funktionen*
+a|
+* `groupBySeasonId(matches)` → `{ [seasonId]: Array<Match> }` — gruppiert die rohen API-Matches eines Teams anhand von `ligaData.seasonId`; Matches ohne numerische `seasonId` werden übersprungen.
+* `buildArchiveTeamEntry(teamMeta, seasonMatches, details, apiFns)` → `Promise<ArchiveTeamEntry>` — baut den Archiv-Eintrag eines Teams für eine Saison: aufsteigend sortierte, angereicherte `matches[]` (Gegner, Heim/Auswärts, Ergebnis, Liganame) sowie `competitions[]` mit Tabelle (`fetchLeagueTable`) oder Turnierbaum (`fetchTournamentRounds`) je nach Liga-Heuristik (`isLiga`, gleiche Namens-Heuristik wie ADR-009).
+* `saveArchive(season, data)` → `string` (Dateipfad) — schreibt `generated/archive/{seasonId}.json`, validiert `season` per Regex (`/^\d{4}$/`) gegen Path-Traversal.
+* `loadArchive(season)` → `object \| null` — liest `generated/archive/{seasonId}.json`, `null` wenn nicht vorhanden.
+* `updateArchiveForTeam(teamMeta, groupedBySeason, currentSeasonId, details, apiFns)` → `Promise<void>` — die zentrale Rolling-Update-Logik (siehe unten).
+
+| *Rolling-Update-Mechanismus*
+a|
+* Für jede in `groupedBySeason` vorkommende Saison außer der aktuellen (`currentSeasonId`) wird der Archiv-Eintrag des Teams neu gebaut und mit `status: 'provisional'` sowie `lastSeenAt` (ISO-Zeitstempel) in `generated/archive/{seasonId}.json` gespeichert — bei jedem Lauf erneut, solange die API noch Matches dieser Saison für das Team liefert (kommt während des Saisonübergangs häufig vor).
+* Anschließend werden alle vorhandenen Archivdateien durchsucht: Taucht die Saison eines Teams nicht mehr unter den aktuell von der API gelieferten Matches auf (und ist nicht die aktuelle Saison) und war ihr Status bisher `provisional`, wird sie auf `status: 'final'` gesetzt. Ab diesem Zeitpunkt wird dieser Eintrag nie wieder verändert.
+* Dieser Mechanismus verhindert sowohl vorzeitiges Einfrieren (Team wechselt noch mitten im Übergang) als auch dauerhaftes `provisional`-Verharren (kein expliziter Cutoff-Zeitpunkt nötig).
+
+| *Bewusste Design-Entscheidung: Dependency Injection statt direktem Import*
+| `buildArchiveTeamEntry` und `updateArchiveForTeam` erhalten `fetchLeagueTable`/`fetchTournamentRounds` als Parameter (`apiFns`) statt sie selbst aus `apiClient.js` zu importieren. Das hält die Abhängigkeitsrichtung explizit (`cronUpdate.js` importiert bereits `seasonArchive.js`) und macht `seasonArchive.js` unabhängig von der konkreten API-Anbindung testbar — Tests injizieren Stub-Funktionen statt echter HTTP-Aufrufe. Ein direkter Import von `apiClient.js` wäre zwar kein echter Zyklus gewesen (`apiClient.js` importiert selbst nichts aus `seasonArchive.js`), wurde aber aus diesen Gründen bewusst vermieden.
+
+| *Speicherformat*
+| Ein JSON-File pro Saison unter `generated/archive/{seasonId}.json`: `{ season, teams: { [teamId]: { teamName, ageGroup, gender, matches[], competitions[], status, lastSeenAt } } }`.
+
+| *Abhängigkeiten*
+| `fs`, `path` (Node.js Stdlib); keine Abhängigkeit auf `apiClient.js` (siehe Design-Entscheidung oben)
+|===
+
 === Modul: generateHTML.js (Portal-Generator)
 
 [cols="2,5", options="header"]
@@ -148,10 +183,10 @@ a|
 | Aspekt | Beschreibung
 
 | *Verantwortlichkeit*
-| Erzeugt die komplette statische Website aus `metadata.json`: Startseite (`index.html`) mit adaptiven Team-Teasern und Navigationsmenü sowie individuelle Team-Seiten (`teams/{teamId}.html`) mit Next-Game-Teaser, Ligatabellen, Turnierbäumen, Spielplan-Tabs und Kalender-Abo-Links.
+| Erzeugt die komplette statische Website aus `metadata.json`: Startseite (`index.html`) mit adaptiven Team-Teasern und Navigationsmenü sowie individuelle Team-Seiten (`teams/{teamId}.html`) mit Next-Game-Teaser, Ligatabellen, Turnierbäumen, Spielplan-Tabs, Kalender-Abo-Links und optionalem Archiv-Tab für vergangene Saisons.
 
 | *Eingang*
-| `generated/metadata.json` mit vollständigen Team-Metadaten: Spielplan (mit `isNext`, `ownShort`, `opponentShort`, `venueName`, `venueAddress`), Ligatabellen (`competitions[].table`), Turnierbäume (`competitions[].bracket`), Geschlecht, Altersgruppe, Logo-URL, `spotlightMatches` (0–2 Spotlight-Spiele pro Team).
+| `generated/metadata.json` mit vollständigen Team-Metadaten: Spielplan (mit `isNext`, `ownShort`, `opponentShort`, `venueName`, `venueAddress`), Ligatabellen (`competitions[].table`), Turnierbäume (`competitions[].bracket`), Geschlecht, Altersgruppe, Logo-URL, `spotlightMatches` (0–2 Spotlight-Spiele pro Team), optional `notCurrentlyListed: true` (Team ist vorübergehend nicht in der API-Teamliste enthalten). Zusätzlich `generated/archive/{seasonId}.json`-Dateien (geschrieben von `seasonArchive.js`) mit archivierten Vorjahres-Saisons pro Team.
 
 | *Ausgang*
 | `generated/index.html` (Startseite), `generated/teams/{teamId}.html` (eine Datei pro Team), `generated/datenschutz.html` und `generated/barrierefreiheit.html` (immer), sowie `generated/impressum.html` (nur wenn `config.legal` mindestens ein nicht-leeres Feld hat). Alle HTML-Dateien sind vollständig eigenständig (inline CSS + JS, keine externen Assets außer Leaflet CDN, Font Awesome CDN und BBB-Logo-URL).
@@ -168,7 +203,10 @@ a|
 * `resultIcon(match)` — gibt SVG-Icon-String für Sieg (Pokal) oder Niederlage (✕) zurück, oder leeren String wenn kein Ergebnis/Unentschieden
 * `buildStandingsTable(comp)` — zwei Tabs: offizielle Tabelle + Games-Behind-Ranking
 * `buildBracket(comp, ownTeamName)` — Turnierbaum mit Highlight des eigenen Teams und TBD-Platzhaltern für zukünftige Runden
-* `buildTeamPage(team, allTeams, theme)` — vollständige Team-Seite
+* `buildTeamPage(team, allTeams, theme, legal, archives)` — vollständige Team-Seite; rendert bei `team.notCurrentlyListed === true` einen Hinweis „Team aktuell nicht gemeldet" oberhalb des Next-Game-Teasers, und bei nicht-leerem `archives`-Array einen zusätzlichen „Archiv"-Tab neben Alle/Heim/Auswärts
+* `loadTeamArchives(generatedDir, teamId)` — liest alle `generated/archive/{seasonId}.json`-Dateien, filtert auf den jeweiligen `teamId`-Eintrag und liefert die Ergebnisse absteigend nach Saison sortiert; nicht parsbare Archivdateien werden übersprungen, damit ein defektes Archiv nicht die gesamte HTML-Generierung blockiert
+* `buildArchiveSeasonBlock(archiveEntry, cupColor)` — rendert eine archivierte Saison: Überschrift „Saison YYYY/YY", optionaler „vorläufiger Stand"-Hinweis bei `status === 'provisional'`, Ligatabellen/Turnierbäume (wiederverwendet `buildStandingsTable`/`buildBracket`) und Spielplanzeilen (wiederverwendet `buildScheduleRow`)
+* `buildArchiveTab(teamId, archives, cupColor)` — liefert leeren String wenn keine Archive vorhanden sind, sonst ein `role="tabpanel"`-Element mit allen Saison-Blöcken
 * `buildIndexPage(teams, theme)` — Startseite
 * `teamLabel(teamName, ageGroup, gender)` — einheitliche Teambezeichnung mit Geschlechtssymbol
 * `sortTeams(teams)` — Senioren zuerst, dann aufsteigend nach Altersgruppe
@@ -200,12 +238,13 @@ a|
 
 === Abhängigkeitsmatrix
 
-[cols="2,1,1,1,1,1,1", options="header"]
+[cols="2,1,1,1,1,1,1,1", options="header"]
 |===
-| Modul | cronUpdate | apiClient | icsGenerator | storage | generateHTML | server
+| Modul | cronUpdate | apiClient | icsGenerator | storage | seasonArchive | generateHTML | server
 
 | *cronUpdate.js*
 | —
+| nutzt
 | nutzt
 | nutzt
 | nutzt
@@ -213,6 +252,7 @@ a|
 | —
 
 | *apiClient.js*
+| —
 | —
 | —
 | —
@@ -227,8 +267,19 @@ a|
 | —
 | —
 | —
+| —
 
 | *storage.js*
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+
+| *seasonArchive.js*
+| —
 | —
 | —
 | —
@@ -241,10 +292,12 @@ a|
 | —
 | —
 | liest FS direkt
+| liest FS direkt
 | —
 | —
 
 | *server.js*
+| —
 | —
 | —
 | —

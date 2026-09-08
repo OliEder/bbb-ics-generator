@@ -1,6 +1,6 @@
 'use strict';
 
-const { mkdtempSync, writeFileSync } = require('node:fs');
+const { mkdtempSync, writeFileSync, mkdirSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 
@@ -45,9 +45,32 @@ const _sampleMetadata = [
   },
 ];
 
-function generatePages(theme = sampleTheme, metadata = _sampleMetadata, legal = sampleLegal) {
+// One archived season (2025) for team 167881, matching the shape written by
+// seasonArchive.saveArchive(): { season, teams: { [teamId]: { status, teamName, matches, competitions } } }.
+const sampleArchive = {
+  season: 2025,
+  teams: {
+    '167881': {
+      status: 'final',
+      teamName: 'Fibalon Baskets U16',
+      matches: [
+        { date: '2025-10-04', time: '16:00', opponent: 'BC Weiden', opponentShort: 'BCW', ownShort: 'NM', isHome: true, result: '60:55', competition: 'Bezirksliga U16 männlich' },
+      ],
+      competitions: [],
+    },
+  },
+};
+
+function generatePages(theme = sampleTheme, metadata = _sampleMetadata, legal = sampleLegal, archives = null) {
   const dir = mkdtempSync(join(tmpdir(), 'bbb-ui-'));
   writeFileSync(join(dir, 'metadata.json'), JSON.stringify(metadata));
+  if (archives) {
+    const archiveDir = join(dir, 'archive');
+    mkdirSync(archiveDir, { recursive: true });
+    for (const archive of archives) {
+      writeFileSync(join(archiveDir, `${archive.season}.json`), JSON.stringify(archive));
+    }
+  }
   const modPath = require.resolve('../../src/generateHTML.js');
   delete require.cache[modPath];
   const prev = process.env.BBB_GENERATED_DIR;
@@ -67,6 +90,7 @@ function generatePages(theme = sampleTheme, metadata = _sampleMetadata, legal = 
 module.exports = {
   generatePages,
   sampleMetadata: () => JSON.parse(JSON.stringify(_sampleMetadata)),
+  sampleArchive: () => JSON.parse(JSON.stringify(sampleArchive)),
   sampleTheme,
   sampleLegal,
 };

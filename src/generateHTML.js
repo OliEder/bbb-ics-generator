@@ -156,6 +156,70 @@ function buildCalHelp() {
 </details>`;
 }
 
+function loadTeamArchives(generatedDir, teamId) {
+  const archiveDir = path.join(generatedDir, 'archive');
+  if (!fs.existsSync(archiveDir)) return [];
+
+  const files = fs.readdirSync(archiveDir).filter(f => /^\d{4}\.json$/.test(f));
+  const entries = [];
+  for (const file of files) {
+    let data;
+    try {
+      data = JSON.parse(fs.readFileSync(path.join(archiveDir, file), 'utf8'));
+    } catch {
+      continue;
+    }
+    const teamEntry = data && data.teams && data.teams[teamId];
+    if (!teamEntry) continue;
+    entries.push({ season: data.season, ...teamEntry });
+  }
+  return entries.sort((a, b) => b.season - a.season);
+}
+
+function buildArchiveSeasonBlock(archiveEntry, cupColor) {
+  const season = archiveEntry.season;
+  const seasonLabel = `Saison ${season}/${String((season + 1) % 100).padStart(2, '0')}`;
+  const provisionalNote = archiveEntry.status === 'provisional'
+    ? `<p class="archive-provisional-note">Vorläufiger Stand — diese Saison wird noch aktualisiert.</p>`
+    : '';
+
+  const competitions = Array.isArray(archiveEntry.competitions) ? archiveEntry.competitions : [];
+  const compBlocks = competitions.map(comp => {
+    const headingClass = isLiga(comp.liganame) ? 'comp-heading' : 'comp-heading comp-heading--cup';
+    const body = isLiga(comp.liganame)
+      ? buildStandingsTable(comp)
+      : buildBracket(comp, archiveEntry.teamName);
+    return `<section class="comp-section">
+  <h2 class="${headingClass}">${escapeHtml(comp.liganame)}</h2>
+  ${body}
+</section>`;
+  }).join('');
+
+  const matches = Array.isArray(archiveEntry.matches) ? archiveEntry.matches : [];
+  const rows = matches.map(m => buildScheduleRow(m, cupColor)).join('');
+  const scheduleHtml = rows
+    ? `<div class="schedule-list">${rows}</div>`
+    : `<p class="comp-unavailable">Keine Spiele für diese Saison gespeichert.</p>`;
+
+  return `<div class="archive-season">
+  <h3 class="archive-season-heading">${escapeHtml(seasonLabel)}</h3>
+  ${provisionalNote}
+  ${compBlocks}
+  ${scheduleHtml}
+</div>`;
+}
+
+function buildArchiveTab(teamId, archives, cupColor) {
+  if (!Array.isArray(archives) || archives.length === 0) return '';
+  const id = `panel-${teamId}-archive`;
+  const tabId = `tab-${teamId}-archive`;
+  const blocks = archives.map(a => buildArchiveSeasonBlock(a, cupColor)).join('');
+  return `
+    <div id="${id}" role="tabpanel" aria-labelledby="${tabId}" class="tab-panel" hidden>
+      ${blocks}
+    </div>`;
+}
+
 function buildTabPanel(teamId, type, webcalLink, googleLink, httpsLink, matches, cupColor) {
   const id     = `panel-${teamId}-${type}`;
   const tabId  = `tab-${teamId}-${type}`;
@@ -493,6 +557,11 @@ function buildSharedStyles(primary, accent, cupColor) {
     .comp-heading { font-size: 0.9rem; font-weight: 700; color: var(--color-primary); border-left: 3px solid var(--color-primary); padding-left: 10px; margin-bottom: 10px; }
     .comp-heading--cup { color: var(--color-cup); border-left-color: var(--color-cup); }
     .comp-unavailable { font-size: 0.82rem; color: var(--color-text); padding: 8px 0; }
+    .not-listed-note { background: var(--color-info-bg); border: 1px solid var(--color-info-border); border-radius: 8px; padding: 10px 14px; font-size: 0.82rem; color: var(--color-text); margin-bottom: 16px; }
+    .archive-season { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border); }
+    .archive-season:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+    .archive-season-heading { font-size: 1rem; font-weight: 700; color: var(--color-primary); margin-bottom: 8px; }
+    .archive-provisional-note { font-size: 0.78rem; color: var(--color-text); background: var(--color-info-bg); border: 1px solid var(--color-info-border); border-radius: 6px; padding: 6px 10px; margin-bottom: 10px; display: inline-block; }
     /* Standings */
     .standings-tabs { margin-bottom: 4px; }
     .standings-tab-bar { display: flex; gap: 4px; margin-bottom: 8px; }
@@ -920,7 +989,7 @@ function buildSpotlightBlock(teams, cupColor) {
 </section>`;
 }
 
-function buildTeamPage(team, allTeams, theme, legal = {}) {
+function buildTeamPage(team, allTeams, theme, legal = {}, archives = []) {
   const { primary, accent, cupColor } = theme;
 
   const logoHtml = team.logoUrl
@@ -955,6 +1024,11 @@ function buildTeamPage(team, allTeams, theme, legal = {}) {
     return `<button id="tab-${escapeHtml(team.teamId)}-${type}" role="tab" aria-selected="${selected}" aria-controls="panel-${escapeHtml(team.teamId)}-${type}" tabindex="${tabindex}">${label}</button>`;
   }).join('');
 
+  const hasArchives = Array.isArray(archives) && archives.length > 0;
+  const archiveTabButton = hasArchives
+    ? `<button id="tab-${escapeHtml(team.teamId)}-archive" role="tab" aria-selected="false" aria-controls="panel-${escapeHtml(team.teamId)}-archive" tabindex="-1">Archiv</button>`
+    : '';
+
   const panels = variants.map(({ type }) =>
     buildTabPanel(
       team.teamId, type,
@@ -964,7 +1038,11 @@ function buildTeamPage(team, allTeams, theme, legal = {}) {
       team.matches || [],
       cupColor,
     )
-  ).join('');
+  ).join('') + buildArchiveTab(team.teamId, archives, cupColor);
+
+  const notListedNote = team.notCurrentlyListed
+    ? `<p class="not-listed-note">Team aktuell nicht gemeldet — letzter bekannter Stand.</p>`
+    : '';
 
   const nav = buildNavigation(allTeams, team.teamId);
 
@@ -988,11 +1066,12 @@ function buildTeamPage(team, allTeams, theme, legal = {}) {
         <p class="team-page-meta">Stand: ${lastUpdate}</p>
       </div>
     </div>
+    ${notListedNote}
     ${buildNextGameTeaser(team)}
     ${compBlocks}
     <section class="schedule-section">
       <div class="tab-bar" role="tablist" aria-label="Spielvariante für ${escapeHtml(team.teamName)}">
-        ${tabs}
+        ${tabs}${archiveTabButton}
       </div>
       ${panels}
     </section>
@@ -1174,9 +1253,10 @@ function genHTML(theme = {}, legal = {}) {
   const teamsDir = path.join(generatedDir, 'teams');
   fs.mkdirSync(teamsDir, { recursive: true });
   for (const team of teams) {
+    const archives = loadTeamArchives(generatedDir, team.teamId);
     fs.writeFileSync(
       path.join(teamsDir, `${team.teamId}.html`),
-      buildTeamPage(team, teams, resolvedTheme, legal),
+      buildTeamPage(team, teams, resolvedTheme, legal, archives),
       'utf8'
     );
   }
@@ -1191,7 +1271,7 @@ function genHTML(theme = {}, legal = {}) {
 }
 
 module.exports = { genHTML };
-module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket, buildNavScript, buildSharedStyles, buildTabScript, buildTeamPage, buildIndexPage, buildNextGameTeaser, buildSpotlightBlock, spotlightTeamLabel, buildFooter, buildImpressum, buildDatenschutz, buildBarrierefreiheit, buildCalHelp, buildTabPanel, isWin, resultIcon };
+module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket, buildNavScript, buildSharedStyles, buildTabScript, buildTeamPage, buildIndexPage, buildNextGameTeaser, buildSpotlightBlock, spotlightTeamLabel, buildFooter, buildImpressum, buildDatenschutz, buildBarrierefreiheit, buildCalHelp, buildTabPanel, isWin, resultIcon, loadTeamArchives, buildArchiveSeasonBlock, buildArchiveTab };
 
 if (require.main === module) {
   const config = require('../config.json');
