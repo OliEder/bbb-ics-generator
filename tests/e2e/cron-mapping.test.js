@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { mkdtempSync, rmSync } = require('node:fs');
+const { mkdtempSync, rmSync, writeFileSync, readFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const axios = require('axios');
@@ -279,6 +279,121 @@ test('updateAll: archiviert ältere Saison beim Übergang (Integrationstest)', a
     assert.ok(archive2024, 'Archiv für 2024 wurde beim Update angelegt');
     assert.equal(archive2024.teams['100'].status, 'provisional');
     assert.equal(archive2024.teams['100'].matches[0].result, '80:70');
+  } finally {
+    if (originalIcsDir === undefined) delete process.env.BBB_ICS_DIR;
+    else process.env.BBB_ICS_DIR = originalIcsDir;
+    rmSync(dir, { recursive: true });
+    for (const mod of ['../../src/cronUpdate', '../../src/storage', '../../src/seasonArchive', '../../src/apiClient', '../../src/generateHTML']) {
+      delete require.cache[require.resolve(mod)];
+    }
+  }
+});
+
+test('updateAll: Team, das nicht mehr in der API-Team-Liste auftaucht, bleibt mit altem Stand in metadata.json und bekommt notCurrentlyListed:true', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-cron-missing-'));
+  const originalIcsDir = process.env.BBB_ICS_DIR;
+  process.env.BBB_ICS_DIR = dir;
+
+  for (const mod of ['../../src/cronUpdate', '../../src/storage', '../../src/seasonArchive', '../../src/apiClient', '../../src/generateHTML']) {
+    delete require.cache[require.resolve(mod)];
+  }
+
+  // Alten Stand für ein Team simulieren, das die API-Team-Liste in diesem Lauf nicht mehr liefert.
+  writeFileSync(join(dir, 'metadata.json'), JSON.stringify([
+    {
+      teamId: '999', teamName: 'Verschwundenes Team', ageGroup: 'U16', gender: 'weiblich',
+      lastUpdate: '2026-08-01T00:00:00.000Z', matchCount: 3, homeMatchCount: 2, awayMatchCount: 1,
+      logoUrl: 'https://www.basketball-bund.net/media/team/999/logo',
+      matches: [{ date: '2026-05-01', time: '18:00', opponent: 'X', opponentShort: 'X', ownShort: 'VT', isHome: true, result: '70:60', competition: 'Bezirksliga', isNext: false, venueName: '', venueAddress: '', opponentLogoUrl: '' }],
+      spotlightMatches: [], competitions: [],
+    },
+  ]));
+
+  const activeMatch = makeMatch({ matchId: 1, teamId: 100, result: null, date: '2026-10-01' });
+  activeMatch.ligaData.seasonId = 2026;
+
+  t.mock.method(axios, 'get', (url) => {
+    if (url.includes('/club/id/')) {
+      // Team 999 taucht hier bewusst nicht mehr auf — nur noch Team 100.
+      return Promise.resolve({ data: { data: { matches: [
+        { homeTeam: { teamPermanentId: 100, clubId: 4468, teamname: 'Aktives Team' }, guestTeam: { teamPermanentId: 999999, clubId: 1, teamname: 'Gegner' }, ligaData: { akName: 'U18', geschlecht: 'männlich' } },
+      ] } } });
+    }
+    if (url.includes('/team/id/')) {
+      return Promise.resolve({ data: { data: { team: { teamGenderId: 1 }, matches: [activeMatch] } } });
+    }
+    if (url.includes('/match/id/')) return Promise.resolve({ data: { data: {} } });
+    if (url.includes('/competition/table/')) return Promise.resolve({ data: { data: { tabelle: { entries: [] } } } });
+    if (url.includes('/competition/spielplan/')) return Promise.resolve({ data: { data: { spieltage: [] } } });
+    return Promise.reject(new Error(`Unerwarteter Request in Test: ${url}`));
+  });
+
+  try {
+    const cronUpdate = require('../../src/cronUpdate');
+    await cronUpdate.updateAll();
+
+    const meta = JSON.parse(readFileSync(join(dir, 'metadata.json'), 'utf8'));
+    const missingTeam = meta.find(t => t.teamId === '999');
+    assert.ok(missingTeam, 'Verschwundenes Team fehlt nicht mehr komplett aus metadata.json');
+    assert.equal(missingTeam.notCurrentlyListed, true);
+    assert.equal(missingTeam.matches[0].result, '70:60', 'alter Datenstand bleibt unverändert erhalten');
+
+    const activeTeam = meta.find(t => t.teamId === '100');
+    assert.ok(activeTeam, 'aktives Team wird weiterhin normal verarbeitet');
+    assert.equal(activeTeam.notCurrentlyListed, undefined, 'aktives Team bekommt keinen notCurrentlyListed-Flag');
+  } finally {
+    if (originalIcsDir === undefined) delete process.env.BBB_ICS_DIR;
+    else process.env.BBB_ICS_DIR = originalIcsDir;
+    rmSync(dir, { recursive: true });
+    for (const mod of ['../../src/cronUpdate', '../../src/storage', '../../src/seasonArchive', '../../src/apiClient', '../../src/generateHTML']) {
+      delete require.cache[require.resolve(mod)];
+    }
+  }
+});
+
+test('updateAll: Team, das wieder in der API-Team-Liste auftaucht, verliert notCurrentlyListed automatisch', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-cron-return-'));
+  const originalIcsDir = process.env.BBB_ICS_DIR;
+  process.env.BBB_ICS_DIR = dir;
+
+  for (const mod of ['../../src/cronUpdate', '../../src/storage', '../../src/seasonArchive', '../../src/apiClient', '../../src/generateHTML']) {
+    delete require.cache[require.resolve(mod)];
+  }
+
+  writeFileSync(join(dir, 'metadata.json'), JSON.stringify([
+    {
+      teamId: '100', teamName: 'Wieder aktives Team', ageGroup: 'U18', gender: 'männlich',
+      lastUpdate: '2026-08-01T00:00:00.000Z', matchCount: 1, homeMatchCount: 1, awayMatchCount: 0,
+      logoUrl: 'https://www.basketball-bund.net/media/team/100/logo',
+      matches: [], spotlightMatches: [], competitions: [],
+      notCurrentlyListed: true,
+    },
+  ]));
+
+  const activeMatch = makeMatch({ matchId: 1, teamId: 100, result: null, date: '2026-10-01' });
+  activeMatch.ligaData.seasonId = 2026;
+
+  t.mock.method(axios, 'get', (url) => {
+    if (url.includes('/club/id/')) {
+      return Promise.resolve({ data: { data: { matches: [
+        { homeTeam: { teamPermanentId: 100, clubId: 4468, teamname: 'Wieder aktives Team' }, guestTeam: { teamPermanentId: 999999, clubId: 1, teamname: 'Gegner' }, ligaData: { akName: 'U18', geschlecht: 'männlich' } },
+      ] } } });
+    }
+    if (url.includes('/team/id/')) return Promise.resolve({ data: { data: { team: { teamGenderId: 1 }, matches: [activeMatch] } } });
+    if (url.includes('/match/id/')) return Promise.resolve({ data: { data: {} } });
+    if (url.includes('/competition/table/')) return Promise.resolve({ data: { data: { tabelle: { entries: [] } } } });
+    if (url.includes('/competition/spielplan/')) return Promise.resolve({ data: { data: { spieltage: [] } } });
+    return Promise.reject(new Error(`Unerwarteter Request in Test: ${url}`));
+  });
+
+  try {
+    const cronUpdate = require('../../src/cronUpdate');
+    await cronUpdate.updateAll();
+
+    const meta = JSON.parse(readFileSync(join(dir, 'metadata.json'), 'utf8'));
+    const team = meta.find(t => t.teamId === '100');
+    assert.ok(team);
+    assert.equal(team.notCurrentlyListed, undefined, 'Flag verschwindet automatisch, sobald das Team wieder gelistet ist');
   } finally {
     if (originalIcsDir === undefined) delete process.env.BBB_ICS_DIR;
     else process.env.BBB_ICS_DIR = originalIcsDir;
