@@ -21,6 +21,7 @@ Thumbs.db
 docs/superpowers/
 docs/plans/
 .superpowers/
+.worktrees/
 
 # Playwright MCP
 .playwright-mcp/
