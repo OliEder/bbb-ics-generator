@@ -921,20 +921,24 @@ test('buildSpotlightBlock: rendert Spiele aller Teams chronologisch', () => {
   assert.ok(html.includes('Roth'), 'Gegner fehlt');
 });
 
-test('buildSpotlightBlock: Sonderzeichen in ageGroup/teamName werden nicht doppelt escaped', () => {
+test('buildSpotlightBlock: Sonderzeichen in teamName werden nicht doppelt escaped (Fallback-Pfad ohne teamAkjId/teamNumber)', () => {
+  // Bewusst OHNE teamAkjId/teamNumber: buildTeamLabel() nutzt teamName nur im
+  // Fallback-Pfad (via teamLabel()) — mit teamAkjId/teamNumber gesetzt würde
+  // das Label rein aus ageGroup+Nummer gebaut und teamName nie durchlaufen,
+  // wodurch dieser Test den eigentlichen Bug (doppeltes escapeHtml() am
+  // Spotlight-Aufrufer) fälschlich nie ausgelöst hätte.
   const { buildSpotlightBlock } = require('../../src/generateHTML.js')._testExports;
   const teams = [
     {
       teamId: 'T1', teamName: 'TV Bar & Ball', ageGroup: 'U16', gender: 'männlich',
-      teamAkjId: 16, teamNumber: 1,
       spotlightMatches: [
         { date: '2026-04-20', time: '18:00', isHome: true, opponent: 'Gegner', opponentShort: 'GG', ownShort: 'NM', result: null, competition: 'Bezirksliga', isNext: true },
       ],
     },
   ];
   const html = buildSpotlightBlock(teams, '#7c3aed');
+  assert.ok(html.includes('TV Bar &amp; Ball'), 'teamName sollte genau einmal escaped sein ("&amp;")');
   assert.ok(!html.includes('&amp;amp;'), 'Kein doppelt escaptes "&" im spotlight-team-Label');
-  assert.ok(html.includes('U16m'), 'Label sollte "U16m" enthalten (einfach escaped)');
 });
 
 test('buildSpotlightBlock: Heim-Tab enthält nur Heimspiele', () => {
