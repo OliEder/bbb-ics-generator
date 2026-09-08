@@ -46,7 +46,8 @@ sequenceDiagram
 . `createEvents()` der ics-Bibliothek erzeugt RFC-5545-konforme VEVENT-Blöcke.
 . Post-Processing: VCALENDAR-Header wird mit X-WR-CALNAME, X-WR-TIMEZONE etc. angereichert.
 . `saveICS(teamId, type, ics)` schreibt die Datei nach `generated/{teamId}_{type}.ics`.
-. Nach allen Teams: `metadata.json` wird je Team mit Update-Zeitstempel, Spielzahlen, `logoUrl` und einem `matches`-Array geschrieben. Das `matches`-Array enthält alle Spiele der aktuellen Saison (seasonId 2025), gefiltert aus den Roh-API-Daten, aufsteigend nach Datum sortiert. Jeder Eintrag enthält: `date`, `time`, `opponent`, `isHome`, `result` (null = noch nicht gespielt), `competition` (Liga-Name), `isNext` (erstes Spiel ohne Ergebnis). Die `logoUrl` wird direkt konstruiert: `https://www.basketball-bund.net/media/team/{teamPermanentId}/logo` — kein zusätzlicher API-Aufruf.
+. Vor der Verarbeitung der aktuellen Saison ruft `cronUpdate.js` pro Team `updateArchiveForTeam()` aus `seasonArchive.js` auf (siehe Szenario 3 für den Rolling-Update-Mechanismus).
+. Nach allen Teams: `metadata.json` wird je Team mit Update-Zeitstempel, Spielzahlen, `logoUrl`, `teamAkjId`, `teamNumber` und einem `matches`-Array geschrieben. Das `matches`-Array enthält alle Spiele der aktuellen Saison, ermittelt per `currentSeasonId(matches)` (höchste vorkommende `seasonId` in den Roh-API-Daten des Teams — siehe ADR-009-Update), gefiltert und aufsteigend nach Datum sortiert. Jeder Eintrag enthält: `date`, `time`, `opponent`, `isHome`, `result` (null = noch nicht gespielt), `competition` (Liga-Name), `isNext` (erstes Spiel ohne Ergebnis). Die `logoUrl` wird direkt konstruiert: `https://www.basketball-bund.net/media/team/{teamPermanentId}/logo` — kein zusätzlicher API-Aufruf. Ein Team, das nicht mehr in der aktuellen API-Team-Liste auftaucht, wird stattdessen unverändert aus dem vorherigen Lauf übernommen und mit `notCurrentlyListed: true` markiert (siehe ADR-014).
 . GitHub Actions führt danach `npm run generate-html` aus, das `index.html` aus `metadata.json` erzeugt (Tab-UI mit Logos, ARIA-Tab-Pattern, eingebettetem Keyboard-Nav-JS). Jeder Tab-Panel zeigt oben den gefilterten Spielplan (Alle/Heim/Auswärts) mit H/A-Badges und Wettbewerbs-Label, darunter die Kalender-Abo-Buttons.
 . Das `generated/`-Verzeichnis wird als GitHub Pages Artefakt hochgeladen und deployed.
 
@@ -76,3 +77,38 @@ Wenn Schritt 6 fehlschlägt (HTTP-Fehler oder Netzwerkfehler):
 . `cronUpdate.js` prüft: `fresh === null` → prüft ob `cached` (abgelaufener Cache) vorhanden.
 . Falls abgelaufener Cache vorhanden: Warnung wird geloggt, abgelaufene Teams werden als Fallback verwendet.
 . Falls kein Cache vorhanden: Fehlermeldung wird geloggt, `[]` wird zurückgegeben — kein ICS-Update in diesem Lauf.
+
+=== Szenario 3: Saison-Archivierung während des Saisonübergangs (Rolling-Update)
+
+Dieser Ablauf tritt pro Team bei jedem Update-Zyklus ein, sobald die API für ein Team Matches mehrerer Saisons gleichzeitig zurückliefert (Übergangsphase zwischen zwei Spielzeiten) oder eine zuvor noch mitgelieferte alte Saison erstmals nicht mehr auftaucht. Details zur Entscheidung siehe ADR-014.
+
+[source,mermaid]
+----
+sequenceDiagram
+    participant CU as cronUpdate.js
+    participant SA as seasonArchive.js
+    participant FS as generated/archive/
+    CU->>SA: updateArchiveForTeam(team, matches)
+    SA->>SA: groupBySeasonId(matches)
+    SA->>SA: currentSeasonId = höchste seasonId
+    loop fuer jede aeltere seasonId in matches
+        SA->>FS: loadArchive(seasonId)
+        SA->>SA: baut/aktualisiert Team-Eintrag
+        SA->>FS: saveArchive(seasonId, status: provisional)
+    end
+    loop fuer jede vorhandene Archiv-Datei ohne aktuelle Matches
+        SA->>FS: loadArchive(seasonId)
+        SA->>SA: prüft ob Team-Status provisional
+        SA->>FS: saveArchive(seasonId, status: final)
+    end
+----
+
+==== Ablauf als nummerierte Schritte
+
+. `cronUpdate.js` ruft für jedes Team `updateArchiveForTeam(teamMeta, groupedBySeason, currentSeasonId, ...)` auf, bevor die aktuelle Saison in `metadata.json` verarbeitet wird.
+. `groupBySeasonId(matches)` gruppiert die rohen API-Matches des Teams nach `ligaData.seasonId`.
+. Für jede Saison außer der aktuellen (`currentSeasonId`, siehe Szenario 1): `buildArchiveTeamEntry()` baut Matches und Wettbewerbe (Tabelle oder Turnierbaum) analog zur Live-Saison-Verarbeitung.
+. Der bestehende Archiv-Eintrag dieser Saison wird geladen (`loadArchive(seasonId)`, falls vorhanden), der Team-Eintrag mit dem neuen Stand überschrieben, `status: 'provisional'` gesetzt, `lastSeenAt` aktualisiert, und die Datei zurückgeschrieben (`saveArchive`).
+. Anschließend werden alle vorhandenen Archiv-Dateien durchsucht: Taucht die Saison eines Teams nicht mehr unter den aktuell von der API gelieferten Matches auf (und ist nicht die aktuelle Saison) und war ihr Status bisher `provisional`, wird sie auf `status: 'final'` gesetzt. Ab diesem Zeitpunkt wird dieser Eintrag nie wieder verändert.
+. `.github/workflows/deploy.yml` committet `generated/archive/**` nach jedem Lauf zurück auf `main` (Schritt „Commit season archive"), da `generated/` sonst als reines Build-Output verloren ginge.
+. `generateHTML.js` liest beim nächsten `npm run generate-html` alle vorhandenen `generated/archive/*.json`-Dateien pro Team (`loadTeamArchives`) und rendert sie als „Archiv"-Tab auf der jeweiligen Team-Seite.

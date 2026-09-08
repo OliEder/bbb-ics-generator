@@ -39,6 +39,10 @@ flowchart TD
 | Browser → Nominatim (HTTP GET, clientseitig)
 | Geocoding für den Next-Game-Teaser: `https://nominatim.openstreetmap.org/search?format=json&q=<adresse>`. Wird im Browser des Nutzers aufgerufen (1 Anfrage pro Seitenaufruf). Kein API-Key erforderlich.
 
+| *Leaflet.js (CDN)*
+| Browser → CDN (HTTP GET, clientseitig)
+| Kartenbibliothek für den Next-Game-Teaser (v1.9.4, SRI-Hash-gesichert). Rendert die von Nominatim georeferenzierte Spielhalle als interaktive Karte mit OpenStreetMap-Tiles. Wird im Browser des Nutzers geladen, nur auf Team-Seiten mit bekannter `venueAddress`. Siehe ADR-011.
+
 | *GitHub Actions*
 | GitHub Actions → BBB Vereinsportal (triggert Build)
 | Führt den Node.js-Prozess (`npm run update` und `npm run generate-html`) in einer Ubuntu-Runner-Umgebung aus. Trigger: Cron alle 6 Stunden, Push auf `main`, manueller `workflow_dispatch`.
@@ -76,7 +80,7 @@ flowchart TD
 
 | GitHub Actions → GitHub Pages
 | GitHub Actions API / HTTP Upload
-| Artefakt-Upload via `actions/upload-pages-artifact@v3`; Deployment via `actions/deploy-pages@v4`; Concurrency-Gruppe `pages` verhindert parallele Deployments
+| Artefakt-Upload via `actions/upload-pages-artifact@v3`; Deployment via `actions/deploy-pages@v5`; Concurrency-Gruppe `pages` verhindert parallele Deployments
 
 | GitHub Pages → Kalender-Clients
 | HTTPS (TLS 1.2+) / text/calendar
@@ -85,6 +89,10 @@ flowchart TD
 | Browser → cdnjs.cloudflare.com
 | HTTPS / CSS + Webfonts
 | Font Awesome CSS und Webfont-Dateien; clientseitiger Abruf pro Seitenaufruf; keine Authentifizierung; IP-Adresse des Nutzers wird übertragen
+
+| Browser → Leaflet-CDN
+| HTTPS / JS + CSS
+| Leaflet.js v1.9.4 (SRI-Hash-gesichert); lädt anschließend Kartenkacheln direkt von OpenStreetMap-Tile-Servern nach; nur auf Team-Seiten mit bekannter Spielhallen-Adresse
 |===
 
 === Externe API-Endpunkte im Detail

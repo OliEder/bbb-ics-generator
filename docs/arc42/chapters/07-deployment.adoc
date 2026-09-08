@@ -57,7 +57,7 @@ Der Workflow benötigt drei spezifische Permissions:
 
 ==== Workflow-Schritte im Detail
 
-. *Checkout* (`actions/checkout@v4`): Klont den `main`-Branch in das Runner-Arbeitsverzeichnis. Enthält `src/`, `config.json`, `package.json`.
+. *Checkout* (`actions/checkout@v5`): Klont den `main`-Branch in das Runner-Arbeitsverzeichnis. Enthält `src/`, `config.json`, `package.json`.
 
 . *Setup Node.js* (`actions/setup-node@v5`, `node-version: '24'`): Installiert Node.js 24 LTS auf dem Ubuntu-Runner.
 
@@ -71,11 +71,11 @@ Der Workflow benötigt drei spezifische Permissions:
 
 . *List generated files (debug)* (`ls -la generated/`, `find generated/ -name "*.ics" -ls`): Diagnostik-Schritt, listet alle erzeugten Dateien im Actions-Log.
 
-. *Setup Pages* (`actions/configure-pages@v4`): Konfiguriert GitHub Pages für den aktuellen Repository-Kontext.
+. *Setup Pages* (`actions/configure-pages@v5`): Konfiguriert GitHub Pages für den aktuellen Repository-Kontext.
 
 . *Upload artifact* (`actions/upload-pages-artifact@v3`, `path: ./generated`): Packt das `generated/`-Verzeichnis als Pages-Artefakt.
 
-. *Deploy to GitHub Pages* (`actions/deploy-pages@v4`): Deployed das Artefakt auf GitHub Pages. Gibt die öffentliche URL als Output `page_url` zurück.
+. *Deploy to GitHub Pages* (`actions/deploy-pages@v5`): Deployed das Artefakt auf GitHub Pages. Gibt die öffentliche URL als Output `page_url` zurück.
 
 ==== Concurrency-Steuerung
 
