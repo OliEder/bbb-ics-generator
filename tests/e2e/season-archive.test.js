@@ -198,6 +198,17 @@ test('updateArchiveForTeam: nur eine Saison vorhanden → kein Archiv-Eintrag', 
   });
 });
 
+test('updateArchiveForTeam: currentSeasonId ist null (keine erkennbare aktuelle Saison) → kein Archiv-Zugriff, keine Saison wird fälschlich als alt archiviert', async () => {
+  await withTempDirAsync(async ({ updateArchiveForTeam, loadArchive }) => {
+    const teamMeta = { id: '100', name: 'Eigenes Team', ageGroup: 'U18', gender: 'männlich' };
+    const groupedBySeason = { 2025: [makeMatch({ matchId: 1, seasonId: 2025 })] };
+
+    await updateArchiveForTeam(teamMeta, groupedBySeason, null, {}, noopApiFns);
+
+    assert.equal(loadArchive(2025), null, 'Ohne bekannte aktuelle Saison darf nichts archiviert werden');
+  });
+});
+
 test('updateArchiveForTeam: final gewordene Saison wird nicht erneut überschrieben, wenn sie weiterhin fehlt', async () => {
   await withTempDirAsync(async ({ updateArchiveForTeam, loadArchive, saveArchive }) => {
     saveArchive(2025, {

@@ -116,6 +116,12 @@ function loadArchive(season) {
 }
 
 async function updateArchiveForTeam(teamMeta, groupedBySeason, currentSeasonId, details, apiFns) {
+  // Ohne eine bekannte aktuelle Saison lässt sich "alt" nicht von "aktuell"
+  // unterscheiden — ein Team ohne jegliche numerische seasonId in seinen
+  // Matches wird übersprungen, statt versehentlich die einzige Saison als
+  // "alt" zu archivieren.
+  if (typeof currentSeasonId !== 'number') return;
+
   const seasonIds = Object.keys(groupedBySeason).map(Number);
   const olderSeasonIds = seasonIds.filter(id => id !== currentSeasonId);
 
