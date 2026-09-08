@@ -148,10 +148,10 @@ a|
 | Aspekt | Beschreibung
 
 | *Verantwortlichkeit*
-| Erzeugt die komplette statische Website aus `metadata.json`: Startseite (`index.html`) mit adaptiven Team-Teasern und Navigationsmenü sowie individuelle Team-Seiten (`teams/{teamId}.html`) mit Next-Game-Teaser, Ligatabellen, Turnierbäumen, Spielplan-Tabs und Kalender-Abo-Links.
+| Erzeugt die komplette statische Website aus `metadata.json`: Startseite (`index.html`) mit adaptiven Team-Teasern und Navigationsmenü sowie individuelle Team-Seiten (`teams/{teamId}.html`) mit Next-Game-Teaser, Ligatabellen, Turnierbäumen, Spielplan-Tabs, Kalender-Abo-Links und optionalem Archiv-Tab für vergangene Saisons.
 
 | *Eingang*
-| `generated/metadata.json` mit vollständigen Team-Metadaten: Spielplan (mit `isNext`, `ownShort`, `opponentShort`, `venueName`, `venueAddress`), Ligatabellen (`competitions[].table`), Turnierbäume (`competitions[].bracket`), Geschlecht, Altersgruppe, Logo-URL, `spotlightMatches` (0–2 Spotlight-Spiele pro Team).
+| `generated/metadata.json` mit vollständigen Team-Metadaten: Spielplan (mit `isNext`, `ownShort`, `opponentShort`, `venueName`, `venueAddress`), Ligatabellen (`competitions[].table`), Turnierbäume (`competitions[].bracket`), Geschlecht, Altersgruppe, Logo-URL, `spotlightMatches` (0–2 Spotlight-Spiele pro Team), optional `notCurrentlyListed: true` (Team ist vorübergehend nicht in der API-Teamliste enthalten). Zusätzlich `generated/archive/{season}.json`-Dateien (geschrieben von `seasonArchive.js`) mit archivierten Vorjahres-Saisons pro Team.
 
 | *Ausgang*
 | `generated/index.html` (Startseite), `generated/teams/{teamId}.html` (eine Datei pro Team), `generated/datenschutz.html` und `generated/barrierefreiheit.html` (immer), sowie `generated/impressum.html` (nur wenn `config.legal` mindestens ein nicht-leeres Feld hat). Alle HTML-Dateien sind vollständig eigenständig (inline CSS + JS, keine externen Assets außer Leaflet CDN, Font Awesome CDN und BBB-Logo-URL).
@@ -168,7 +168,10 @@ a|
 * `resultIcon(match)` — gibt SVG-Icon-String für Sieg (Pokal) oder Niederlage (✕) zurück, oder leeren String wenn kein Ergebnis/Unentschieden
 * `buildStandingsTable(comp)` — zwei Tabs: offizielle Tabelle + Games-Behind-Ranking
 * `buildBracket(comp, ownTeamName)` — Turnierbaum mit Highlight des eigenen Teams und TBD-Platzhaltern für zukünftige Runden
-* `buildTeamPage(team, allTeams, theme)` — vollständige Team-Seite
+* `buildTeamPage(team, allTeams, theme, legal, archives)` — vollständige Team-Seite; rendert bei `team.notCurrentlyListed === true` einen Hinweis „Team aktuell nicht gemeldet" oberhalb des Next-Game-Teasers, und bei nicht-leerem `archives`-Array einen zusätzlichen „Archiv"-Tab neben Alle/Heim/Auswärts
+* `loadTeamArchives(generatedDir, teamId)` — liest alle `generated/archive/{season}.json`-Dateien, filtert auf den jeweiligen `teamId`-Eintrag und liefert die Ergebnisse absteigend nach Saison sortiert; nicht parsbare Archivdateien werden übersprungen, damit ein defektes Archiv nicht die gesamte HTML-Generierung blockiert
+* `buildArchiveSeasonBlock(archiveEntry, cupColor)` — rendert eine archivierte Saison: Überschrift „Saison YYYY/YY", optionaler „vorläufiger Stand"-Hinweis bei `status === 'provisional'`, Ligatabellen/Turnierbäume (wiederverwendet `buildStandingsTable`/`buildBracket`) und Spielplanzeilen (wiederverwendet `buildScheduleRow`)
+* `buildArchiveTab(teamId, archives, cupColor)` — liefert leeren String wenn keine Archive vorhanden sind, sonst ein `role="tabpanel"`-Element mit allen Saison-Blöcken
 * `buildIndexPage(teams, theme)` — Startseite
 * `teamLabel(teamName, ageGroup, gender)` — einheitliche Teambezeichnung mit Geschlechtssymbol
 * `sortTeams(teams)` — Senioren zuerst, dann aufsteigend nach Altersgruppe

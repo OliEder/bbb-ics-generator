@@ -1289,3 +1289,167 @@ test('buildTabScript: enthält Clipboard-Handler für btn--copy', () => {
     assert.ok(!html.includes('aria-label="Sieg"') && !html.includes('aria-label="Niederlage"'), 'Icon darf bei zukünftigem Spotlight-Spiel nicht erscheinen');
   });
 }
+
+// --- Archiv-Tab & "nicht gemeldet" Banner ---
+
+test('Team ohne Archiv-Dateien: kein Archiv-Tab in generierter Seite', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
+    assert.ok(!html.includes('tab-167881-archive'), 'Archiv-Tab-Button darf ohne Archivdaten nicht existieren');
+    assert.ok(!html.includes('panel-167881-archive'), 'Archiv-Tab-Panel darf ohne Archivdaten nicht existieren');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('Team MIT Archiv-Eintrag: Archiv-Tab erscheint mit Saison-Label und Gegner/Ergebnis', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const archiveDir = join(dir, 'archive');
+    require('fs').mkdirSync(archiveDir, { recursive: true });
+    writeFileSync(join(archiveDir, '2025.json'), JSON.stringify({
+      season: 2025,
+      teams: {
+        '167881': {
+          teamName: 'Fibalon Baskets Neumarkt U10',
+          ageGroup: 'U10',
+          gender: 'männlich',
+          status: 'final',
+          lastSeenAt: new Date().toISOString(),
+          matches: [
+            { date: '2025-10-12', time: '15:00', opponent: 'ArchivGegner', isHome: true, result: '55:40', competition: 'Kreisliga', isNext: false, venueName: '', venueAddress: '', opponentLogoUrl: '' },
+          ],
+          competitions: [],
+        },
+      },
+    }));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
+    assert.ok(html.includes('tab-167881-archive'), 'Archiv-Tab-Button fehlt');
+    assert.ok(html.includes('panel-167881-archive'), 'Archiv-Tab-Panel fehlt');
+    assert.ok(html.includes('Saison 2025/26'), 'Saison-Label fehlt');
+    assert.ok(html.includes('ArchivGegner'), 'Gegnername aus Archiv fehlt');
+    assert.ok(html.includes('55:40'), 'Ergebnis aus Archiv fehlt');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('Archivierte Saison mit status "provisional" zeigt "vorläufig" Hinweis', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const archiveDir = join(dir, 'archive');
+    require('fs').mkdirSync(archiveDir, { recursive: true });
+    writeFileSync(join(archiveDir, '2025.json'), JSON.stringify({
+      season: 2025,
+      teams: {
+        '167881': {
+          teamName: 'Fibalon Baskets Neumarkt U10',
+          ageGroup: 'U10',
+          gender: 'männlich',
+          status: 'provisional',
+          lastSeenAt: new Date().toISOString(),
+          matches: [],
+          competitions: [],
+        },
+      },
+    }));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
+    assert.ok(/vorläufig/i.test(html), '"vorläufig" Hinweis fehlt bei status: provisional');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('Team mit notCurrentlyListed: true zeigt "nicht gemeldet" Hinweis, Team ohne Flag nicht', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    const meta = [
+      { ...sampleMetadata[0], notCurrentlyListed: true },
+      { ...sampleMetadata[1] },
+    ];
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(meta));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const htmlFlagged = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
+    const htmlNormal = readFileSync(join(dir, 'teams', '167882.html'), 'utf8');
+    assert.ok(/nicht gemeldet/i.test(htmlFlagged), '"nicht gemeldet" Hinweis fehlt bei notCurrentlyListed: true');
+    assert.ok(!/nicht gemeldet/i.test(htmlNormal), '"nicht gemeldet" Hinweis darf ohne Flag nicht erscheinen');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('Archivierter Gegnername mit <script> wird escaped ausgegeben', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const archiveDir = join(dir, 'archive');
+    require('fs').mkdirSync(archiveDir, { recursive: true });
+    writeFileSync(join(archiveDir, '2025.json'), JSON.stringify({
+      season: 2025,
+      teams: {
+        '167881': {
+          teamName: 'Fibalon Baskets Neumarkt U10',
+          ageGroup: 'U10',
+          gender: 'männlich',
+          status: 'final',
+          lastSeenAt: new Date().toISOString(),
+          matches: [
+            { date: '2025-10-12', time: '15:00', opponent: '<script>alert(1337)</script>', isHome: true, result: '55:40', competition: 'Kreisliga', isNext: false, venueName: '', venueAddress: '', opponentLogoUrl: '' },
+          ],
+          competitions: [],
+        },
+      },
+    }));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
+    assert.ok(!html.includes('<script>alert(1337)'), 'raw script tag aus Archiv-Gegnername darf nicht im Output sein');
+    assert.ok(html.includes('&lt;script&gt;alert(1337)&lt;/script&gt;'), 'escaped Form des Archiv-Gegnernamens fehlt');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('loadTeamArchives: liest Archivdateien, ignoriert kaputte Dateien, sortiert absteigend', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    const archiveDir = join(dir, 'archive');
+    require('fs').mkdirSync(archiveDir, { recursive: true });
+    writeFileSync(join(archiveDir, '2024.json'), JSON.stringify({
+      season: 2024,
+      teams: { '167881': { teamName: 'T', ageGroup: 'U10', gender: '', status: 'final', lastSeenAt: '', matches: [], competitions: [] } },
+    }));
+    writeFileSync(join(archiveDir, '2025.json'), JSON.stringify({
+      season: 2025,
+      teams: { '167881': { teamName: 'T', ageGroup: 'U10', gender: '', status: 'final', lastSeenAt: '', matches: [], competitions: [] } },
+    }));
+    writeFileSync(join(archiveDir, '2023.json'), JSON.stringify({
+      season: 2023,
+      teams: { '999999': { teamName: 'Other', ageGroup: 'U10', gender: '', status: 'final', lastSeenAt: '', matches: [], competitions: [] } },
+    }));
+    writeFileSync(join(archiveDir, '2022.json'), '{not valid json');
+
+    const modPath = require.resolve('../../src/generateHTML.js');
+    delete require.cache[modPath];
+    const { _testExports } = require('../../src/generateHTML.js');
+    const { loadTeamArchives } = _testExports;
+
+    const archives = loadTeamArchives(dir, '167881');
+    assert.equal(archives.length, 2, 'sollte nur die 2 Archive mit passender teamId liefern');
+    assert.equal(archives[0].season, 2025, 'sollte absteigend sortiert sein');
+    assert.equal(archives[1].season, 2024, 'sollte absteigend sortiert sein');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
