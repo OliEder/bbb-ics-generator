@@ -3,16 +3,16 @@
 const fs   = require('fs');
 const path = require('path');
 
-const BASE_URL = 'https://olieder.github.io/bbb-ics-generator/';
+const DEFAULT_BASE_URL = 'https://olieder.github.io/bbb-ics-generator/';
 
-function makeWebcalLink(filename) {
-  return BASE_URL.replace(/^https:/, 'webcal:') + filename;
+function makeWebcalLink(filename, baseUrl) {
+  return baseUrl.replace(/^https:/, 'webcal:') + filename;
 }
-function makeHttpsLink(filename) {
-  return BASE_URL + filename;
+function makeHttpsLink(filename, baseUrl) {
+  return baseUrl + filename;
 }
-function makeGoogleCalLink(filename) {
-  return 'https://www.google.com/calendar/render?cid=' + encodeURIComponent(makeWebcalLink(filename));
+function makeGoogleCalLink(filename, baseUrl) {
+  return 'https://www.google.com/calendar/render?cid=' + encodeURIComponent(makeWebcalLink(filename, baseUrl));
 }
 
 // Returns an HTML span with a visible symbol and a screen-reader label.
@@ -920,7 +920,7 @@ function buildSpotlightBlock(teams, cupColor) {
 </section>`;
 }
 
-function buildTeamPage(team, allTeams, theme, legal = {}) {
+function buildTeamPage(team, allTeams, theme, legal = {}, baseUrl = DEFAULT_BASE_URL) {
   const { primary, accent, cupColor } = theme;
 
   const logoHtml = team.logoUrl
@@ -958,9 +958,9 @@ function buildTeamPage(team, allTeams, theme, legal = {}) {
   const panels = variants.map(({ type }) =>
     buildTabPanel(
       team.teamId, type,
-      makeWebcalLink(`${team.teamId}_${type}.ics`),
-      makeGoogleCalLink(`${team.teamId}_${type}.ics`),
-      makeHttpsLink(`${team.teamId}_${type}.ics`),
+      makeWebcalLink(`${team.teamId}_${type}.ics`, baseUrl),
+      makeGoogleCalLink(`${team.teamId}_${type}.ics`, baseUrl),
+      makeHttpsLink(`${team.teamId}_${type}.ics`, baseUrl),
       team.matches || [],
       cupColor,
     )
@@ -1155,7 +1155,7 @@ function buildBarrierefreiheit(legal, allTeams, theme) {
   return buildLegalSkeleton('Barrierefreiheitserklärung', content, allTeams, theme, legal);
 }
 
-function genHTML(theme = {}, legal = {}) {
+function genHTML(theme = {}, legal = {}, options = {}) {
   const primary  = sanitizeCssColor(theme.primary  || '#004174');
   const accent   = sanitizeCssColor(theme.accent   || '#009ef3');
   const cupColor = sanitizeCssColor(theme.cupColor || '#7c3aed');
@@ -1163,7 +1163,8 @@ function genHTML(theme = {}, legal = {}) {
 
   const resolvedTheme = { primary, accent, cupColor, logoUrl };
 
-  const generatedDir = process.env.BBB_GENERATED_DIR || process.env.BBB_ICS_DIR || path.resolve(__dirname, '../generated');
+  const baseUrl = options.baseUrl || DEFAULT_BASE_URL;
+  const generatedDir = options.outputDir || process.env.BBB_GENERATED_DIR || process.env.BBB_ICS_DIR || path.resolve(__dirname, '../generated');
   const metaPath = path.join(generatedDir, 'metadata.json');
   const teams    = fs.existsSync(metaPath) ? JSON.parse(fs.readFileSync(metaPath, 'utf8')) : [];
 
@@ -1176,7 +1177,7 @@ function genHTML(theme = {}, legal = {}) {
   for (const team of teams) {
     fs.writeFileSync(
       path.join(teamsDir, `${team.teamId}.html`),
-      buildTeamPage(team, teams, resolvedTheme, legal),
+      buildTeamPage(team, teams, resolvedTheme, legal, baseUrl),
       'utf8'
     );
   }

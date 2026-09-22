@@ -467,6 +467,33 @@ test('Auswärtsspiel hat badge--away im HTML', () => {
   }
 });
 
+test('genHTML: options.baseUrl überschreibt die Standard-BASE_URL in ICS-Links', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME, {}, { baseUrl: 'https://olieder.github.io/bbb-ics-generator/bayern/fibalon/' });
+    const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
+    assert.ok(html.includes('webcal://olieder.github.io/bbb-ics-generator/bayern/fibalon/167881_all.ics'));
+    assert.ok(!html.includes('webcal://olieder.github.io/bbb-ics-generator/167881_all.ics'));
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('genHTML: ohne options.baseUrl bleibt das bisherige Default-Verhalten erhalten', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
+    assert.ok(html.includes('webcal://olieder.github.io/bbb-ics-generator/167881_all.ics'));
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
 // --- sortTeams ---
 test('sortTeams: Herren first, then U-groups descending', () => {
   const modPath = require.resolve('../../src/generateHTML.js');
