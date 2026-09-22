@@ -1316,3 +1316,37 @@ test('buildTabScript: enthält Clipboard-Handler für btn--copy', () => {
     assert.ok(!html.includes('aria-label="Sieg"') && !html.includes('aria-label="Niederlage"'), 'Icon darf bei zukünftigem Spotlight-Spiel nicht erscheinen');
   });
 }
+
+test('genHTML: mit options.migrationNotice erscheint ein Banner auf index.html und Team-Seiten', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME, {}, {
+      migrationNotice: { newBasePath: '/bayern/fibalon/' },
+    });
+
+    const index = readFileSync(join(dir, 'index.html'), 'utf8');
+    assert.ok(index.includes('/bayern/fibalon/'), 'Banner-Link fehlt auf index.html');
+    assert.ok(/migration-banner/i.test(index), 'Banner-Markup fehlt auf index.html');
+
+    const teamPage = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
+    assert.ok(teamPage.includes('/bayern/fibalon/'), 'Banner-Link fehlt auf Team-Seite');
+    assert.ok(/migration-banner/i.test(teamPage), 'Banner-Markup fehlt auf Team-Seite');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('genHTML: ohne options.migrationNotice erscheint kein Banner', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const index = readFileSync(join(dir, 'index.html'), 'utf8');
+    assert.ok(!/migration-banner/i.test(index));
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});

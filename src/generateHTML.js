@@ -46,6 +46,15 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
+function buildMigrationBanner(migrationNotice) {
+  if (!migrationNotice || !migrationNotice.newBasePath) return '';
+  const href = escapeHtml(migrationNotice.newBasePath);
+  return `<div class="migration-banner" role="note">` +
+    `Diese Seite ist umgezogen. Bitte besuche und aktualisiere deine Lesezeichen: ` +
+    `<a href="${href}">${href}</a>` +
+    `</div>`;
+}
+
 const ICON_WIN = `<svg class="result-icon result-icon--win" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Sieg"><path d="M6 9H4a2 2 0 0 1-2-2V5h4"/><path d="M18 9h2a2 2 0 0 0 2-2V5h-4"/><path d="M12 17v4"/><path d="M8 21h8"/><path d="M6 9a6 6 0 0 0 12 0V3H6z"/></svg>`;
 const ICON_LOSS = `<svg class="result-icon result-icon--loss" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" role="img" aria-label="Niederlage"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
 
@@ -922,6 +931,7 @@ function buildSpotlightBlock(teams, cupColor) {
 
 function buildTeamPage(team, allTeams, theme, legal = {}, renderOptions = {}) {
   const baseUrl = renderOptions.baseUrl || DEFAULT_BASE_URL;
+  const migrationNotice = renderOptions.migrationNotice || null;
   const { primary, accent, cupColor } = theme;
 
   const logoHtml = team.logoUrl
@@ -980,6 +990,7 @@ function buildTeamPage(team, allTeams, theme, legal = {}, renderOptions = {}) {
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 </head>
 <body>
+  ${buildMigrationBanner(migrationNotice)}
   ${nav}
   <main>
     <div class="team-page-header">
@@ -1024,7 +1035,7 @@ function buildFooter(legal, relativePath) {
 </footer>`;
 }
 
-function buildIndexPage(teams, theme, legal = {}) {
+function buildIndexPage(teams, theme, legal = {}, migrationNotice = null) {
   const { primary, accent, cupColor, logoUrl } = theme;
   const sorted = sortTeams(teams);
   const nav = buildNavigation(teams, 'index');
@@ -1044,6 +1055,7 @@ function buildIndexPage(teams, theme, legal = {}) {
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous">
 </head>
 <body>
+  ${buildMigrationBanner(migrationNotice)}
   ${nav}
   <main>
     <div class="team-page-header">
@@ -1165,12 +1177,13 @@ function genHTML(theme = {}, legal = {}, options = {}) {
   const resolvedTheme = { primary, accent, cupColor, logoUrl };
 
   const baseUrl = options.baseUrl || DEFAULT_BASE_URL;
+  const migrationNotice = options.migrationNotice || null;
   const generatedDir = options.outputDir || process.env.BBB_GENERATED_DIR || process.env.BBB_ICS_DIR || path.resolve(__dirname, '../generated');
   const metaPath = path.join(generatedDir, 'metadata.json');
   const teams    = fs.existsSync(metaPath) ? JSON.parse(fs.readFileSync(metaPath, 'utf8')) : [];
 
   // Write index.html
-  fs.writeFileSync(path.join(generatedDir, 'index.html'), buildIndexPage(teams, resolvedTheme, legal), 'utf8');
+  fs.writeFileSync(path.join(generatedDir, 'index.html'), buildIndexPage(teams, resolvedTheme, legal, migrationNotice), 'utf8');
 
   // Write teams/{teamId}.html
   const teamsDir = path.join(generatedDir, 'teams');
@@ -1178,7 +1191,7 @@ function genHTML(theme = {}, legal = {}, options = {}) {
   for (const team of teams) {
     fs.writeFileSync(
       path.join(teamsDir, `${team.teamId}.html`),
-      buildTeamPage(team, teams, resolvedTheme, legal, { baseUrl }),
+      buildTeamPage(team, teams, resolvedTheme, legal, { baseUrl, migrationNotice }),
       'utf8'
     );
   }
@@ -1193,7 +1206,7 @@ function genHTML(theme = {}, legal = {}, options = {}) {
 }
 
 module.exports = { genHTML };
-module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket, buildNavScript, buildSharedStyles, buildTabScript, buildTeamPage, buildIndexPage, buildNextGameTeaser, buildSpotlightBlock, spotlightTeamLabel, buildFooter, buildImpressum, buildDatenschutz, buildBarrierefreiheit, buildCalHelp, buildTabPanel, isWin, resultIcon };
+module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket, buildNavScript, buildSharedStyles, buildTabScript, buildTeamPage, buildIndexPage, buildNextGameTeaser, buildSpotlightBlock, spotlightTeamLabel, buildFooter, buildImpressum, buildDatenschutz, buildBarrierefreiheit, buildCalHelp, buildTabPanel, isWin, resultIcon, buildMigrationBanner };
 
 if (require.main === module) {
   const config = require('../config.json');
