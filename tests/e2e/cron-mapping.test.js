@@ -390,3 +390,99 @@ test('updateAll: ohne legacyRootOutput entsteht KEIN Alt-Pfad-Duplikat unter gen
     delete process.env.BBB_ICS_DIR;
   }
 });
+
+// ---- Regressionstest: Teams-Cache-Isolation über updateAll() bei mehreren Clubs ----
+// Deckt genau den Bug ab, der beim echten End-to-End-Test gegen die Basketball-Bund.net-API
+// mit mehreren Clubs gefunden wurde: teams-cache.json war eine einzige globale Datei ohne
+// Club-Bezug. getTeams(clubId) rief loadTeamsCache()/saveTeamsCache(fresh) OHNE clubId auf,
+// sodass der zweite (und jeder weitere) Club in einem Multi-Club-Lauf beim Cache-Check
+// stillschweigend die gecachte Team-Liste des ERSTEN Clubs zurückbekam — falsche Teams,
+// falsche Spiele und (als Folge) falsch hergeleitetes Bundesland für jeden Club nach dem
+// ersten. fetchClubTeams wird hier bewusst als Funktion implementiert, die je nach
+// übergebener clubId unterschiedliche Team-Listen liefert (kein fixer Rückgabewert) — nur
+// so kann ein Test überhaupt unterscheiden, ob Club B seine EIGENEN Teams bekommt oder
+// (Bug) die von Club A geerbten.
+test('updateAll: zwei Clubs mit unterschiedlichen Team-Listen — Club B bekommt NICHT Club As Teams (Cache-Isolation)', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-cron-multiclub-'));
+  const clubsDir = mkdtempSync(join(tmpdir(), 'bbb-cron-multiclub-clubs-'));
+  try {
+    // Club A: Bayern, clubId 1111
+    mkdirSync(join(clubsDir, 'bayern', 'club-a'), { recursive: true });
+    writeFileSync(
+      join(clubsDir, 'bayern', 'club-a', 'config.json'),
+      JSON.stringify({ clubId: '1111' })
+    );
+    // Club B: Hessen, clubId 2222 — Verarbeitungsreihenfolge ist plattformabhängig
+    // (fs.readdirSync sortiert nicht garantiert); der Test prüft daher beide Clubs
+    // unabhängig davon, welcher zuerst verarbeitet wird — der Bug betraf ohnehin
+    // "jeden Club nach dem ersten", unabhängig von A/B-Reihenfolge.
+    mkdirSync(join(clubsDir, 'hessen', 'club-b'), { recursive: true });
+    writeFileSync(
+      join(clubsDir, 'hessen', 'club-b', 'config.json'),
+      JSON.stringify({ clubId: '2222' })
+    );
+
+    process.env.BBB_ICS_DIR = dir;
+    process.env.BBB_CLUBS_DIR = clubsDir;
+
+    const TEAMS_BY_CLUB = {
+      '1111': [{ id: '100', name: 'Club A Team', ageGroup: 'Herren', gender: 'männlich' }],
+      '2222': [{ id: '200', name: 'Club B Team', ageGroup: 'Damen', gender: 'weiblich' }],
+    };
+
+    // verbandId 2 = Bayern, 6 = Hessen (siehe src/verbandMapping.js) — das derivierte
+    // Bundesland (nicht der Quellordnername sourceBundeslandSlug) bestimmt den
+    // tatsächlichen Ausgabepfad, daher müssen die Matches die passende verbandId tragen.
+    function makeMatchFor(teamId, teamName, verbandId) {
+      return {
+        matchId: Number(teamId) * 10 + 1,
+        kickoffDate: '2026-05-01',
+        kickoffTime: '18:00',
+        matchNo: '1',
+        result: null,
+        homeTeam: { teamPermanentId: teamId, teamname: teamName, teamnameSmall: teamName.slice(0, 2) },
+        guestTeam: { teamPermanentId: 999, teamname: 'Gegner', teamnameSmall: 'GG' },
+        ligaData: { liganame: 'Bezirksliga', seasonId: 2026, seasonName: '2025/26', ligaId: '1', verbandId },
+      };
+    }
+
+    const { cronModule } = resetCronModules(apiClient => {
+      // Schaltet je nach übergebener clubId auf unterschiedliche Team-Listen um —
+      // genau das Verhalten, das den Bug beim echten API-Test sichtbar machte.
+      apiClient.fetchClubTeams = async (clubId) => TEAMS_BY_CLUB[clubId] || [];
+      apiClient.fetchTeamMatches = async (teamId) => {
+        const isClubA = teamId === '100';
+        const team = isClubA ? TEAMS_BY_CLUB['1111'][0] : TEAMS_BY_CLUB['2222'][0];
+        const verbandId = isClubA ? 2 : 6; // Bayern vs. Hessen
+        return { matches: [makeMatchFor(teamId, team.name, verbandId)], gender: team.gender };
+      };
+      apiClient.fetchMatchInfo = async () => null;
+      apiClient.fetchLeagueTable = async () => null;
+      apiClient.fetchTournamentRounds = async () => null;
+    });
+
+    await cronModule.updateAll();
+
+    const metaAPath = join(dir, 'bayern', 'club-a', 'metadata.json');
+    const metaBPath = join(dir, 'hessen', 'club-b', 'metadata.json');
+
+    assert.ok(existsSync(metaAPath), 'Club A metadata.json muss existieren');
+    assert.ok(existsSync(metaBPath), 'Club B metadata.json muss existieren');
+
+    const metaA = JSON.parse(readFileSync(metaAPath, 'utf8'));
+    const metaB = JSON.parse(readFileSync(metaBPath, 'utf8'));
+
+    assert.equal(metaA.length, 1, 'Club A muss genau sein eigenes Team enthalten');
+    assert.equal(metaA[0].teamId, '100', 'Club A muss seine EIGENE teamId haben');
+    assert.equal(metaA[0].teamName, 'Club A Team', 'Club A muss seinen EIGENEN Teamnamen haben');
+
+    assert.equal(metaB.length, 1, 'Club B muss genau sein eigenes Team enthalten');
+    assert.equal(metaB[0].teamId, '200', 'Club B (zweiter verarbeiteter Club) muss seine EIGENE teamId haben, NICHT die von Club A');
+    assert.equal(metaB[0].teamName, 'Club B Team', 'Club B darf NICHT den von Club A geerbten (gecachten) Teamnamen bekommen');
+  } finally {
+    rmSync(dir, { recursive: true });
+    rmSync(clubsDir, { recursive: true });
+    delete process.env.BBB_CLUBS_DIR;
+    delete process.env.BBB_ICS_DIR;
+  }
+});

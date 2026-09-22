@@ -44,7 +44,7 @@ a|
 `verbandMapping.js`: `deriveClubBundesland(teamVerbandIds)` +
 `apiClient.js`: `fetchTeamMatches(teamId)`, `fetchMatchInfo(matchId)`, `fetchClubTeams(clubId)`, `fetchLeagueTable(ligaId, ownTeamId)`, `fetchTournamentRounds(ligaId)`, `mapWithConcurrency(items, limit, mapper)` +
 `icsGenerator.js`: `generateICS(matches, details, teamId, type, teamName, migrationNotice)` +
-`storage.js`: `saveICS(teamId, type, data, outputDir)`, `saveTeamsCache(teams)`, `loadTeamsCache()`, `sanitizeSlug(slug)` +
+`storage.js`: `saveICS(teamId, type, data, outputDir)`, `saveTeamsCache(teams, clubId)`, `loadTeamsCache(clubId)`, `sanitizeSlug(slug)` +
 `generateHTML.js`: `genHTML(theme, legal, options)` +
 `clubs/<bundesland>/<club>/config.json`: `clubId`, `legacyRootOutput`, `theme`, `cupColor`, `legal`
 
@@ -198,8 +198,8 @@ a|
 a|
 * `saveICS(teamId, type, data, outputDir)` → `string` (Dateipfad) — `outputDir` ist ein neuer, optionaler vierter Parameter
 * `readICS(teamId, type, outputDir)` → `string \| null` — ebenfalls um `outputDir` erweitert
-* `saveTeamsCache(teams)` → schreibt `teams-cache.json`
-* `loadTeamsCache()` → `{ teams: Array \| null, stale: boolean }`
+* `saveTeamsCache(teams, clubId)` → schreibt `teams-cache-<clubId>.json` — `clubId` ist erforderlich (wirft ohne)
+* `loadTeamsCache(clubId)` → `{ teams: Array \| null, stale: boolean }` — `clubId` ist erforderlich (wirft ohne)
 * `sanitizeSlug(slug)` → `string` (neu) — validiert und gibt den Slug unverändert zurück, oder wirft
 
 | *`outputDir`-Parameter (neu)*
@@ -216,7 +216,7 @@ a|
 * Alle drei Prüfungen verhindern Path-Traversal (z. B. `../../etc/passwd`).
 
 | *Cache-Logik*
-| `teams-cache.json` enthält `{ cachedAt: ISO-8601-String, teams: [...] }`. TTL = 30 Tage. `loadTeamsCache` gibt `stale: true` zurück wenn `Date.now() - cachedAt >= 30 * 24 * 60 * 60 * 1000`. Bei Parse-Fehler wird `{ teams: null, stale: true }` zurückgegeben.
+| Der Team-Cache ist pro Club gescoped: `teams-cache-<clubId>.json` (clubId wird auf `[a-zA-Z0-9_-]` bereinigt) enthält `{ cachedAt: ISO-8601-String, teams: [...] }`. TTL = 30 Tage. `loadTeamsCache(clubId)` gibt `stale: true` zurück wenn `Date.now() - cachedAt >= 30 * 24 * 60 * 60 * 1000`. Bei Parse-Fehler wird `{ teams: null, stale: true }` zurückgegeben. `clubId` ist ein PFLICHT-Parameter (kein optionaler globaler Fallback wie bei `outputDir`) — ohne clubId-Scoping würden alle Clubs sich denselben Cache teilen und der zweite/jeder weitere Club in einem Multi-Club-Lauf würde stillschweigend die Team-Liste des vorherigen Clubs erben (siehe ADR/Bugfix: geteilter Teams-Cache).
 
 | *Ausgabeverzeichnis*
 | Global: `generated/` (relativ zum Projektroot, überschreibbar via `BBB_ICS_DIR`), wird bei Start automatisch angelegt wenn nicht vorhanden. Pro Club: `generated/<bundesland>/<club-slug>/`, via den neuen `outputDir`-Parameter von `cronUpdate.js` übergeben.

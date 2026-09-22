@@ -38,7 +38,7 @@ test('Cache-HIT: loadTeamsCache gibt frische Teams zurück → fetchClubTeams ni
   try {
     // Write a fresh cache
     const storage = requireStorage(dir);
-    storage.saveTeamsCache(mockTeams);
+    storage.saveTeamsCache(mockTeams, '4468');
 
     // Stub axios so any real network call fails loudly
     const axios = require('axios');
@@ -61,7 +61,7 @@ test('Cache-MISS: stale Cache → fetchClubTeams wird aufgerufen, Cache neu gesc
     // Write a stale cache (31 days old)
     const old = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString();
     writeFileSync(
-      join(dir, 'teams-cache.json'),
+      join(dir, 'teams-cache-4468.json'),
       JSON.stringify({ cachedAt: old, teams: mockTeams }),
       'utf8'
     );
@@ -76,7 +76,7 @@ test('Cache-MISS: stale Cache → fetchClubTeams wird aufgerufen, Cache neu gesc
 
     // Verify cache was written fresh
     const { loadTeamsCache } = requireStorage(dir);
-    const { stale } = loadTeamsCache();
+    const { stale } = loadTeamsCache('4468');
     assert.equal(stale, false, 'Cache sollte nach Update nicht stale sein');
   } finally {
     rmSync(dir, { recursive: true });
@@ -91,7 +91,7 @@ test('Fallback: fetchClubTeams wirft Error + stale Cache → stale Cache zurück
     // Write a stale cache
     const old = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString();
     writeFileSync(
-      join(dir, 'teams-cache.json'),
+      join(dir, 'teams-cache-4468.json'),
       JSON.stringify({ cachedAt: old, teams: mockTeams }),
       'utf8'
     );

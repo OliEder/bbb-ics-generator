@@ -43,17 +43,32 @@ function readICS(teamId, type, outputDir) {
   return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
 }
 
-const TEAMS_CACHE_FILE = path.join(ICS_DIR, 'teams-cache.json');
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 Tage
 
-function saveTeamsCache(teams) {
-  fs.writeFileSync(TEAMS_CACHE_FILE, JSON.stringify({ cachedAt: new Date().toISOString(), teams }, null, 2), 'utf8');
+// Bestimmt den club-spezifischen Cache-Dateipfad. clubId ist erforderlich (nicht
+// optional mit globalem Fallback): ein ungescopter Teams-Cache ist genau der Bug,
+// den dieses Schema behebt (Team-Liste von Club A wird beim Verarbeiten von Club B
+// zurückgegeben, weil beide dieselbe Datei teilen). Ein fehlendes clubId wirft daher
+// laut, statt still eine "teams-cache-undefined.json" zu erzeugen, die selbst wieder
+// zu einer geteilten (Bug-)Datei würde.
+function teamsCacheFilePath(clubId) {
+  if (!clubId) throw new Error('teamsCacheFilePath: clubId ist erforderlich');
+  const safeClubId = String(clubId).replace(/[^a-zA-Z0-9_-]/g, '_');
+  return path.join(ICS_DIR, `teams-cache-${safeClubId}.json`);
 }
 
-function loadTeamsCache() {
-  if (!fs.existsSync(TEAMS_CACHE_FILE)) return { teams: null, stale: false };
+function saveTeamsCache(teams, clubId) {
+  if (!clubId) throw new Error('saveTeamsCache: clubId ist erforderlich');
+  const file = teamsCacheFilePath(clubId);
+  fs.writeFileSync(file, JSON.stringify({ cachedAt: new Date().toISOString(), teams }, null, 2), 'utf8');
+}
+
+function loadTeamsCache(clubId) {
+  if (!clubId) throw new Error('loadTeamsCache: clubId ist erforderlich');
+  const file = teamsCacheFilePath(clubId);
+  if (!fs.existsSync(file)) return { teams: null, stale: false };
   try {
-    const raw = JSON.parse(fs.readFileSync(TEAMS_CACHE_FILE, 'utf8'));
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
     const age = Date.now() - new Date(raw.cachedAt).getTime();
     return { teams: raw.teams, stale: age >= CACHE_TTL_MS };
   } catch {

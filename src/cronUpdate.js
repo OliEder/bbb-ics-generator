@@ -19,7 +19,7 @@ function isLiga(liganame) {
 }
 
 async function getTeams(clubId) {
-  const { teams: cached, stale } = loadTeamsCache();
+  const { teams: cached, stale } = loadTeamsCache(clubId);
   if (cached && !stale) {
     console.log(`[DEBUG] Teams aus Cache geladen (${cached.length} Teams)`);
     return cached;
@@ -27,7 +27,7 @@ async function getTeams(clubId) {
   console.log(`[DEBUG] Lade Teams von API für Club ${clubId}...`);
   const fresh = await fetchClubTeams(clubId);
   if (fresh && fresh.length > 0) {
-    saveTeamsCache(fresh);
+    saveTeamsCache(fresh, clubId);
     console.log(`[DEBUG] ${fresh.length} Teams gecacht`);
     return fresh;
   }

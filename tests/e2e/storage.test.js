@@ -69,8 +69,8 @@ test('saveTeamsCache und loadTeamsCache: Round-trip korrekt', () => {
   try {
     const { saveTeamsCache, loadTeamsCache } = requireStorage(dir);
     const teams = [{ id: '167881', name: 'Test Team', ageGroup: 'U10' }];
-    saveTeamsCache(teams);
-    const { teams: loaded, stale } = loadTeamsCache();
+    saveTeamsCache(teams, '4468');
+    const { teams: loaded, stale } = loadTeamsCache('4468');
     assert.deepEqual(loaded, teams);
     assert.equal(stale, false);
   } finally {
@@ -82,7 +82,7 @@ test('loadTeamsCache gibt { teams: null, stale: false } wenn keine Datei', () =>
   const dir = mkdtempSync(join(tmpdir(), 'bbb-test-'));
   try {
     const { loadTeamsCache } = requireStorage(dir);
-    const result = loadTeamsCache();
+    const result = loadTeamsCache('4468');
     assert.deepEqual(result, { teams: null, stale: false });
   } finally {
     rmSync(dir, { recursive: true });
@@ -99,12 +99,58 @@ test('loadTeamsCache gibt stale: true wenn cachedAt 31 Tage alt', () => {
     const { join: pathJoin } = require('node:path');
     const old = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString();
     writeFileSync(
-      pathJoin(dir, 'teams-cache.json'),
+      pathJoin(dir, 'teams-cache-4468.json'),
       JSON.stringify({ cachedAt: old, teams }),
       'utf8'
     );
-    const { stale } = loadTeamsCache();
+    const { stale } = loadTeamsCache('4468');
     assert.equal(stale, true);
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+// ---- saveTeamsCache/loadTeamsCache: Cache-Isolation zwischen Clubs (Regressionstest) ----
+// Deckt den Bug ab, bei dem teams-cache.json eine einzige globale Datei war: der
+// zweite Club in einem Multi-Club-Lauf erbte stillschweigend die Team-Liste des
+// ersten Clubs, weil beide dieselbe Cache-Datei teilten. Dieser Test würde fehlschlagen,
+// wenn clubId aus saveTeamsCache/loadTeamsCache entfernt (oder ignoriert) würde.
+test('saveTeamsCache/loadTeamsCache: Caches verschiedener Clubs sind vollständig isoliert', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-test-'));
+  try {
+    const { saveTeamsCache, loadTeamsCache } = requireStorage(dir);
+    const teamsAAA = [{ id: '1001', name: 'Club AAA Team 1', ageGroup: 'U10' }];
+    const teamsBBB = [{ id: '2002', name: 'Club BBB Team 1', ageGroup: 'U12' }, { id: '2003', name: 'Club BBB Team 2', ageGroup: 'U14' }];
+
+    saveTeamsCache(teamsAAA, 'AAA');
+    saveTeamsCache(teamsBBB, 'BBB');
+
+    const resultAAA = loadTeamsCache('AAA');
+    const resultBBB = loadTeamsCache('BBB');
+
+    assert.deepEqual(resultAAA.teams, teamsAAA, 'Club AAA muss seine EIGENEN Teams zurückbekommen');
+    assert.deepEqual(resultBBB.teams, teamsBBB, 'Club BBB muss seine EIGENEN Teams zurückbekommen');
+    assert.notDeepEqual(resultAAA.teams, resultBBB.teams, 'Caches dürfen sich nicht gegenseitig überschreiben/vermischen');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('saveTeamsCache wirft ohne clubId', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-test-'));
+  try {
+    const { saveTeamsCache } = requireStorage(dir);
+    assert.throws(() => saveTeamsCache([{ id: '1' }]), /clubId ist erforderlich/);
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('loadTeamsCache wirft ohne clubId', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-test-'));
+  try {
+    const { loadTeamsCache } = requireStorage(dir);
+    assert.throws(() => loadTeamsCache(), /clubId ist erforderlich/);
   } finally {
     rmSync(dir, { recursive: true });
   }
