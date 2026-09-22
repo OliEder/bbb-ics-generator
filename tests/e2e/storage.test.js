@@ -119,14 +119,18 @@ test('saveTeamsCache/loadTeamsCache: Caches verschiedener Clubs sind vollständi
   const dir = mkdtempSync(join(tmpdir(), 'bbb-test-'));
   try {
     const { saveTeamsCache, loadTeamsCache } = requireStorage(dir);
+    // Numerische clubIds (wie echte Basketball-Bund-clubIds) — clubId wird strikt
+    // gegen /^\d+$/ validiert (siehe Test weiter unten), daher keine Buchstaben-IDs.
+    const CLUB_AAA = '1111';
+    const CLUB_BBB = '2222';
     const teamsAAA = [{ id: '1001', name: 'Club AAA Team 1', ageGroup: 'U10' }];
     const teamsBBB = [{ id: '2002', name: 'Club BBB Team 1', ageGroup: 'U12' }, { id: '2003', name: 'Club BBB Team 2', ageGroup: 'U14' }];
 
-    saveTeamsCache(teamsAAA, 'AAA');
-    saveTeamsCache(teamsBBB, 'BBB');
+    saveTeamsCache(teamsAAA, CLUB_AAA);
+    saveTeamsCache(teamsBBB, CLUB_BBB);
 
-    const resultAAA = loadTeamsCache('AAA');
-    const resultBBB = loadTeamsCache('BBB');
+    const resultAAA = loadTeamsCache(CLUB_AAA);
+    const resultBBB = loadTeamsCache(CLUB_BBB);
 
     assert.deepEqual(resultAAA.teams, teamsAAA, 'Club AAA muss seine EIGENEN Teams zurückbekommen');
     assert.deepEqual(resultBBB.teams, teamsBBB, 'Club BBB muss seine EIGENEN Teams zurückbekommen');
@@ -151,6 +155,26 @@ test('loadTeamsCache wirft ohne clubId', () => {
   try {
     const { loadTeamsCache } = requireStorage(dir);
     assert.throws(() => loadTeamsCache(), /clubId ist erforderlich/);
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+// Regressionstest für einen vom Code-Review gefundenen Schwester-Bug derselben Klasse:
+// teamsCacheFilePath normalisierte clubId ursprünglich per Zeichen-Ersetzung statt sie
+// zu validieren, wodurch zwei UNTERSCHIEDLICHE clubIds (z.B. "44-68" und "44 68") auf
+// denselben sanitisierten Dateinamen "44_68" hätten kollidieren können — strukturell
+// dieselbe "implizite Annahme, die nirgends erzwungen wird" wie der ursprüngliche
+// geteilte-Cache-Bug. clubId muss jetzt strikt gegen /^\d+$/ validiert werden (wie
+// teamId in saveICS/readICS), statt still normalisiert zu werden.
+test('saveTeamsCache/loadTeamsCache: wirft bei ungültiger clubId (Sonderzeichen/Leerzeichen) statt still zu normalisieren', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-test-'));
+  try {
+    const { saveTeamsCache, loadTeamsCache } = requireStorage(dir);
+    assert.throws(() => saveTeamsCache([{ id: '1' }], '44-68'), /Ungültige clubId/);
+    assert.throws(() => saveTeamsCache([{ id: '1' }], '44 68'), /Ungültige clubId/);
+    assert.throws(() => loadTeamsCache('44-68'), /Ungültige clubId/);
+    assert.throws(() => loadTeamsCache('44 68'), /Ungültige clubId/);
   } finally {
     rmSync(dir, { recursive: true });
   }

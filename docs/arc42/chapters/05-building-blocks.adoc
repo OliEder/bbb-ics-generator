@@ -212,11 +212,12 @@ a|
 a|
 * *Whitelist-Validierung für `type`*: Nur `'all'`, `'home'`, `'away'` erlaubt (via `Set`-Lookup).
 * *Regex-Validierung für `teamId`*: Nur reine Zahlenketten erlaubt (`/^\d+$/`).
+* *Regex-Validierung für `clubId`* (im Teams-Cache, neu): Ebenfalls nur reine Zahlenketten (`/^\d+$/`) — bewusst eine strikte Validierung statt einer Zeichen-Normalisierung, siehe Cache-Logik unten.
 * *Regex-Validierung für Slugs* (`sanitizeSlug`, neu): Nur `/^[a-z0-9-]+$/`.
-* Alle drei Prüfungen verhindern Path-Traversal (z. B. `../../etc/passwd`).
+* Alle vier Prüfungen verhindern Path-Traversal (z. B. `../../etc/passwd`).
 
 | *Cache-Logik*
-| Der Team-Cache ist pro Club gescoped: `teams-cache-<clubId>.json` (clubId wird auf `[a-zA-Z0-9_-]` bereinigt) enthält `{ cachedAt: ISO-8601-String, teams: [...] }`. TTL = 30 Tage. `loadTeamsCache(clubId)` gibt `stale: true` zurück wenn `Date.now() - cachedAt >= 30 * 24 * 60 * 60 * 1000`. Bei Parse-Fehler wird `{ teams: null, stale: true }` zurückgegeben. `clubId` ist ein PFLICHT-Parameter (kein optionaler globaler Fallback wie bei `outputDir`) — ohne clubId-Scoping würden alle Clubs sich denselben Cache teilen und der zweite/jeder weitere Club in einem Multi-Club-Lauf würde stillschweigend die Team-Liste des vorherigen Clubs erben (siehe ADR/Bugfix: geteilter Teams-Cache).
+| Der Team-Cache ist pro Club gescoped: `teams-cache-<clubId>.json` enthält `{ cachedAt: ISO-8601-String, teams: [...] }`. TTL = 30 Tage. `loadTeamsCache(clubId)` gibt `stale: true` zurück wenn `Date.now() - cachedAt >= 30 * 24 * 60 * 60 * 1000`. Bei Parse-Fehler wird `{ teams: null, stale: true }` zurückgegeben. `clubId` ist ein PFLICHT-Parameter (kein optionaler globaler Fallback wie bei `outputDir`) — ohne clubId-Scoping würden alle Clubs sich denselben Cache teilen und der zweite/jeder weitere Club in einem Multi-Club-Lauf würde stillschweigend die Team-Liste des vorherigen Clubs erben (siehe ADR/Bugfix: geteilter Teams-Cache). `clubId` wird zusätzlich strikt gegen `/^\d+$/` validiert (wirft bei Nichterfüllung) statt nur zeichenweise normalisiert zu werden — eine reine Ersetzung ungültiger Zeichen (z.B. alles außer `[a-zA-Z0-9_-]` durch `_`) könnte zwei unterschiedliche `clubId`-Werte (z.B. `"44-68"` und `"44 68"`) auf denselben Cache-Dateinamen abbilden und damit dieselbe Bug-Klasse (kollidierende Cache-Schlüssel) reintroduzieren, die dieser Fix eigentlich beheben soll.
 
 | *Ausgabeverzeichnis*
 | Global: `generated/` (relativ zum Projektroot, überschreibbar via `BBB_ICS_DIR`), wird bei Start automatisch angelegt wenn nicht vorhanden. Pro Club: `generated/<bundesland>/<club-slug>/`, via den neuen `outputDir`-Parameter von `cronUpdate.js` übergeben.

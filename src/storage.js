@@ -51,10 +51,19 @@ const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 Tage
 // zurückgegeben, weil beide dieselbe Datei teilen). Ein fehlendes clubId wirft daher
 // laut, statt still eine "teams-cache-undefined.json" zu erzeugen, die selbst wieder
 // zu einer geteilten (Bug-)Datei würde.
+//
+// clubId wird zusätzlich strikt gegen /^\d+$/ validiert (analog zur teamId-Prüfung
+// in saveICS/readICS oben) statt nur normalisiert: ein reines Zeichen-Ersetzen
+// (z.B. alles außer [a-zA-Z0-9_-] durch "_") würde zwei UNTERSCHIEDLICHE clubIds
+// still auf denselben Dateinamen abbilden können (z.B. "44-68" und "44 68" werden
+// beide zu "44_68") — genau dieselbe Bug-Klasse (implizite Annahme über eindeutige
+// Cache-Schlüssel, die nirgends erzwungen wird), die dieser gesamte Fix behebt. Echte
+// Basketball-Bund-clubIds sind ohnehin rein numerisch, daher ist die Einschränkung
+// auf Ziffern unproblematisch.
 function teamsCacheFilePath(clubId) {
   if (!clubId) throw new Error('teamsCacheFilePath: clubId ist erforderlich');
-  const safeClubId = String(clubId).replace(/[^a-zA-Z0-9_-]/g, '_');
-  return path.join(ICS_DIR, `teams-cache-${safeClubId}.json`);
+  if (!/^\d+$/.test(String(clubId))) throw new Error(`Ungültige clubId: ${clubId}`);
+  return path.join(ICS_DIR, `teams-cache-${clubId}.json`);
 }
 
 function saveTeamsCache(teams, clubId) {
