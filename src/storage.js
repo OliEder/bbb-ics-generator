@@ -5,19 +5,35 @@ const ICS_DIR = process.env.BBB_ICS_DIR || path.resolve(__dirname, '../generated
 if (!fs.existsSync(ICS_DIR)) fs.mkdirSync(ICS_DIR, { recursive: true });
 
 const VALID_TYPES = new Set(['all', 'home', 'away']);
+const SLUG_PATTERN = /^[a-z0-9-]+$/;
 
-function saveICS(teamId, type, data) {
+function sanitizeSlug(slug) {
+  if (typeof slug !== 'string' || !SLUG_PATTERN.test(slug)) {
+    throw new Error(`Ungültiger Slug: ${slug}`);
+  }
+  return slug;
+}
+
+function resolveDir(outputDir) {
+  if (!outputDir) return ICS_DIR;
+  if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+  return outputDir;
+}
+
+function saveICS(teamId, type, data, outputDir) {
   if (!VALID_TYPES.has(type)) throw new Error(`Ungültiger ICS-Typ: ${type}`);
   if (!/^\d+$/.test(String(teamId))) throw new Error(`Ungültige teamId: ${teamId}`);
-  const filepath = path.join(ICS_DIR, `${teamId}_${type}.ics`);
+  const dir = resolveDir(outputDir);
+  const filepath = path.join(dir, `${teamId}_${type}.ics`);
   fs.writeFileSync(filepath, data, 'utf8');
   return filepath;
 }
 
-function readICS(teamId, type) {
+function readICS(teamId, type, outputDir) {
   if (!VALID_TYPES.has(type)) return null;
   if (!/^\d+$/.test(String(teamId))) return null;
-  const file = path.join(ICS_DIR, `${teamId}_${type}.ics`);
+  const dir = resolveDir(outputDir);
+  const file = path.join(dir, `${teamId}_${type}.ics`);
   return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
 }
 
@@ -39,4 +55,4 @@ function loadTeamsCache() {
   }
 }
 
-module.exports = { ICS_DIR, saveICS, readICS, saveTeamsCache, loadTeamsCache };
+module.exports = { ICS_DIR, saveICS, readICS, saveTeamsCache, loadTeamsCache, sanitizeSlug };

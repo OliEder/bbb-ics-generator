@@ -109,3 +109,35 @@ test('loadTeamsCache gibt stale: true wenn cachedAt 31 Tage alt', () => {
     rmSync(dir, { recursive: true });
   }
 });
+
+// ---- sanitizeSlug ----
+
+test('sanitizeSlug: akzeptiert gültige Slugs', () => {
+  const { sanitizeSlug } = requireStorage(mkdtempSync(join(tmpdir(), 'bbb-test-')));
+  assert.equal(sanitizeSlug('bayern'), 'bayern');
+  assert.equal(sanitizeSlug('fibalon-baskets'), 'fibalon-baskets');
+});
+
+test('sanitizeSlug: wirft bei Path-Traversal-Versuchen', () => {
+  const { sanitizeSlug } = requireStorage(mkdtempSync(join(tmpdir(), 'bbb-test-')));
+  assert.throws(() => sanitizeSlug('../etc'), /Ungültiger Slug/);
+  assert.throws(() => sanitizeSlug('a/b'), /Ungültiger Slug/);
+  assert.throws(() => sanitizeSlug(''), /Ungültiger Slug/);
+});
+
+// ---- saveICS/readICS mit outputDir ----
+
+test('saveICS/readICS: outputDir-Parameter schreibt/liest außerhalb des globalen ICS_DIR', () => {
+  const globalDir = mkdtempSync(join(tmpdir(), 'bbb-test-'));
+  const clubDir = mkdtempSync(join(tmpdir(), 'bbb-club-'));
+  try {
+    const { saveICS, readICS } = requireStorage(globalDir);
+    const content = 'BEGIN:VCALENDAR\r\nEND:VCALENDAR';
+    saveICS('12345', 'all', content, clubDir);
+    assert.equal(readICS('12345', 'all', clubDir), content);
+    assert.equal(readICS('12345', 'all'), null, 'darf nicht im globalen ICS_DIR gelandet sein');
+  } finally {
+    rmSync(globalDir, { recursive: true });
+    rmSync(clubDir, { recursive: true });
+  }
+});
