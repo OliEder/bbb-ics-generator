@@ -155,7 +155,13 @@ async function generateICS(matches, details, teamId, type = 'all', teamName = 'B
   const events = [];
 
   if (migrationNotice && migrationNotice.newUrl) {
-    const today = new Date();
+    // today.today ist nur für Tests gedacht, um Monatsenden deterministisch zu simulieren.
+    const today = migrationNotice.today || new Date();
+    // Echte Date-Arithmetik (nicht getDate() + 1) — sonst entsteht an Monatsenden
+    // ein ungültiger Tageswert (z.B. 32), den die ics-Bibliothek bei 3-elementigen
+    // Arrays nicht wie ein echtes Date rollt, sondern als ValidationError ablehnt.
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
     events.push({
       uid: `migration-notice-${teamId}-${type}@basketball-bund.net`,
       title: 'Kalender-Abo aktualisieren',
@@ -163,7 +169,7 @@ async function generateICS(matches, details, teamId, type = 'all', teamName = 'B
       start: [today.getFullYear(), today.getMonth() + 1, today.getDate()],
       startInputType: 'local',
       startOutputType: 'local',
-      end: [today.getFullYear(), today.getMonth() + 1, today.getDate() + 1],
+      end: [tomorrow.getFullYear(), tomorrow.getMonth() + 1, tomorrow.getDate()],
       endInputType: 'local',
       endOutputType: 'local',
       busyStatus: 'FREE',

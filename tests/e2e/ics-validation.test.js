@@ -155,3 +155,24 @@ test('generateICS: mit migrationNotice enthält ein Hinweis-VEVENT mit der neuen
   const eventCount = (ics.match(/BEGIN:VEVENT/g) || []).length;
   assert.equal(eventCount, 2);
 });
+
+test('generateICS: migrationNotice an einem Monatsende erzeugt kein ungültiges End-Datum', async () => {
+  const matches = [{
+    matchId: 1, homeTeam: { teamPermanentId: 111, teamname: 'A' }, guestTeam: { teamPermanentId: 222, teamname: 'B' },
+    kickoffDate: '2026-10-01', kickoffTime: '18:00', matchNo: 1, ligaData: { liganame: 'Test-Liga', seasonName: '2026' },
+  }];
+  const details = { 1: null };
+  const newUrl = 'https://olieder.github.io/bbb-ics-generator/bayern/fibalon/111_all.ics';
+
+  // Regressionstest für: today.getDate() + 1 ergibt am 31. einen ungültigen
+  // Tageswert (32), den die ics-Bibliothek bei 3-elementigen Arrays nicht wie
+  // ein echtes Date rollt, sondern mit ValidationError ablehnt.
+  const ics = await generateICS(matches, details, '111', 'all', 'Team A', {
+    newUrl,
+    today: new Date('2026-12-31'),
+  });
+
+  assert.ok(ics.includes('Kalender-Abo aktualisieren'));
+  // Enddatum muss auf den nächsten Monat rollen: 2027-01-01
+  assert.ok(ics.includes('DTEND;VALUE=DATE:20270101'), `Ungültiges oder falsches End-Datum, ICS:\n${ics}`);
+});
