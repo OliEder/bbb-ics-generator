@@ -45,7 +45,7 @@ test('Cache-HIT: loadTeamsCache gibt frische Teams zurück → fetchClubTeams ni
     const stub = t.mock.method(axios, 'get', () => Promise.reject(new Error('Should not be called')));
 
     const { getTeams } = requireCronUpdate(dir);
-    const result = await getTeams();
+    const result = await getTeams('4468');
     assert.deepEqual(result, mockTeams);
     assert.equal(stub.mock.calls.length, 0, 'fetchClubTeams (axios.get) wurde unerwartet aufgerufen');
   } finally {
@@ -70,7 +70,7 @@ test('Cache-MISS: stale Cache → fetchClubTeams wird aufgerufen, Cache neu gesc
     t.mock.method(axios, 'get', () => Promise.resolve(clubTeamsResponse));
 
     const { getTeams } = requireCronUpdate(dir);
-    const result = await getTeams();
+    const result = await getTeams('4468');
     assert.ok(Array.isArray(result) && result.length > 0, 'Keine Teams zurückgegeben');
     assert.equal(result[0].id, String(clubTeamsResponse.data.data.matches[0].homeTeam.teamPermanentId));
 
@@ -100,7 +100,7 @@ test('Fallback: fetchClubTeams wirft Error + stale Cache → stale Cache zurück
     t.mock.method(axios, 'get', () => Promise.reject(new Error('Network error')));
 
     const { getTeams } = requireCronUpdate(dir);
-    const result = await getTeams();
+    const result = await getTeams('4468');
     // Should fall back to stale cached teams
     assert.deepEqual(result, mockTeams, 'Stale Cache wurde nicht als Fallback verwendet');
   } finally {

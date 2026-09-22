@@ -2,7 +2,32 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync, rmSync } = require('node:fs');
+const { tmpdir } = require('node:os');
+const { join } = require('node:path');
 const { mapMatches, computeSpotlight } = require('../../src/cronUpdate');
+
+// Löscht die require-Caches, die von env-Variablen abhängiges Modul-Setup betreiben
+// (BBB_ICS_DIR/BBB_CLUBS_DIR werden nur beim ersten require ausgewertet), damit jeder
+// Test mit frischem Zustand läuft. Analog zum Muster in tests/e2e/storage.test.js.
+function freshRequire(modulePath) {
+  const resolved = require.resolve(modulePath);
+  delete require.cache[resolved];
+  return require(modulePath);
+}
+
+// applyMocks(apiClient) darf apiClient.fetchClubTeams etc. überschreiben, BEVOR
+// cronUpdate.js frisch geladen wird — cronUpdate.js destrukturiert diese Funktionen
+// beim require() in lokale Bindings; ein Überschreiben NACH dem require hätte keine
+// Wirkung mehr, weil die lokale Bindung bereits auf die alte Funktion zeigt.
+function resetCronModules(applyMocks) {
+  freshRequire('../../src/storage.js');
+  freshRequire('../../src/generateHTML.js');
+  const apiClient = freshRequire('../../src/apiClient.js');
+  if (applyMocks) applyMocks(apiClient);
+  const cronModule = freshRequire('../../src/cronUpdate.js');
+  return { cronModule, apiClient };
+}
 
 // Minimal match factory
 function makeMatch({ matchId = 1, teamId = 100, isHome = true, result = null, date = '2026-05-01', time = '18:00', liganame = 'Bezirksliga', oppId = 999 } = {}) {
@@ -204,4 +229,164 @@ test('computeSpotlight: nur ein Spiel mit Ergebnis → 1 Spiel', () => {
   const result = computeSpotlight(matches);
   assert.equal(result.length, 1);
   assert.equal(result[0].result, '80:70');
+});
+
+test('updateAll: schreibt metadata.json unter generated/<bundesland>/<club-slug>/ — bundesweit bei fehlenden Teams', async () => {
+  // Der im Task-Prompt vorgegebene Test-Template-Assert (generated/bayern/fibalon/metadata.json)
+  // ist bei fetchClubTeams => [] FALSCH: ohne Teams gibt es keine verbandId-Daten, aus denen
+  // deriveClubBundesland ein echtes Bundesland ableiten könnte. deriveClubBundesland([]) liefert
+  // laut src/verbandMapping.js (Task 1) 'bundesweit' zurück — die Datei landet also unter
+  // generated/bundesweit/fibalon/metadata.json, nicht generated/bayern/fibalon/metadata.json.
+  // Dieser Test prüft genau dieses (korrekte) Verhalten als Regressionsschutz.
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-cron-'));
+  const clubsDir = mkdtempSync(join(tmpdir(), 'bbb-cron-clubs-'));
+  try {
+    mkdirSync(join(clubsDir, 'bayern', 'fibalon'), { recursive: true });
+    writeFileSync(
+      join(clubsDir, 'bayern', 'fibalon', 'config.json'),
+      JSON.stringify({ clubId: '4468' })
+    );
+
+    process.env.BBB_ICS_DIR = dir;
+    process.env.BBB_CLUBS_DIR = clubsDir;
+
+    const { cronModule } = resetCronModules(apiClient => {
+      apiClient.fetchClubTeams = async () => [];
+    });
+
+    await cronModule.updateAll();
+
+    assert.ok(
+      existsSync(join(dir, 'bundesweit', 'fibalon', 'metadata.json')),
+      'Ohne Teams/verbandId-Daten muss die Metadata unter "bundesweit" landen'
+    );
+    assert.ok(
+      !existsSync(join(dir, 'bayern', 'fibalon', 'metadata.json')),
+      'Ohne echte Bundesland-Herleitung darf keine bayern/-Ausgabe entstehen'
+    );
+  } finally {
+    rmSync(dir, { recursive: true });
+    rmSync(clubsDir, { recursive: true });
+    delete process.env.BBB_CLUBS_DIR;
+    delete process.env.BBB_ICS_DIR;
+  }
+});
+
+test('updateAll: legacyRootOutput=true erzeugt Alt-Pfad-Duplikat MIT echten Spielen + Migrationshinweis', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-cron-legacy-'));
+  const clubsDir = mkdtempSync(join(tmpdir(), 'bbb-cron-legacy-clubs-'));
+  try {
+    mkdirSync(join(clubsDir, 'bayern', 'fibalon'), { recursive: true });
+    writeFileSync(
+      join(clubsDir, 'bayern', 'fibalon', 'config.json'),
+      JSON.stringify({ clubId: '4468', legacyRootOutput: true })
+    );
+
+    process.env.BBB_ICS_DIR = dir;
+    process.env.BBB_CLUBS_DIR = clubsDir;
+
+    const TEAM_ID = '100';
+    const MATCH = {
+      matchId: 555,
+      kickoffDate: '2026-05-01',
+      kickoffTime: '18:00',
+      matchNo: '1',
+      result: null,
+      homeTeam: { teamPermanentId: TEAM_ID, teamname: 'Eigenes Team', teamnameSmall: 'ET', clubId: '4468' },
+      guestTeam: { teamPermanentId: 999, teamname: 'Auswärtiger Gegner', teamnameSmall: 'AG' },
+      ligaData: { liganame: 'Bezirksliga', seasonId: 2026, seasonName: '2025/26', ligaId: '1', verbandId: 2 }, // 2 = Bayern
+    };
+
+    const { cronModule } = resetCronModules(apiClient => {
+      apiClient.fetchClubTeams = async () => [{ id: TEAM_ID, name: 'Eigenes Team', ageGroup: 'Herren', gender: 'männlich' }];
+      apiClient.fetchTeamMatches = async () => ({ matches: [MATCH], gender: 'männlich' });
+      apiClient.fetchMatchInfo = async () => null;
+      apiClient.fetchLeagueTable = async () => null;
+      apiClient.fetchTournamentRounds = async () => null;
+    });
+
+    await cronModule.updateAll();
+
+    const newPathIcs = join(dir, 'bayern', 'fibalon', `${TEAM_ID}_all.ics`);
+    const legacyIcs = join(dir, `${TEAM_ID}_all.ics`);
+    const legacyIndex = join(dir, 'index.html');
+    const newIndex = join(dir, 'bayern', 'fibalon', 'index.html');
+
+    assert.ok(existsSync(newPathIcs), 'Neuer Pfad muss ICS-Datei enthalten');
+    const newPathContent = readFileSync(newPathIcs, 'utf8');
+    assert.ok(!newPathContent.includes('Kalender-Abo aktualisieren'), 'Neuer Pfad darf keinen Migrationshinweis enthalten');
+    assert.ok(newPathContent.includes('Auswärtiger Gegner'), 'Neuer Pfad muss das echte Spiel enthalten');
+
+    assert.ok(existsSync(legacyIcs), 'Alt-Pfad muss ICS-Datei enthalten');
+    const legacyContent = readFileSync(legacyIcs, 'utf8');
+    assert.ok(legacyContent.includes('Kalender-Abo aktualisieren'), 'Alt-Pfad muss Migrationshinweis enthalten');
+    assert.ok(legacyContent.includes('Auswärtiger Gegner'), 'Alt-Pfad muss ZUSÄTZLICH das echte Spiel enthalten (nicht nur den Hinweis)');
+
+    // Hinweis: 'migration-banner' als CSS-Klassenname steht immer im <style>-Block
+    // (buildSharedStyles), unabhängig davon ob der Banner tatsächlich gerendert wird.
+    // Wir prüfen daher gezielt auf das <div class="migration-banner" ...>-Markup.
+    const MIGRATION_BANNER_MARKUP = '<div class="migration-banner"';
+
+    assert.ok(existsSync(legacyIndex), 'Alt-Pfad index.html muss existieren');
+    const legacyIndexContent = readFileSync(legacyIndex, 'utf8');
+    assert.ok(legacyIndexContent.includes(MIGRATION_BANNER_MARKUP), 'Alt-Pfad index.html muss das Migrations-Banner-Markup enthalten');
+
+    assert.ok(existsSync(newIndex), 'Neuer Pfad index.html muss existieren');
+    const newIndexContent = readFileSync(newIndex, 'utf8');
+    assert.ok(!newIndexContent.includes(MIGRATION_BANNER_MARKUP), 'Neuer Pfad index.html darf KEIN Migrations-Banner-Markup enthalten');
+  } finally {
+    rmSync(dir, { recursive: true });
+    rmSync(clubsDir, { recursive: true });
+    delete process.env.BBB_CLUBS_DIR;
+    delete process.env.BBB_ICS_DIR;
+  }
+});
+
+test('updateAll: ohne legacyRootOutput entsteht KEIN Alt-Pfad-Duplikat unter generatedRootDir', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-cron-nolegacy-'));
+  const clubsDir = mkdtempSync(join(tmpdir(), 'bbb-cron-nolegacy-clubs-'));
+  try {
+    mkdirSync(join(clubsDir, 'bayern', 'fibalon'), { recursive: true });
+    writeFileSync(
+      join(clubsDir, 'bayern', 'fibalon', 'config.json'),
+      // Bewusst OHNE legacyRootOutput — Negativ-Fall: ein Club, der die Multi-Club-
+      // Migration nicht "geerbt" hat, darf NIE unter generatedRootDir selbst schreiben.
+      JSON.stringify({ clubId: '4468' })
+    );
+
+    process.env.BBB_ICS_DIR = dir;
+    process.env.BBB_CLUBS_DIR = clubsDir;
+
+    const TEAM_ID = '200';
+    const MATCH = {
+      matchId: 777,
+      kickoffDate: '2026-05-01',
+      kickoffTime: '18:00',
+      matchNo: '1',
+      result: null,
+      homeTeam: { teamPermanentId: TEAM_ID, teamname: 'Eigenes Team', teamnameSmall: 'ET', clubId: '4468' },
+      guestTeam: { teamPermanentId: 999, teamname: 'Gegner', teamnameSmall: 'GG' },
+      ligaData: { liganame: 'Bezirksliga', seasonId: 2026, seasonName: '2025/26', ligaId: '1', verbandId: 2 },
+    };
+
+    const { cronModule } = resetCronModules(apiClient => {
+      apiClient.fetchClubTeams = async () => [{ id: TEAM_ID, name: 'Eigenes Team', ageGroup: 'Herren', gender: 'männlich' }];
+      apiClient.fetchTeamMatches = async () => ({ matches: [MATCH], gender: 'männlich' });
+      apiClient.fetchMatchInfo = async () => null;
+      apiClient.fetchLeagueTable = async () => null;
+      apiClient.fetchTournamentRounds = async () => null;
+    });
+
+    await cronModule.updateAll();
+
+    assert.ok(existsSync(join(dir, 'bayern', 'fibalon', `${TEAM_ID}_all.ics`)), 'Neuer Pfad muss trotzdem geschrieben werden');
+    assert.ok(!existsSync(join(dir, `${TEAM_ID}_all.ics`)), 'Ohne legacyRootOutput darf KEINE Alt-Pfad-ICS entstehen');
+    assert.ok(!existsSync(join(dir, 'metadata.json')), 'Ohne legacyRootOutput darf KEINE Alt-Pfad-metadata.json unter generatedRootDir entstehen');
+    assert.ok(!existsSync(join(dir, 'index.html')), 'Ohne legacyRootOutput darf KEIN Alt-Pfad-index.html unter generatedRootDir entstehen');
+  } finally {
+    rmSync(dir, { recursive: true });
+    rmSync(clubsDir, { recursive: true });
+    delete process.env.BBB_CLUBS_DIR;
+    delete process.env.BBB_ICS_DIR;
+  }
 });
