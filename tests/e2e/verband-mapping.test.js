@@ -39,7 +39,7 @@ test('deriveClubBundesland: leere Liste ergibt bundesweit', () => {
 
 test('deriveClubBundesland: Gleichstand wählt das zuerst gesehene Bundesland deterministisch', () => {
   const teamVerbandIds = [5, 2];
-  assert.equal(deriveClubBundesland(teamVerbandIds), 'sachsen');
+  assert.equal(deriveClubBundesland(teamVerbandIds), 'hamburg');
 });
 
 test('deriveClubBundesland: N-Wege-Gleichstand wählt das zuerst gesehene Bundesland deterministisch', () => {

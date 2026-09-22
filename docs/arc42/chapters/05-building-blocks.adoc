@@ -101,7 +101,7 @@ a|
 * `BUNDESWEIT` → Konstante `'bundesweit'`
 
 | *Mapping-Tabelle*
-| Statische Tabelle `VERBAND_TO_BUNDESLAND` mit den 16 Landesverbands-IDs (1–16, laut öffentlicher Basketball-Bund-API-Dokumentation) auf die entsprechenden Bundesland-Slugs. `verbandId` ohne Eintrag (z.B. bundesweite Ligen) fällt auf `'bundesweit'` zurück; ebenso `null`/`undefined`.
+| Statische Tabelle `VERBAND_TO_BUNDESLAND` mit den 16 Landesverbands-IDs (1–16) auf die entsprechenden Bundesland-Slugs. Die öffentliche Basketball-Bund-API-Dokumentation nennt für `verbandId` nur zwei Beispielwerte (2=Bayern, 100=Bundesligen), keine vollständige Enum-Liste; die Tabelle ist daher gegen 1725 real gecrawlte Vereinsdatensätze (`verbandId`/`verbandName`-Paare) aus dem Schwesterprojekt `basketball-vereinsregister-deutschland` verifiziert. `verbandId` ohne Eintrag (z.B. bundesweite Ligen) fällt auf `'bundesweit'` zurück; ebenso `null`/`undefined`.
 
 | *Mehrheitslogik*
 | `deriveClubBundesland` zählt, wie oft jeder (Nicht-`'bundesweit'`-)Bundesland-Slug unter den übergebenen `verbandId`-Werten vorkommt, und gibt den häufigsten zurück. Bei Gleichstand gewinnt der Slug, der zuerst in der Eingabeliste auftrat (`firstSeenOrder`). Enthält die Liste ausschließlich `'bundesweit'`-Werte oder ist leer, ist das Ergebnis `'bundesweit'`.
