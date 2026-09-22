@@ -41,3 +41,20 @@ test('deriveClubBundesland: Gleichstand wählt das zuerst gesehene Bundesland de
   const teamVerbandIds = [5, 2];
   assert.equal(deriveClubBundesland(teamVerbandIds), 'sachsen');
 });
+
+test('deriveClubBundesland: N-Wege-Gleichstand wählt das zuerst gesehene Bundesland deterministisch', () => {
+  const teamVerbandIds = [2, 5, 8];
+  assert.equal(deriveClubBundesland(teamVerbandIds), 'bayern');
+});
+
+test('verbandIdToBundesland: nicht-numerischer String liefert bundesweit (NaN-Fallback)', () => {
+  assert.equal(verbandIdToBundesland('abc'), 'bundesweit');
+});
+
+test('verbandIdToBundesland: NaN liefert bundesweit', () => {
+  assert.equal(verbandIdToBundesland(NaN), 'bundesweit');
+});
+
+test('verbandIdToBundesland: negative Zahl liefert bundesweit', () => {
+  assert.equal(verbandIdToBundesland(-1), 'bundesweit');
+});
