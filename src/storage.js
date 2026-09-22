@@ -7,6 +7,10 @@ if (!fs.existsSync(ICS_DIR)) fs.mkdirSync(ICS_DIR, { recursive: true });
 const VALID_TYPES = new Set(['all', 'home', 'away']);
 const SLUG_PATTERN = /^[a-z0-9-]+$/;
 
+// Validiert Pfadsegmente (Bundesland-/Club-Slugs), die später von Aufrufern
+// zu Dateisystempfaden zusammengesetzt werden. Nur Kleinbuchstaben, Ziffern
+// und Bindestrich sind erlaubt — verhindert Path-Traversal (../, /) und
+// uneinheitliche Groß-/Kleinschreibung zwischen Verzeichnisnamen.
 function sanitizeSlug(slug) {
   if (typeof slug !== 'string' || !SLUG_PATTERN.test(slug)) {
     throw new Error(`Ungültiger Slug: ${slug}`);
@@ -20,6 +24,8 @@ function resolveDir(outputDir) {
   return outputDir;
 }
 
+// outputDir ist optional: ohne Angabe wird auf das globale ICS_DIR zurückgefallen
+// (Rückwärtskompatibilität); mit Angabe landet die Datei im club-spezifischen Verzeichnis.
 function saveICS(teamId, type, data, outputDir) {
   if (!VALID_TYPES.has(type)) throw new Error(`Ungültiger ICS-Typ: ${type}`);
   if (!/^\d+$/.test(String(teamId))) throw new Error(`Ungültige teamId: ${teamId}`);
