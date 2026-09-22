@@ -63,6 +63,56 @@ test('loadClubs: config.json ohne clubId wird übersprungen und geloggt', () => 
   }
 });
 
+test('loadClubs: Club-Verzeichnis mit ungültigem Namen wird übersprungen, gültiger Nachbar bleibt', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-clubs-'));
+  try {
+    mkdirSync(join(dir, 'bayern', 'fibalon'), { recursive: true });
+    writeFileSync(
+      join(dir, 'bayern', 'fibalon', 'config.json'),
+      JSON.stringify({ clubId: '4468' })
+    );
+    mkdirSync(join(dir, 'bayern', 'Ungueltig_Name'), { recursive: true });
+    writeFileSync(
+      join(dir, 'bayern', 'Ungueltig_Name', 'config.json'),
+      JSON.stringify({ clubId: '1234' })
+    );
+
+    const { loadClubs } = requireClubs();
+    const clubs = loadClubs(dir);
+
+    assert.equal(clubs.length, 1);
+    assert.ok(clubs.find(c => c.slug === 'fibalon'), 'fibalon sollte trotz ungültigem Nachbarverzeichnis gefunden werden');
+    assert.ok(!clubs.find(c => c.slug === 'Ungueltig_Name'), 'Club mit ungültigem Verzeichnisnamen darf nicht enthalten sein');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('loadClubs: Bundesland-Verzeichnis mit ungültigem Namen wird übersprungen, gültiger Nachbar bleibt', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-clubs-'));
+  try {
+    mkdirSync(join(dir, 'bayern', 'fibalon'), { recursive: true });
+    writeFileSync(
+      join(dir, 'bayern', 'fibalon', 'config.json'),
+      JSON.stringify({ clubId: '4468' })
+    );
+    mkdirSync(join(dir, '..gesperrt', 'boesewicht'), { recursive: true });
+    writeFileSync(
+      join(dir, '..gesperrt', 'boesewicht', 'config.json'),
+      JSON.stringify({ clubId: '9999' })
+    );
+
+    const { loadClubs } = requireClubs();
+    const clubs = loadClubs(dir);
+
+    assert.equal(clubs.length, 1);
+    assert.ok(clubs.find(c => c.slug === 'fibalon'), 'fibalon sollte trotz ungültigem Nachbar-Bundesland gefunden werden');
+    assert.ok(!clubs.find(c => c.slug === 'boesewicht'), 'Club unter ungültigem Bundesland-Verzeichnis darf nicht enthalten sein');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
 test('loadClubs: unlesbares Bundesland-Verzeichnis bricht nicht die gesamte Funktion ab', () => {
   const dir = mkdtempSync(join(tmpdir(), 'bbb-clubs-'));
   const unreadableDir = join(dir, 'gesperrt');
