@@ -113,28 +113,166 @@ function firstVerbandId(matches) {
   return null;
 }
 
-// Verarbeitet einen einzelnen Club: holt Teams + Spiele, erzeugt die neuen
-// (nach Bundesland/Club verschachtelten) ICS-/HTML-Dateien, und — nur für Clubs mit
-// legacyRootOutput: true — zusätzlich ein Alt-Pfad-Duplikat direkt unter generatedRootDir
-// (mit Migrationshinweis), das die ECHTEN Spieldaten behält (nicht nur den Hinweis-Event).
-async function updateClub(club, generatedRootDir) {
-  const meta = [];
-  const clubId = club.config.clubId;
-  const teams = await getTeams(clubId);
-
+// Ermittelt das Theme eines Clubs (Farben/Logo). Fällt auf den Standard-Fibalon-Look
+// zurück, wenn der Club keine eigenen Overrides in config.json hinterlegt hat.
+function resolveTheme(club, teams) {
   // All teamPermanentIds for this club share the same club logo at this endpoint.
   // Using teams[0] is safe; any team ID resolves to the club crest.
   const firstTeamLogoUrl = teams.length > 0
     ? `${BBB_MEDIA_BASE}/${teams[0].id}/logo`
     : null;
 
-  const theme = {
+  return {
     primary:  club.config.theme?.primary  || '#004174',
     accent:   club.config.theme?.accent   || '#009ef3',
     logoUrl:  club.config.theme?.logoUrl  || firstTeamLogoUrl,
     cupColor: club.config.cupColor        || '#7c3aed',
   };
+}
 
+// Holt für ein einzelnes Team alle Rohdaten (Spiele, Details, Home/Away-Filter) sowie
+// die daraus abgeleiteten, für metadata.json aufbereiteten Felder. Gibt null zurück,
+// wenn das Team keine Spiele hat (Aufrufer überspringt es dann).
+async function fetchTeamData(team) {
+  console.log(`[DEBUG] Starte Update für Team ${team.id} (${team.name})`);
+
+  const { matches, gender: teamGender } = await fetchTeamMatches(team.id);
+  console.log(`[DEBUG] API-Matches: ${matches.length}`);
+
+  if (!Array.isArray(matches) || matches.length === 0) {
+    console.warn(`[WARN] Keine Matches für Team ${team.id}`);
+    return null;
+  }
+
+  // Detailinfos für jedes Match holen (parallel, mit Concurrency-Limit)
+  const detailsList = await mapWithConcurrency(matches, MATCH_INFO_CONCURRENCY, m => fetchMatchInfo(m.matchId));
+  const details = {};
+  matches.forEach((m, i) => { details[m.matchId] = detailsList[i]; });
+
+  const homeMatches = matches.filter(m => Number(m.homeTeam.teamPermanentId) === Number(team.id));
+  const awayMatches = matches.filter(m => Number(m.guestTeam.teamPermanentId) === Number(team.id));
+
+  const seasonMatches = matches
+    .filter(m => m.ligaData?.seasonId === CURRENT_SEASON)
+    .sort((a, b) => {
+      const da = (a.kickoffDate || '') + (a.kickoffTime || '');
+      const db = (b.kickoffDate || '') + (b.kickoffTime || '');
+      return da < db ? -1 : da > db ? 1 : 0;
+    });
+
+  const mappedMatches = mapMatches(seasonMatches, team.id, details);
+
+  // Collect unique competitions from this season's matches
+  const compMap = new Map();
+  for (const m of seasonMatches) {
+    const ligaId = String(m.ligaData?.ligaId || '');
+    if (!ligaId || compMap.has(ligaId)) continue;
+    compMap.set(ligaId, {
+      ligaId,
+      liganame: m.ligaData?.liganame || '',
+      isLiga:   isLiga(m.ligaData?.liganame),
+    });
+  }
+
+  // Fetch table or bracket for each competition in parallel
+  const competitions = await Promise.all(
+    Array.from(compMap.values()).map(async comp => {
+      if (comp.isLiga) {
+        const table = await fetchLeagueTable(comp.ligaId, team.id);
+        return { ...comp, table: table || null, bracket: null };
+      } else {
+        const bracket = await fetchTournamentRounds(comp.ligaId);
+        return { ...comp, table: null, bracket: bracket || null };
+      }
+    })
+  );
+
+  const verbandId = firstVerbandId(matches);
+
+  const metaEntry = {
+    teamId:         team.id,
+    teamName:       team.name,
+    ageGroup:       team.ageGroup,
+    gender:         teamGender || team.gender,
+    lastUpdate:     new Date().toISOString(),
+    matchCount:     matches.length,
+    homeMatchCount: homeMatches.length,
+    awayMatchCount: awayMatches.length,
+    logoUrl:        `${BBB_MEDIA_BASE}/${team.id}/logo`,
+    matches:          mappedMatches,
+    spotlightMatches: computeSpotlight(mappedMatches),
+    competitions,
+  };
+
+  return { raw: { team, matches, homeMatches, awayMatches, details, teamGender }, metaEntry, verbandId };
+}
+
+// Erzeugt und speichert die ICS-Dateien für alle 3 Varianten (all/home/away) eines Teams.
+// Wird sowohl für den neuen Club-Pfad (kein migrationNotice) als auch für den
+// Alt-Pfad (mit migrationNotice) verwendet — der einzige Unterschied zwischen beiden
+// Aufrufstellen ist outputDir und makeMigrationNotice (je Variante ggf. eine eigene
+// newUrl, z.B. "..._home.ics" für die Heim-Variante statt immer "..._all.ics").
+// Eine Variante ohne Spiele wird übersprungen, bevor generateICS/migrationNotice ins
+// Spiel kommen — sonst würde der Alt-Pfad bei z.B. 0 Auswärtsspielen eine
+// hinweis-only-ICS erzeugen, wo bisher (bewusst) gar keine Datei entstand.
+async function writeIcsVariants(teamId, teamName, matches, homeMatches, awayMatches, details, outputDir, makeMigrationNotice) {
+  const variants = { all: matches, home: homeMatches, away: awayMatches };
+  for (const [kind, ms] of Object.entries(variants)) {
+    if (!ms.length) {
+      console.warn(`[WARN] Keine ICS für Team ${teamId}, Typ ${kind} (keine Spiele)`);
+      continue;
+    }
+    console.log(`[DEBUG] Erzeuge ICS für Team ${teamId}, Typ ${kind}, Spiele: ${ms.length}`);
+    const migrationNotice = makeMigrationNotice ? makeMigrationNotice(kind) : null;
+    const ics = await generateICS(ms, details, teamId, kind, teamName, migrationNotice);
+    console.log(`[DEBUG] ICS erzeugt: Länge ${ics?.length || 0}`);
+    if (ics) {
+      saveICS(teamId, kind, ics, outputDir);
+      console.log(`[DEBUG] ICS gespeichert: ${teamId}_${kind}.ics${outputDir ? ` (${outputDir})` : ''}`);
+    } else {
+      console.warn(`[WARN] Keine ICS für Team ${teamId}, Typ ${kind}`);
+    }
+  }
+}
+
+// Schreibt die neuen, Club-spezifischen ICS-Dateien (kein migrationNotice) für alle
+// Teams eines Clubs nach clubOutputDir.
+async function writeClubIcs(meta, rawTeamData, clubOutputDir) {
+  for (const entry of meta) {
+    const data = rawTeamData.get(entry.teamId);
+    await writeIcsVariants(entry.teamId, entry.teamName, data.matches, data.homeMatches, data.awayMatches, data.details, clubOutputDir, null);
+  }
+}
+
+// Alt-Pfad-Duplikat NUR für Clubs, die vor der Multi-Club-Migration bereits existierten
+// und echte Kalender-Abonnenten haben. Die Alt-Pfad-ICS müssen die ECHTEN Spiele
+// enthalten (nicht nur den Migrationshinweis) — deshalb werden hier dieselben
+// Rohdaten (rawTeamData) erneut verwendet, statt eine leere/hinweis-only ICS zu erzeugen.
+async function writeLegacyOutput(club, rawTeamData, meta, bundesland, baseUrl, generatedRootDir, theme) {
+  for (const [teamId, data] of rawTeamData.entries()) {
+    const { team, matches, homeMatches, awayMatches, details } = data;
+    await writeIcsVariants(teamId, team.name, matches, homeMatches, awayMatches, details, null, kind => ({
+      newUrl: `${baseUrl}${teamId}_${kind}.ics`,
+    }));
+  }
+
+  fs.writeFileSync(path.join(generatedRootDir, 'metadata.json'), JSON.stringify(meta, null, 2));
+  genHTML(theme, club.config.legal || {}, {
+    outputDir: generatedRootDir,
+    baseUrl: PORTAL_BASE_URL,
+    migrationNotice: { newBasePath: `/${bundesland}/${club.slug}/` },
+  });
+}
+
+// Verarbeitet einen einzelnen Club: holt Teams + Spiele, erzeugt die neuen
+// (nach Bundesland/Club verschachtelten) ICS-/HTML-Dateien, und — nur für Clubs mit
+// legacyRootOutput: true — zusätzlich ein Alt-Pfad-Duplikat direkt unter generatedRootDir
+// (mit Migrationshinweis), das die ECHTEN Spieldaten behält (nicht nur den Hinweis-Event).
+async function updateClub(club, generatedRootDir) {
+  const teams = await getTeams(club.config.clubId);
+  const theme = resolveTheme(club, teams);
+
+  const meta = [];
   // Rohdaten je Team (matches ungefiltert + details), für die eventuelle
   // Alt-Pfad-Regenerierung mit echten Spielen weiter unten.
   const rawTeamData = new Map();
@@ -142,90 +280,11 @@ async function updateClub(club, generatedRootDir) {
 
   for (const t of teams) {
     try {
-      console.log(`[DEBUG] Starte Update für Team ${t.id} (${t.name})`);
-
-      // Matches abrufen
-      const { matches, gender: teamGender } = await fetchTeamMatches(t.id);
-      console.log(`[DEBUG] API-Matches: ${matches.length}`);
-
-      if (!Array.isArray(matches) || matches.length === 0) {
-        console.warn(`[WARN] Keine Matches für Team ${t.id}`);
-        continue;
-      }
-
-      teamVerbandIds.push(firstVerbandId(matches));
-
-      // Detailinfos für jedes Match holen (parallel, mit Concurrency-Limit)
-      const detailsList = await mapWithConcurrency(matches, MATCH_INFO_CONCURRENCY, m => fetchMatchInfo(m.matchId));
-      const details = {};
-      matches.forEach((m, i) => { details[m.matchId] = detailsList[i]; });
-
-      // Home und Away Matches filtern
-      const homeMatches = matches.filter(m => Number(m.homeTeam.teamPermanentId) === Number(t.id));
-      const awayMatches = matches.filter(m => Number(m.guestTeam.teamPermanentId) === Number(t.id));
-
-      rawTeamData.set(t.id, { team: t, matches, homeMatches, awayMatches, details, teamGender });
-
-      // ICS-Varianten werden hier nur vorbereitet (matchVariants) — gespeichert werden
-      // sie erst NACH der Team-Schleife (siehe unten), weil clubOutputDir vom
-      // aggregierten Bundesland aller Teams abhängt (deriveClubBundesland),
-      // das erst nach vollständiger Team-Iteration feststeht.
-      const matchVariants = {
-        all: matches,
-        home: homeMatches,
-        away: awayMatches,
-      };
-
-      const seasonMatches = matches
-        .filter(m => m.ligaData?.seasonId === CURRENT_SEASON)
-        .sort((a, b) => {
-          const da = (a.kickoffDate || '') + (a.kickoffTime || '');
-          const db = (b.kickoffDate || '') + (b.kickoffTime || '');
-          return da < db ? -1 : da > db ? 1 : 0;
-        });
-
-      const mappedMatches = mapMatches(seasonMatches, t.id, details);
-
-      // Collect unique competitions from this season's matches
-      const compMap = new Map();
-      for (const m of seasonMatches) {
-        const ligaId = String(m.ligaData?.ligaId || '');
-        if (!ligaId || compMap.has(ligaId)) continue;
-        compMap.set(ligaId, {
-          ligaId,
-          liganame: m.ligaData?.liganame || '',
-          isLiga:   isLiga(m.ligaData?.liganame),
-        });
-      }
-
-      // Fetch table or bracket for each competition in parallel
-      const competitions = await Promise.all(
-        Array.from(compMap.values()).map(async comp => {
-          if (comp.isLiga) {
-            const table = await fetchLeagueTable(comp.ligaId, t.id);
-            return { ...comp, table: table || null, bracket: null };
-          } else {
-            const bracket = await fetchTournamentRounds(comp.ligaId);
-            return { ...comp, table: null, bracket: bracket || null };
-          }
-        })
-      );
-
-      meta.push({
-        teamId:         t.id,
-        teamName:       t.name,
-        ageGroup:       t.ageGroup,
-        gender:         teamGender || t.gender,
-        lastUpdate:     new Date().toISOString(),
-        matchCount:     matches.length,
-        homeMatchCount: homeMatches.length,
-        awayMatchCount: awayMatches.length,
-        logoUrl:        `${BBB_MEDIA_BASE}/${t.id}/logo`,
-        matches:          mappedMatches,
-        spotlightMatches: computeSpotlight(mappedMatches),
-        competitions,
-        _matchVariants: matchVariants, // temporär, wird vor dem Schreiben entfernt
-      });
+      const result = await fetchTeamData(t);
+      if (!result) continue;
+      rawTeamData.set(t.id, result.raw);
+      teamVerbandIds.push(result.verbandId);
+      meta.push(result.metaEntry);
     } catch (e) {
       console.error(`Fehler beim Update Team ${t.id}:`, e.stack || e);
     }
@@ -235,63 +294,14 @@ async function updateClub(club, generatedRootDir) {
   const clubOutputDir = path.join(generatedRootDir, bundesland, club.slug);
   const baseUrl = `${PORTAL_BASE_URL}${bundesland}/${club.slug}/`;
 
-  // Neue, Club-spezifische ICS-Dateien schreiben (kein migrationNotice)
-  for (const entry of meta) {
-    const { all, home, away } = entry._matchVariants;
-    delete entry._matchVariants;
-    const data = rawTeamData.get(entry.teamId);
-    const variants = { all, home, away };
-    for (const [kind, ms] of Object.entries(variants)) {
-      console.log(`[DEBUG] Erzeuge ICS für Team ${entry.teamId}, Typ ${kind}, Spiele: ${ms.length}`);
-      const ics = await generateICS(ms, data.details, entry.teamId, kind, entry.teamName);
-      console.log(`[DEBUG] ICS erzeugt: Länge ${ics?.length || 0}`);
-      if (ics) {
-        saveICS(entry.teamId, kind, ics, clubOutputDir);
-        console.log(`[DEBUG] ICS gespeichert: ${entry.teamId}_${kind}.ics (${clubOutputDir})`);
-      } else {
-        console.warn(`[WARN] Keine ICS für Team ${entry.teamId}, Typ ${kind}`);
-      }
-    }
-  }
+  await writeClubIcs(meta, rawTeamData, clubOutputDir);
 
   fs.mkdirSync(clubOutputDir, { recursive: true });
   fs.writeFileSync(path.join(clubOutputDir, 'metadata.json'), JSON.stringify(meta, null, 2));
   genHTML(theme, club.config.legal || {}, { outputDir: clubOutputDir, baseUrl });
 
-  // Alt-Pfad-Duplikat NUR für Clubs, die vor der Multi-Club-Migration bereits existierten
-  // und echte Kalender-Abonnenten haben. Die Alt-Pfad-ICS müssen die ECHTEN Spiele
-  // enthalten (nicht nur den Migrationshinweis) — deshalb werden hier dieselben
-  // Rohdaten (rawTeamData) erneut verwendet, statt eine leere/hinweis-only ICS zu erzeugen.
   if (club.config.legacyRootOutput) {
-    for (const [teamId, data] of rawTeamData.entries()) {
-      const { team, matches, homeMatches, awayMatches, details } = data;
-      const legacyVariants = {
-        all: matches,
-        home: homeMatches,
-        away: awayMatches,
-      };
-      for (const [kind, ms] of Object.entries(legacyVariants)) {
-        if (!ms.length) {
-          console.warn(`[WARN] Keine Alt-Pfad-ICS für Team ${teamId}, Typ ${kind} (keine Spiele)`);
-          continue;
-        }
-        const newUrl = `${baseUrl}${teamId}_${kind}.ics`;
-        const legacyIcs = await generateICS(ms, details, teamId, kind, team.name, { newUrl });
-        if (legacyIcs) {
-          saveICS(teamId, kind, legacyIcs);
-          console.log(`[DEBUG] Alt-Pfad-ICS gespeichert: ${teamId}_${kind}.ics`);
-        } else {
-          console.warn(`[WARN] Keine Alt-Pfad-ICS für Team ${teamId}, Typ ${kind}`);
-        }
-      }
-    }
-
-    fs.writeFileSync(path.join(generatedRootDir, 'metadata.json'), JSON.stringify(meta, null, 2));
-    genHTML(theme, club.config.legal || {}, {
-      outputDir: generatedRootDir,
-      baseUrl: PORTAL_BASE_URL,
-      migrationNotice: { newBasePath: `/${bundesland}/${club.slug}/` },
-    });
+    await writeLegacyOutput(club, rawTeamData, meta, bundesland, baseUrl, generatedRootDir, theme);
   }
 
   return { bundesland, meta };
