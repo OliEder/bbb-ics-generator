@@ -503,3 +503,34 @@ a|
 * Positive: Isolierte, unabhängig review- und mergebare Änderungen pro Club. Einfaches Onboarding: ein neuer Ordner mit einer `config.json` genügt.
 * Negative: Ein Überblick über alle Clubs auf einmal erfordert das Einlesen mehrerer Dateien (`loadClubs` kapselt das), statt eine einzige Datei zu öffnen.
 |===
+
+=== ADR-016: Mindestbreite für Multi-Club-Orchestrierungstests (9 Clubs, 6+ Bundesländer, 1 bundesweit)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-22
+
+| *Kontext*
+| Beim End-to-End-Test gegen die reale Basketball-Bund.net-API mit 10 echten Clubs aus 9 verschiedenen Bundesländern wurde ein kritischer Bug gefunden: Der Teams-Cache in `src/storage.js` war eine einzige globale Datei ohne Club-Bezug, sodass jeder Club nach dem ersten stillschweigend die gecachte Team-Liste des ERSTEN Clubs erhielt — falsche Teams, falsche Spiele, falsch hergeleitetes Bundesland. Keiner der zu diesem Zeitpunkt 176 bestehenden Tests fand diesen Bug, weil kein Integrationstest, der `updateAll()`/`updateClub()` aufruft, mit mehr als zwei Clubs gleichzeitig testete (der bis dahin einzige Multi-Club-Test deckte genau zwei Clubs ab).
+
+| *Entscheidung*
+| Integrationstests, die `updateAll()`/`updateClub()` aufrufen und clubübergreifendes Orchestrierungsverhalten prüfen (nicht reine Einzelfunktionslogik), müssen mit mindestens 9 Clubs aus mindestens 6 verschiedenen Bundesländern testen, plus mindestens einem Club, dessen Teams ausschließlich in bundesweiten Wettbewerben spielen (verbandId ohne Bundesland-Zuordnung, z.B. Bundesligen). Diese Regel ist in `CLAUDE.md` unter „Testregeln“ verbindlich festgehalten.
+
+| *Begründung*
+a|
+* Die eigentliche Eigenschaft — keine Datenlecks zwischen Clubs — ließe sich bereits mit zwei Clubs nachweisen (siehe der bestehende Zwei-Club-Regressionstest). Die höhere Schwelle ist bewusst deutlich über diesem Minimum gewählt, damit ein Test nicht nur "gerade so" die Mindestanforderung einer zweiten Instanz erfüllt, sondern echte Vielfalt erzwingt.
+* 9 Clubs über mindestens 6 Bundesländer stellen sicher, dass ein Test gleichzeitig mehrere Klassen von Kollisionsrisiken abdeckt, die bei nur zwei Clubs unsichtbar bleiben können: echte Bundesland-Gruppierung (mehrere Clubs im selben Bundesland, um Verwechslung innerhalb einer Gruppe auszuschließen), alphabetisch benachbarte Bundesland-Slugs (die sich bei fehlerhafter String-Verarbeitung eher gegenseitig überschreiben würden) und Verarbeitungsreihenfolge-Effekte, die bei nur zwei Elementen zufällig unauffällig bleiben können.
+* Der verpflichtende bundesweite Club deckt den einzigen Sonderfall ab, der nicht über die "Mehrheits-Bundesland"-Logik läuft (siehe <<adr-014-automatische-statt-manuelle-bundesland-zuordnung-pro-club,ADR-014>>), sondern direkt auf `bundesweit` fällt — ein Bug, der nur diesen Pfad betrifft, würde von einer reinen Bundesland-zu-Bundesland-Stichprobe nicht gefunden.
+* Die konkrete Zahl 9 ist damit kein Zufallswert, sondern die kleinste Zahl, mit der sich 6+ Bundesländer UND mindestens eine Bundesland-Gruppe mit mehr als einem Club UND ein bundesweiter Sonderfall gleichzeitig in einem einzigen Testlauf realistisch abbilden lassen.
+
+| *Konsequenzen*
+a|
+* Positive: Multi-Club-Orchestrierungsbugs, die nur bei echter Vielfalt auftreten (wie der Cache-Contamination-Bug), werden künftig vor dem Merge gefunden statt erst im realen Cron-Lauf.
+* Negative: Neue Multi-Club-Integrationstests sind aufwändiger zu schreiben und langsamer in der Ausführung als ein einfacher Zwei-Club-Test (siehe `tests/e2e/cron-update-integration.test.js` für das etablierte Muster mit einer einzigen Clubs-Tabelle als Quelle der Wahrheit für Mock-Setup und erwartete Pfade).
+|===
