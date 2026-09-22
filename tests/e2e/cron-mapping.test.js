@@ -6,6 +6,7 @@ const { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync, rmSync 
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const { mapMatches, computeSpotlight } = require('../../src/cronUpdate');
+const { verbandIdToBundesland, BUNDESWEIT } = require('../../src/verbandMapping');
 
 // Löscht die require-Caches, die von env-Variablen abhängiges Modul-Setup betreiben
 // (BBB_ICS_DIR/BBB_CLUBS_DIR werden nur beim ersten require ausgewertet), damit jeder
@@ -479,6 +480,154 @@ test('updateAll: zwei Clubs mit unterschiedlichen Team-Listen — Club B bekommt
     assert.equal(metaB.length, 1, 'Club B muss genau sein eigenes Team enthalten');
     assert.equal(metaB[0].teamId, '200', 'Club B (zweiter verarbeiteter Club) muss seine EIGENE teamId haben, NICHT die von Club A');
     assert.equal(metaB[0].teamName, 'Club B Team', 'Club B darf NICHT den von Club A geerbten (gecachten) Teamnamen bekommen');
+  } finally {
+    rmSync(dir, { recursive: true });
+    rmSync(clubsDir, { recursive: true });
+    delete process.env.BBB_CLUBS_DIR;
+    delete process.env.BBB_ICS_DIR;
+  }
+});
+
+// ---- Policy-Test: 9 Clubs über 6+ Bundesländer + 1 bundesweiter Club (siehe CLAUDE.md) ----
+// Ergänzt (nicht ersetzt) den obigen Zwei-Club-Regressionstest. Der Zwei-Club-Test deckt
+// weiterhin gezielt genau den historischen Cache-Contamination-Bug ab; dieser Test stresst
+// dieselbe Eigenschaft (jeder Club bekommt NUR seine eigenen Daten) mit realistischer Breite
+// über viele gleichzeitige Clubs und Bundesländer, wie von der neuen CLAUDE.md-Testregel
+// gefordert. Die verbandId->Bundesland-Zuordnung ist die einzige Quelle der Wahrheit für die
+// erwarteten Ausgabepfade — es gibt bewusst KEINE separate, parallel gepflegte Liste erwarteter
+// Pfade, um Drift zwischen Testaufbau und Testerwartung zu vermeiden (siehe CLUBS unten, aus
+// dem sowohl die Mocks als auch die erwarteten Pfade abgeleitet werden).
+test('updateAll: 9 Clubs über 8 Bundesländer + 1 bundesweiter Club — jeder Club bekommt korrekt nur seine eigenen Daten', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-cron-9club-'));
+  const clubsDir = mkdtempSync(join(tmpdir(), 'bbb-cron-9club-clubs-'));
+  try {
+    // Einzige Quelle der Wahrheit: clubId, verbandId (siehe src/verbandMapping.js für die
+    // verbandId->Bundesland-Tabelle) und der Bundesland-Ordnername, unter dem der Club im
+    // Test-clubsDir angelegt wird (nur eine organisatorische Ablage-Hilfe, siehe ADR-014 —
+    // NICHT die Quelle für den erwarteten Ausgabepfad, der wird per verbandIdToBundesland
+    // aus verbandId hergeleitet).
+    const CLUBS = [
+      { clubId: '3001', verbandId: 1,   sourceSlug: 'baden-wuerttemberg' },
+      { clubId: '3002', verbandId: 2,   sourceSlug: 'bayern' },
+      { clubId: '3003', verbandId: 3,   sourceSlug: 'berlin' },
+      { clubId: '3004', verbandId: 7,   sourceSlug: 'niedersachsen' },
+      { clubId: '3005', verbandId: 11,  sourceSlug: 'nordrhein-westfalen' },
+      { clubId: '3006', verbandId: 15,  sourceSlug: 'sachsen' },
+      { clubId: '3007', verbandId: 6,   sourceSlug: 'hessen' },
+      { clubId: '3008', verbandId: 9,   sourceSlug: 'saarland' },
+      { clubId: '3009', verbandId: 100, sourceSlug: 'bundesweit' }, // Bundesligen — keine Bundesland-Zuordnung
+    ];
+
+    // Mindestens 6 verschiedene ECHTE Bundesländer müssen unter den State-Clubs vorkommen
+    // (Policy-Vorgabe) — dieser Assert prüft die Testdaten selbst, nicht das Produktivverhalten.
+    const distinctStates = new Set(
+      CLUBS.filter(c => c.verbandId !== 100).map(c => verbandIdToBundesland(c.verbandId))
+    );
+    assert.ok(distinctStates.size >= 6, `Testdaten müssen >=6 Bundesländer abdecken, sind aber nur ${distinctStates.size}`);
+    assert.ok(CLUBS.some(c => verbandIdToBundesland(c.verbandId) === BUNDESWEIT), 'Testdaten müssen mind. einen bundesweiten Club enthalten');
+
+    const clubSlug = clubId => `verein-${clubId}`;
+    // teamId muss rein numerisch sein (siehe src/storage.js: /^\d+$/-Validierung gegen
+    // Sanitizer-Kollisionen) — daher ein numerisches Präfix (9) statt eines Buchstabenpräfix,
+    // um Verwechslung mit den 4-stelligen clubIds auszuschließen.
+    const teamIdFor = clubId => `9${clubId}`;
+
+    for (const club of CLUBS) {
+      mkdirSync(join(clubsDir, club.sourceSlug, clubSlug(club.clubId)), { recursive: true });
+      writeFileSync(
+        join(clubsDir, club.sourceSlug, clubSlug(club.clubId), 'config.json'),
+        JSON.stringify({ clubId: club.clubId })
+      );
+    }
+
+    process.env.BBB_ICS_DIR = dir;
+    process.env.BBB_CLUBS_DIR = clubsDir;
+
+    const TEAMS_BY_CLUB = {};
+    for (const club of CLUBS) {
+      TEAMS_BY_CLUB[club.clubId] = {
+        id: teamIdFor(club.clubId),
+        name: `Team ${club.clubId}`,
+        ageGroup: 'Herren',
+        gender: 'männlich',
+      };
+    }
+    // teamId -> clubId Rückwärtslookup, damit fetchTeamMatches (das nur die teamId erhält)
+    // die richtige verbandId/liganame für sein Team liefern kann.
+    const CLUB_BY_TEAM_ID = {};
+    for (const club of CLUBS) {
+      CLUB_BY_TEAM_ID[teamIdFor(club.clubId)] = club;
+    }
+
+    function makeMatchFor(teamId, teamName, verbandId, clubId) {
+      return {
+        matchId: Number(clubId) * 10 + 1,
+        kickoffDate: '2026-05-01',
+        kickoffTime: '18:00',
+        matchNo: '1',
+        result: null,
+        homeTeam: { teamPermanentId: teamId, teamname: teamName, teamnameSmall: teamName.slice(0, 2) },
+        guestTeam: { teamPermanentId: 999, teamname: 'Gegner', teamnameSmall: 'GG' },
+        ligaData: { liganame: `Bezirksliga Club ${clubId}`, seasonId: 2026, seasonName: '2025/26', ligaId: '1', verbandId },
+      };
+    }
+
+    const { cronModule } = resetCronModules(apiClient => {
+      // Lookup-basiert (nicht fixer Rückgabewert) — genau wie im Zwei-Club-Test, damit ein
+      // Cache-Contamination-Bug (Club N bekommt Teams von Club 1) überhaupt sichtbar würde.
+      apiClient.fetchClubTeams = async (clubId) => {
+        const team = TEAMS_BY_CLUB[clubId];
+        return team ? [team] : [];
+      };
+      apiClient.fetchTeamMatches = async (teamId) => {
+        const club = CLUB_BY_TEAM_ID[teamId];
+        if (!club) return { matches: [], gender: 'männlich' };
+        const team = TEAMS_BY_CLUB[club.clubId];
+        return {
+          matches: [makeMatchFor(teamId, team.name, club.verbandId, club.clubId)],
+          gender: team.gender,
+        };
+      };
+      apiClient.fetchMatchInfo = async () => null;
+      apiClient.fetchLeagueTable = async () => null;
+      apiClient.fetchTournamentRounds = async () => null;
+    });
+
+    await cronModule.updateAll();
+
+    for (const club of CLUBS) {
+      const expectedBundesland = verbandIdToBundesland(club.verbandId);
+      const metaPath = join(dir, expectedBundesland, clubSlug(club.clubId), 'metadata.json');
+
+      assert.ok(
+        existsSync(metaPath),
+        `Club ${club.clubId}: metadata.json muss unter generated/${expectedBundesland}/${clubSlug(club.clubId)}/ existieren`
+      );
+
+      const meta = JSON.parse(readFileSync(metaPath, 'utf8'));
+      assert.equal(meta.length, 1, `Club ${club.clubId}: metadata.json muss genau EIN (das eigene) Team enthalten`);
+      assert.equal(
+        meta[0].teamId,
+        teamIdFor(club.clubId),
+        `Club ${club.clubId}: teamId muss die EIGENE sein, nicht die eines anderen Clubs (Cache-Contamination-Check)`
+      );
+      assert.equal(
+        meta[0].teamName,
+        `Team ${club.clubId}`,
+        `Club ${club.clubId}: teamName muss der EIGENE sein, nicht der eines anderen Clubs (Cache-Contamination-Check)`
+      );
+    }
+
+    // Bundesweiter Club (3009, verbandId 100 = Bundesligen) ist der einzige Fall, der NICHT
+    // über die "häufigstes Bundesland gewinnt"-Logik läuft, sondern direkt auf 'bundesweit'
+    // fällt, weil verbandIdToBundesland(100) keiner Landeskarte zugeordnet ist. Das wird hier
+    // nochmal explizit (statt nur implizit über die Schleife oben) verriegelt.
+    const bundesweitClub = CLUBS.find(c => c.clubId === '3009');
+    assert.equal(verbandIdToBundesland(bundesweitClub.verbandId), BUNDESWEIT, 'Testannahme: verbandId 100 muss auf bundesweit abbilden');
+    assert.ok(
+      existsSync(join(dir, 'bundesweit', clubSlug('3009'), 'metadata.json')),
+      'Club 3009 (nur Bundesligen-Team) muss unter generated/bundesweit/ landen, NICHT unter einem Bundesland'
+    );
   } finally {
     rmSync(dir, { recursive: true });
     rmSync(clubsDir, { recursive: true });

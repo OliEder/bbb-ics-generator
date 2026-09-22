@@ -32,6 +32,7 @@ Die `render-docs.yml` Action rendert die arc42-Doku automatisch bei Änderungen 
 - Neue Features brauchen Tests in `tests/e2e/html-generation.test.js`
 - Neue HTML-Komponenten (Buttons, interaktive Elemente, aufklappbare Bereiche) brauchen zusätzlich einen E2E-Test der das Verhalten im Browser prüft (Playwright)
 - Tests und Dokumentation sind kein optionaler Nachschritt — sie gehören zur Implementierung
+- **Multi-Club-Orchestrierungstests** (Integrationstests, die `updateAll()`/`updateClub()` aus `src/cronUpdate.js` aufrufen und clubübergreifendes Verhalten statt reiner Einzelfunktionslogik prüfen) müssen mit mindestens 9 Clubs aus mindestens 6 verschiedenen Bundesländern testen, plus mindestens einem Club, dessen Teams ausschließlich in bundesweiten Wettbewerben spielen (verbandId ohne Bundesland-Zuordnung, z.B. Bundesligen) — ein Cross-Club-Cache-Contamination-Bug wurde von allen bisherigen Tests (die höchstens 1–2 Clubs gleichzeitig testeten) nicht gefunden, erst ein echter Testlauf mit vielen realen Clubs deckte ihn auf.
 
 ## Grenzen der automatisierten Barrierefreiheitsprüfung
 
