@@ -2,12 +2,14 @@
 
 === Whitebox-Gesamtsystem
 
-Das System besteht aus fünf aktiven Modulen. Die Module sind lose gekoppelt und kommunizieren ausschließlich über Funktionsaufrufe (CommonJS `require`).
+Das System besteht aus sieben aktiven Modulen. Die Module sind lose gekoppelt und kommunizieren ausschließlich über Funktionsaufrufe (CommonJS `require`).
 
 [source,mermaid]
 ----
 graph LR
-    CU["cronUpdate.js\nOrchestrator"] --> AC["apiClient.js\nAPI-Facade"]
+    CU["cronUpdate.js\nMulti-Club-Orchestrator"] --> CL["clubs.js\nClub-Config-Loader"]
+    CU --> VM["verbandMapping.js\nBundesland-Herleitung"]
+    CU --> AC["apiClient.js\nAPI-Facade"]
     CU --> IG["icsGenerator.js\nRFC 5545 Renderer"]
     CU --> ST["storage.js\nPersistenz"]
     CU --> GH["generateHTML.js\nPortal-Generator"]
@@ -15,32 +17,97 @@ graph LR
     SV["server.js\nDev-Server"] -.->|nur lokal| ST
 ----
 
-=== Modul: cronUpdate.js (Orchestrator)
+=== Modul: cronUpdate.js (Multi-Club-Orchestrator)
 
 [cols="2,5", options="header"]
 |===
 | Aspekt | Beschreibung
 
 | *Verantwortlichkeit*
-| Einstiegspunkt des Update-Prozesses. Orchestriert den kompletten Daten-Refresh: Teams ermitteln, Spielpläne abrufen, ICS generieren, Dateien speichern, Metadaten schreiben.
+| Einstiegspunkt des Update-Prozesses. Orchestriert den kompletten Daten-Refresh für **alle** konfigurierten Clubs: Club-Configs laden, pro Club Teams ermitteln, Spielpläne abrufen, Bundesland herleiten, ICS + HTML generieren, und für Bestandsclubs zusätzlich die Alt-Pfad-Ausgabe schreiben.
 
 | *Schnittstellen (eingehend)*
-| Keine. Wird direkt via `node src/cronUpdate.js` gestartet (durch GitHub Actions oder manuell).
+| Keine. Wird direkt via `node src/cronUpdate.js` gestartet (durch GitHub Actions oder manuell). `module.exports = { getTeams, updateAll, updateClub, mapMatches, computeSpotlight }` — diese fünf Funktionen sind die öffentliche, testbare Oberfläche des Moduls.
+
+| *Interne (nicht exportierte) Funktionen*
+a|
+* `resolveTheme(club, teams)` — ermittelt Primär-/Akzentfarbe, Cup-Farbe und Logo-URL eines Clubs aus `club.config.theme`/`club.config.cupColor`, mit Fallback auf den Standard-Fibalon-Look und einer aus der ersten `teamPermanentId` konstruierten Logo-URL
+* `fetchTeamData(team)` — lädt für ein Team Spiele, Match-Details (parallel via `mapWithConcurrency`), Saison-gefilterte `matches[]`, Tabellen/Turnierbäume je Wettbewerb, sowie die für die Bundesland-Herleitung benötigte `verbandId` des ersten Spiels (`firstVerbandId`); gibt `null` zurück, wenn das Team keine Spiele hat
+* `writeIcsVariants(teamId, teamName, matches, homeMatches, awayMatches, details, outputDir, makeMigrationNotice)` — erzeugt und speichert die drei ICS-Varianten (`all`/`home`/`away`) eines Teams; wird sowohl für den neuen Club-Pfad (`makeMigrationNotice = null`) als auch für den Alt-Pfad (mit `makeMigrationNotice`) verwendet; eine Variante ganz ohne Spiele wird übersprungen, bevor ein `migrationNotice` ins Spiel kommt
+* `writeClubIcs(meta, rawTeamData, clubOutputDir)` — ruft `writeIcsVariants` für alle Teams eines Clubs ohne Migrationshinweis auf (neuer, verschachtelter Pfad)
+* `writeLegacyOutput(club, rawTeamData, meta, bundesland, baseUrl, generatedRootDir, theme)` — schreibt für Clubs mit `legacyRootOutput: true` ein vollständiges Duplikat (echte Spieldaten, nicht nur ein Hinweis) direkt unter `generatedRootDir`, inkl. Migrationshinweis-VEVENT in jeder ICS-Variante und Migrationsbanner in der HTML-Ausgabe
+* `firstVerbandId(matches)` — liefert die `verbandId` des ersten (ungefilterten) Rohspiels eines Teams, das eine besitzt; Basis für die Bundesland-Mehrheitsentscheidung
+* `isLiga(liganame)` — Namensheuristik: enthält der Wettbewerbsname "liga", gilt er als Liga (Tabelle), sonst als Cup/Pokal (Turnierbaum)
 
 | *Schnittstellen (ausgehend)*
-| `apiClient.js`: `fetchTeamMatches(teamId)`, `fetchMatchInfo(matchId)`, `fetchClubTeams(clubId)` +
-`icsGenerator.js`: `generateICS(matches, details, teamId, kind, teamName)` +
-`storage.js`: `saveICS(teamId, type, data)`, `saveTeamsCache(teams)`, `loadTeamsCache()` +
-`config.json`: `clubId`
+| `clubs.js`: `loadClubs(clubsRootDir)` +
+`verbandMapping.js`: `deriveClubBundesland(teamVerbandIds)` +
+`apiClient.js`: `fetchTeamMatches(teamId)`, `fetchMatchInfo(matchId)`, `fetchClubTeams(clubId)`, `fetchLeagueTable(ligaId, ownTeamId)`, `fetchTournamentRounds(ligaId)`, `mapWithConcurrency(items, limit, mapper)` +
+`icsGenerator.js`: `generateICS(matches, details, teamId, type, teamName, migrationNotice)` +
+`storage.js`: `saveICS(teamId, type, data, outputDir)`, `saveTeamsCache(teams)`, `loadTeamsCache()`, `sanitizeSlug(slug)` +
+`generateHTML.js`: `genHTML(theme, legal, options)` +
+`clubs/<bundesland>/<club>/config.json`: `clubId`, `legacyRootOutput`, `theme`, `cupColor`, `legal`
 
 | *Wichtige Logik*
-| Zweistufige Strategie für Team-Ermittlung: (1) Cache-HIT → sofortige Nutzung, (2) Cache-MISS → API-Aufruf + Cache-Befüllung, (3) API-Fehler + abgelaufener Cache → Fallback auf alten Cache. Pro Team werden drei ICS-Varianten erzeugt: `all`, `home`, `away`. Pro Team werden zusätzlich `spotlightMatches` (0–2 Einträge) berechnet via `computeSpotlight`: letztes Ergebnis + nächstes Spiel, oder letzte 2 Ergebnisse, oder erste 2 zukünftige.
+| `updateAll()` lädt alle Clubs via `loadClubs()`, validiert jeden `club.slug` per `sanitizeSlug()` (wirft bei ungültigem Slug) und ruft `updateClub(club, generatedRootDir)` pro Club auf. `updateClub()` ist eine schlanke Orchestrierungsfunktion: Teams laden (`getTeams`, zweistufige Cache-Strategie wie zuvor), pro Team `fetchTeamData()` aufrufen, daraus `teamVerbandIds` sammeln und per `deriveClubBundesland()` das Bundesland bestimmen, den verschachtelten Ausgabepfad `generated/<bundesland>/<club-slug>/` bauen, `writeClubIcs()` + `genHTML()` dorthin schreiben, und — nur bei `club.config.legacyRootOutput === true` — zusätzlich `writeLegacyOutput()` aufrufen. Pro Team werden weiterhin `spotlightMatches` (0–2 Einträge) via `computeSpotlight()` berechnet: letztes Ergebnis + nächstes Spiel, oder letzte 2 Ergebnisse, oder erste 2 zukünftige.
 
 | *Fehlerbehandlung*
-| Fehler pro Team werden geloggt, aber der Gesamtprozess wird für die verbleibenden Teams fortgesetzt (Fail-Graceful per Team-Isolation in try/catch).
+| Fehler pro Team werden in `updateClub()` geloggt, der Prozess läuft für die verbleibenden Teams weiter (Fail-Graceful per Team-Isolation in try/catch, unverändert gegenüber dem Single-Club-Modell). `loadClubs()` überspringt nicht lesbare Verzeichnisse und ungültige `config.json`-Dateien (loggt, wirft nicht) — ein defekter Club bricht den Lauf für die übrigen Clubs nicht ab.
 
 | *Abhängigkeiten*
-| `./apiClient`, `./icsGenerator`, `./storage`, `../config.json`, `fs`, `path`
+| `./apiClient`, `./icsGenerator`, `./storage`, `./generateHTML`, `./clubs`, `./verbandMapping`, `fs`, `path`
+|===
+
+=== Modul: clubs.js (neu — Club-Config-Loader)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *Verantwortlichkeit*
+| Liest die Verzeichnisstruktur `clubs/<bundesland-slug>/<club-slug>/config.json` rekursiv ein und liefert eine Liste aller gültigen Club-Configs. Ersetzt das frühere Einlesen einer einzelnen Root-`config.json`.
+
+| *Exportierte Funktionen*
+a|
+* `loadClubs(clubsRootDir)` → `Array<{ slug, sourceBundeslandSlug, configPath, config }>`
+
+| *Rückgabeform*
+a|
+* `slug` — Ordnername des Clubs (z.B. `fibalon`)
+* `sourceBundeslandSlug` — Ordnername der übergeordneten Bundesland-Ebene im Quellbaum; **nur ein Hinweis für Menschen**, keine verbindliche Datenquelle (siehe <<adr-014-automatische-bundesland-ableitung,ADR-014>> — das tatsächliche Bundesland wird zur Laufzeit aus Liga-Daten berechnet, nicht aus diesem Ordnernamen)
+* `configPath` — absoluter Pfad zur `config.json`
+* `config` — geparster Inhalt der `config.json`
+
+| *Fehlertoleranz*
+| Nicht lesbare Bundesland-Verzeichnisse, fehlende `config.json`-Dateien, ungültiges JSON und Configs ohne `clubId` werden übersprungen und mit `console.error` geloggt — sie werfen keine Exception und brechen `loadClubs()` nicht ab. Existiert `clubsRootDir` nicht, liefert die Funktion eine leere Liste statt zu werfen.
+
+| *Abhängigkeiten*
+| `fs`, `path` (Node.js Stdlib)
+|===
+
+=== Modul: verbandMapping.js (neu — Bundesland-Herleitung)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *Verantwortlichkeit*
+| Bildet die von der Basketball-Bund-API gelieferte `verbandId` (Landesverband einer Liga) auf einen deutschen Bundesland-Slug ab und leitet daraus das Bundesland eines gesamten Clubs her (Mehrheitsentscheidung über alle seine Teams).
+
+| *Exportierte Funktionen*
+a|
+* `verbandIdToBundesland(verbandId)` → Bundesland-Slug (z.B. `'bayern'`) oder `'bundesweit'`
+* `deriveClubBundesland(teamVerbandIds)` → Bundesland-Slug; Mehrheitsvotum über die übergebene Liste von `verbandId`-Werten (einer je Team)
+* `BUNDESWEIT` → Konstante `'bundesweit'`
+
+| *Mapping-Tabelle*
+| Statische Tabelle `VERBAND_TO_BUNDESLAND` mit den 16 Landesverbands-IDs (1–16, laut öffentlicher Basketball-Bund-API-Dokumentation) auf die entsprechenden Bundesland-Slugs. `verbandId` ohne Eintrag (z.B. bundesweite Ligen) fällt auf `'bundesweit'` zurück; ebenso `null`/`undefined`.
+
+| *Mehrheitslogik*
+| `deriveClubBundesland` zählt, wie oft jeder (Nicht-`'bundesweit'`-)Bundesland-Slug unter den übergebenen `verbandId`-Werten vorkommt, und gibt den häufigsten zurück. Bei Gleichstand gewinnt der Slug, der zuerst in der Eingabeliste auftrat (`firstSeenOrder`). Enthält die Liste ausschließlich `'bundesweit'`-Werte oder ist leer, ist das Ergebnis `'bundesweit'`.
+
+| *Abhängigkeiten*
+| Keine (reine Funktionen, keine I/O)
 |===
 
 === Modul: apiClient.js (API-Facade)
@@ -54,18 +121,24 @@ graph LR
 
 | *Exportierte Funktionen*
 a|
-* `fetchTeamMatches(teamId)` → `Array<Match>` (leer bei Fehler)
+* `fetchTeamMatches(teamId)` → `{ matches: Array<Match>, gender: string }` (leeres Array bei Fehler)
 * `fetchMatchInfo(matchId)` → `MatchInfo \| null` (null bei Fehler)
 * `fetchClubTeams(clubId)` → `Array<Team> \| null` (null bei Fehler, leer wenn keine Matches)
+* `fetchLeagueTable(ligaId, ownTeamId)` → `Array<TableRow> \| null` (null bei Fehler)
+* `fetchTournamentRounds(ligaId)` → `Array<Round> \| null` (null bei Fehler oder keinen Runden)
+* `mapWithConcurrency(items, limit, mapper)` → `Promise<Array>` (geänderte/neue Funktion, siehe unten)
 
 | *Schnittstellen (ausgehend)*
 | Basketball-Bund REST-API via `axios` HTTP-Client. Basis-URL: `https://www.basketball-bund.net/rest`.
 
 | *Wichtige Logik*
-| `fetchClubTeams` dedupliziert Teams per `teamPermanentId` (Set-basiertes Seen-Tracking). Nur Teams, deren `clubId` mit der übergebenen `clubId` übereinstimmt, werden zurückgegeben.
+| `fetchClubTeams` dedupliziert Teams per `teamPermanentId` (Set-basiertes Seen-Tracking). Nur Teams, deren `clubId` mit der übergebenen `clubId` übereinstimmt, werden zurückgegeben. `fetchTournamentRounds` unterstützt zwei API-Formen (Pfad A: `spieltage[]` mit separatem Abruf je Spieltag; Pfad B: inline `matches[]` gruppiert nach `matchDay`, z.B. Bayernpokal) und füllt fehlende zukünftige Runden mit TBD-Platzhaltern basierend auf bekannten Siegern auf.
+
+| *`mapWithConcurrency(items, limit, mapper)` (geändert/neu)*
+| Generischer, von der Basketball-Bund-API unabhängiger Concurrency-Limited-Parallel-Map-Helfer: verarbeitet `items` mit `mapper`, wobei höchstens `limit` Aufrufe gleichzeitig laufen (Worker-Pool-Pattern, kein `Promise.all` über alle Items). Ergebnisse behalten die Original-Reihenfolge von `items`. Wirft bei `limit <= 0` oder einem nicht-ganzzahligen `limit`. Ein Fehler in `mapper` propagiert über `Promise.all` der Worker und bricht den gesamten Aufruf ab — Fehler werden in `cronUpdate.js` nicht stillschweigend verschluckt. Wird in `cronUpdate.js`'s `fetchTeamData()` genutzt, um `fetchMatchInfo()` für alle Spiele eines Teams parallel abzurufen, begrenzt durch `BBB_MATCH_INFO_CONCURRENCY` (Default 4).
 
 | *Fehlerbehandlung*
-| Alle Funktionen fangen HTTP-Fehler und Netzwerkfehler via try/catch. Bei Fehler: `fetchTeamMatches` → `[]`, `fetchMatchInfo` → `null`, `fetchClubTeams` → `null`.
+| Alle Funktionen fangen HTTP-Fehler und Netzwerkfehler via try/catch. Bei Fehler: `fetchTeamMatches` → `{ matches: [], gender: '' }`, `fetchMatchInfo` → `null`, `fetchClubTeams` → `null`, `fetchLeagueTable` → `null`, `fetchTournamentRounds` → `null`. `mapWithConcurrency` wirft synchron bei ungültigem `limit`, propagiert aber `mapper`-Fehler statt sie zu fangen.
 
 | *Abhängigkeiten*
 | `axios`
@@ -82,7 +155,7 @@ a|
 
 | *Exportierte Funktionen*
 a|
-* `generateICS(matches, details, teamId, type, teamName)` → `Promise<string \| null>`
+* `generateICS(matches, details, teamId, type, teamName, migrationNotice)` → `Promise<string \| null>` — `migrationNotice` ist ein neuer, optionaler sechster Parameter (siehe unten)
 
 | *Interne Funktionen*
 a|
@@ -102,6 +175,9 @@ a|
 | *Wichtige Logik*
 | Die `ics`-Bibliothek erzeugt RFC-konforme VEVENT-Blöcke. Der Generator führt danach eine zeilenbasierte Post-Processing-Pipeline aus: VCALENDAR-Header-Ersetzung mit X-WR-*-Properties, X-ALT-DESC-Injektion nach DESCRIPTION unter Berücksichtigung von Line-Folding, Entfernung automatisch generierter Duplikat-Header.
 
+| *`migrationNotice`-Parameter (neu)*
+| Optionales Objekt `{ newUrl, today? }`. Ist es gesetzt, fügt `generateICS` **vor** den eigentlichen Spiel-Events ein zusätzliches, ganztägiges Hinweis-VEVENT (`busyStatus: 'FREE'`, Titel „Kalender-Abo aktualisieren") ein, dessen Beschreibung auf `newUrl` verweist. `today` ist ausschließlich für Tests gedacht (deterministische Simulation von Monatsenden); ohne Angabe wird `new Date()` verwendet. Das Enddatum wird per echter `Date`-Arithmetik (`setDate(getDate() + 1)`) berechnet statt naiv den Tageswert zu inkrementieren — sonst könnte an Monatsenden ein ungültiges Datum (z.B. Tag 32) entstehen, das die `ics`-Bibliothek als `ValidationError` ablehnt. Wird ausschließlich für die Alt-Pfad-Ausgabe (`legacyRootOutput: true`) aus `cronUpdate.js` befüllt — im neuen, verschachtelten Club-Pfad bleibt der Parameter `null`.
+
 | *ICS-Escaping*
 | `icsEscape` kodiert die vier RFC-5545-Sonderzeichen: `\` → `\\`, `;` → `\;`, `,` → `\,`, `\n` → `\n` (literal), `\r` wird entfernt. HTML-Beschreibungen werden zusätzlich von echten Newlines bereinigt.
 
@@ -120,22 +196,30 @@ a|
 
 | *Exportierte Funktionen*
 a|
-* `saveICS(teamId, type, data)` → `string` (Dateipfad)
-* `readICS(teamId, type)` → `string \| null`
+* `saveICS(teamId, type, data, outputDir)` → `string` (Dateipfad) — `outputDir` ist ein neuer, optionaler vierter Parameter
+* `readICS(teamId, type, outputDir)` → `string \| null` — ebenfalls um `outputDir` erweitert
 * `saveTeamsCache(teams)` → schreibt `teams-cache.json`
 * `loadTeamsCache()` → `{ teams: Array \| null, stale: boolean }`
+* `sanitizeSlug(slug)` → `string` (neu) — validiert und gibt den Slug unverändert zurück, oder wirft
+
+| *`outputDir`-Parameter (neu)*
+| Ohne Angabe fallen `saveICS`/`readICS` auf das globale `ICS_DIR` zurück (Rückwärtskompatibilität mit dem Single-Club-Verhalten). Mit Angabe landet/liest die Datei im club-spezifischen Verzeichnis (z.B. `generated/bayern/fibalon/`); `resolveDir()` legt dieses Verzeichnis bei Bedarf automatisch an.
+
+| *`sanitizeSlug(slug)` (neu)*
+| Validiert Pfadsegmente (Bundesland-/Club-Slugs) gegen `/^[a-z0-9-]+$/` — nur Kleinbuchstaben, Ziffern und Bindestrich. Wirft bei jedem anderen Wert (inkl. nicht-Strings). Zentrale Path-Traversal-Verteidigung für die vom `cronUpdate.js`-Orchestrator dynamisch aus Club-Configs und hergeleiteten Bundesländern zusammengesetzten Verzeichnisnamen (verhindert z.B. `../` oder uneinheitliche Groß-/Kleinschreibung).
 
 | *Sicherheitsmechanismen*
 a|
 * *Whitelist-Validierung für `type`*: Nur `'all'`, `'home'`, `'away'` erlaubt (via `Set`-Lookup).
 * *Regex-Validierung für `teamId`*: Nur reine Zahlenketten erlaubt (`/^\d+$/`).
-* Beide Prüfungen verhindern Path-Traversal (z. B. `../../etc/passwd`).
+* *Regex-Validierung für Slugs* (`sanitizeSlug`, neu): Nur `/^[a-z0-9-]+$/`.
+* Alle drei Prüfungen verhindern Path-Traversal (z. B. `../../etc/passwd`).
 
 | *Cache-Logik*
 | `teams-cache.json` enthält `{ cachedAt: ISO-8601-String, teams: [...] }`. TTL = 30 Tage. `loadTeamsCache` gibt `stale: true` zurück wenn `Date.now() - cachedAt >= 30 * 24 * 60 * 60 * 1000`. Bei Parse-Fehler wird `{ teams: null, stale: true }` zurückgegeben.
 
 | *Ausgabeverzeichnis*
-| `generated/` (relativ zum Projektroot). Wird bei Start automatisch angelegt wenn nicht vorhanden.
+| Global: `generated/` (relativ zum Projektroot, überschreibbar via `BBB_ICS_DIR`), wird bei Start automatisch angelegt wenn nicht vorhanden. Pro Club: `generated/<bundesland>/<club-slug>/`, via den neuen `outputDir`-Parameter von `cronUpdate.js` übergeben.
 
 | *Abhängigkeiten*
 | `fs`, `path` (Node.js Stdlib)
@@ -158,6 +242,7 @@ a|
 
 | *Wichtige interne Funktionen*
 a|
+* `buildMigrationBanner(migrationNotice)` — rendert einen sichtbaren Banner (`role="note"`, CSS-Klasse `.migration-banner`, gestylt über die bestehenden Farbtoken `--color-info-bg`/`--color-info-border`), wenn `migrationNotice.newBasePath` gesetzt ist; leerer String sonst. `migrationNotice` hat hier die Form `{ newBasePath }` — bewusst eine andere Form als das gleichnamige Objekt `{ newUrl, today? }` in `icsGenerator.generateICS()`, da HTML-Banner auf eine Seite (Pfad) verlinken, ICS-Hinweise dagegen auf eine konkrete Datei-URL
 * `buildCalHelp()` — aufklappbarer `<details>`-Block mit Erklärung zu Kalender-Abonnements (iOS/macOS, Google, Outlook, ICS) inkl. offizieller Support-Links; wird in jedem Tab-Panel eingebettet
 * `buildTabPanel(teamId, type, webcalLink, googleLink, httpsLink, matches, cupColor)` — rendert einen Tab-Panel mit Spielplan, Abo-Buttons (inkl. „Link kopieren"-Button für Outlook/HTTPS-URL) und eingebettetem `buildCalHelp()`-Block
 * `buildScheduleRow(match, cupColor)` — rendert eine zweizeilige Spielzeile: Zeile 1 enthält Datum, Gegnername, Sieg/Niederlage-Icon und Ergebnis; Zeile 2 den Liganamen. Verwendet `resultIcon(match)` für das Icon.
@@ -176,7 +261,7 @@ a|
 * `buildImpressum(legal, allTeams, theme)` — erzeugt `generated/impressum.html` nur wenn `config.legal` mindestens ein nicht-leeres Feld hat. Zeigt Betreiber, Adresse, Telefon (optional), E-Mail und Verantwortlichen (optional) aus der Konfiguration sowie einen Haftungshinweis zu aggregierten öffentlichen Daten.
 * `buildDatenschutz(legal, allTeams, theme)` — erzeugt `generated/datenschutz.html` (wird immer generiert). Nennt Drittanbieter: cdnjs.cloudflare.com (Font Awesome), basketball-bund.net (Spielplandaten + Logos). Betreiber und E-Mail werden aus `config.legal` bezogen.
 * `buildBarrierefreiheit(legal, allTeams, theme)` — erzeugt `generated/barrierefreiheit.html` (wird immer generiert). Status: "Teilweise konform mit WCAG 2.1 Stufe AA". E-Mail-Kontakt aus der Konfiguration.
-* `genHTML(theme, legal)` — Einstiegsfunktion; `legal`-Parameter wurde hinzugefügt (vorher `genHTML(theme)`).
+* `genHTML(theme, legal, options)` — Einstiegsfunktion; **geändert**: dritter Parameter `options = { baseUrl, outputDir, migrationNotice }` neu hinzugekommen (vorher `genHTML(theme, legal)`). `baseUrl` überschreibt die Standard-GitHub-Pages-URL (`DEFAULT_BASE_URL`) für Kalender-Abo-Links; `outputDir` überschreibt das Zielverzeichnis (Default: `BBB_GENERATED_DIR`/`BBB_ICS_DIR`-Umgebungsvariable oder `generated/`); `migrationNotice` wird unverändert an `buildIndexPage`/`buildTeamPage` durchgereicht und von dort an `buildMigrationBanner`. Liest weiterhin `metadata.json` aus dem (jetzt club-spezifischen) `outputDir`. Es gibt **keinen eigenständigen CLI-Einstiegspunkt mehr** — das frühere `if (require.main === module)`, das eine Root-`config.json` gelesen hat, wurde entfernt: `cronUpdate.js` ruft `genHTML()` seit der Multi-Club-Umstellung intern pro Club auf, und der alte Einstiegspunkt wäre nach dem Löschen der Root-`config.json` ohnehin abgestürzt.
 
 | *Abhängigkeiten*
 | `fs`, `path` (Node.js Stdlib); Leaflet 1.9.4 (CDN, nur in Team-Seiten); Font Awesome (cdnjs.cloudflare.com, CDN)
@@ -200,19 +285,43 @@ a|
 
 === Abhängigkeitsmatrix
 
-[cols="2,1,1,1,1,1,1", options="header"]
+[cols="2,1,1,1,1,1,1,1,1", options="header"]
 |===
-| Modul | cronUpdate | apiClient | icsGenerator | storage | generateHTML | server
+| Modul | cronUpdate | clubs | verbandMapping | apiClient | icsGenerator | storage | generateHTML | server
 
 | *cronUpdate.js*
 | —
 | nutzt
 | nutzt
 | nutzt
+| nutzt
+| nutzt
+| nutzt
+| —
+
+| *clubs.js*
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+
+| *verbandMapping.js*
+| —
+| —
+| —
+| —
+| —
+| —
 | —
 | —
 
 | *apiClient.js*
+| —
+| —
 | —
 | —
 | —
@@ -227,8 +336,12 @@ a|
 | —
 | —
 | —
+| —
+| —
 
 | *storage.js*
+| —
+| —
 | —
 | —
 | —
@@ -240,11 +353,15 @@ a|
 | —
 | —
 | —
+| —
+| —
 | liest FS direkt
 | —
 | —
 
 | *server.js*
+| —
+| —
 | —
 | —
 | —

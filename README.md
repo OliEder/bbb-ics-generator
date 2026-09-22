@@ -57,20 +57,29 @@ flowchart TD
 bbb-ics-generator/
 ├── src/
 │   ├── server.js          # Express-Server (lokale Entwicklung)
-│   ├── cronUpdate.js      # Haupt-Update-Skript (API → ICS + metadata.json)
-│   ├── apiClient.js       # Basketball-Bund API-Client
+│   ├── cronUpdate.js      # Multi-Club-Orchestrator (API → ICS + metadata.json + HTML, pro Club)
+│   ├── clubs.js           # Lädt clubs/<bundesland>/<club>/config.json rekursiv
+│   ├── verbandMapping.js  # verbandId → Bundesland-Zuordnung + Mehrheitsvotum pro Club
+│   ├── apiClient.js       # Basketball-Bund API-Client (inkl. mapWithConcurrency-Helfer)
 │   ├── icsGenerator.js    # ICS-Datei-Generierung (RFC 5545)
-│   ├── storage.js         # Datei-I/O und Teams-Cache
-│   └── generateHTML.js    # Statischer HTML-Generator
-├── generated/             # Ausgabeverzeichnis (von GitHub Actions befüllt)
-│   ├── index.html         # Startseite mit Team-Teasern
-│   ├── metadata.json      # Team-Metadaten, Spielplandaten, Tabellen
-│   ├── teams/             # Individuelle Team-Seiten
-│   │   └── {teamId}.html
-│   └── {teamId}_{type}.ics
+│   ├── storage.js         # Datei-I/O, Teams-Cache, Slug-Validierung (Path-Traversal-Schutz)
+│   └── generateHTML.js    # Statischer HTML-Generator (pro Club aufgerufen)
+├── clubs/                 # Ein Verzeichnis pro Bundesland/Club
+│   └── bayern/
+│       └── fibalon/
+│           └── config.json    # Vereinskonfiguration (clubId, Theme, legal, legacyRootOutput)
+├── generated/              # Ausgabeverzeichnis (von GitHub Actions befüllt)
+│   ├── bayern/
+│   │   └── fibalon/
+│   │       ├── index.html      # Startseite mit Team-Teasern
+│   │       ├── metadata.json   # Team-Metadaten, Spielplandaten, Tabellen
+│   │       ├── teams/          # Individuelle Team-Seiten
+│   │       │   └── {teamId}.html
+│   │       └── {teamId}_{type}.ics
+│   ├── {teamId}_{type}.ics       # Alt-Pfad-Duplikat nur für Clubs mit legacyRootOutput: true
+│   └── teams/{teamId}.html       # (dito, siehe ADR-013 in docs/arc42)
 ├── tests/
 │   └── e2e/               # End-to-End Tests (node:test)
-├── config.json            # Vereinskonfiguration (clubId, Theme)
 └── .github/workflows/     # GitHub Actions (automatisches Update alle 6h)
 ```
 
@@ -78,26 +87,38 @@ bbb-ics-generator/
 
 ## Konfiguration
 
-`config.json` definiert den Verein und optionales Theming:
+Jeder Verein bekommt ein eigenes Verzeichnis unter `clubs/<bundesland-slug>/<club-slug>/config.json`. Der Ordnername (`<bundesland-slug>`) ist dabei nur eine Organisationshilfe im Repository — welches Bundesland tatsächlich für die Ausgabe-URL verwendet wird, ermittelt `cronUpdate.js` bei jedem Lauf automatisch aus den echten Liga-Daten der Teams (siehe `src/verbandMapping.js`).
+
+Beispiel: `clubs/bayern/fibalon/config.json`
 
 ```json
 {
-  "clubId": "4521",
-  "theme": {
-    "primary": "#004174",
-    "accent":  "#009ef3",
-    "logoUrl": null
-  },
-  "cupColor": "#7c3aed",
+  "clubId": "4468",
+  "legacyRootOutput": true,
   "legal": {
     "operator": "Fibalon Baskets Neumarkt e.V.",
     "address": "Musterstraße 1, 92318 Neumarkt i.d.OPf.",
     "email": "",
     "phone": "",
     "responsible": ""
+  },
+  "_theme_example": {
+    "comment": "Optionale Overrides — entferne '_example' um sie zu aktivieren",
+    "primary": "#004174",
+    "accent": "#009ef3",
+    "logoUrl": "https://example.com/logo.png"
+  },
+  "onboarding": {
+    "status": "confirmed"
   }
 }
 ```
+
+- `clubId` (Pflichtfeld) — die Basketball-Bund-Vereins-ID.
+- `theme` (optional) — `primary`/`accent`/`logoUrl` überschreiben das Standard-Theme.
+- `cupColor` (optional) — Akzentfarbe für Pokalwettbewerbe.
+- `legal` (optional) — steuert Footer-Links und rechtliche Pflichtseiten (siehe unten).
+- `legacyRootOutput` (optional, `true`/`false`) — nur für Vereine, die bereits vor dem Multi-Club-Umbau unter dem alten, flachen Pfad (`generated/{teamId}_{type}.ics`) liefen und bestehende Kalender-Abos haben. Erzeugt zusätzlich zur neuen, verschachtelten Ausgabe ein Duplikat am alten Pfad, inklusive Migrationshinweis im Kalender und Banner auf der Website. Neue Vereine setzen dieses Feld nicht.
 
 Das `legal`-Objekt steuert Footer-Links und rechtliche Pflichtseiten:
 - Alle Felder sind optionale Strings.

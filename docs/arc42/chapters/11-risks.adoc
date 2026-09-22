@@ -60,9 +60,9 @@
 | Entweder in `icsGenerator.js` integrieren (GPS-Koordinaten in LOCATION-Property einbinden) oder aus dem Repository entfernen, um Verwirrung zu vermeiden.
 
 | TD-03
-| *Hartcodierte Base-URL in generateHTML.js*: `const BASE_URL = 'https://olieder.github.io/bbb-ics-generator/'` ist direkt im Code — nicht konfigurierbar.
-| Mittel
-| URL in `config.json` als `baseUrl`-Feld auslagern. `generateHTML.js` liest die URL aus der Konfiguration. Ermöglicht Einsatz des Systems für andere Vereine oder unter anderen GitHub-Usernamen ohne Code-Änderung.
+| *Hartcodierte Base-URL in generateHTML.js (durch Multi-Club-Umbau größtenteils behoben)*: `generateHTML.js` enthielt `const BASE_URL = 'https://olieder.github.io/bbb-ics-generator/'` fest im Code. Seit dem Multi-Club-Umbau akzeptiert `genHTML(theme, legal, options)` einen `options.baseUrl`-Parameter, der `DEFAULT_BASE_URL` überschreibt; `cronUpdate.js` berechnet für jeden Club die passende `baseUrl` (`${PORTAL_BASE_URL}${bundesland}/${club.slug}/`, mit `PORTAL_BASE_URL` überschreibbar via Umgebungsvariable `BBB_PORTAL_BASE_URL`) und übergibt sie pro Aufruf. Der ursprünglich vorgesehene Weg — Auslagerung nach `config.json` — existiert nicht mehr in dieser Form, da die Root-`config.json` im Zuge des Umbaus entfernt wurde; funktional äquivalent liest jetzt jeder Club seine eigene `clubs/<bundesland>/<club>/config.json`, und `cronUpdate.js` reicht die daraus abgeleitete `baseUrl` weiter.
+| Niedrig (Restrisiko)
+| Der Konfigurierbarkeits-Mechanismus (`options.baseUrl`) existiert und wird produktiv genutzt — die ursprüngliche technische Schuld ist im Kern behoben. Verbleibendes Restrisiko: `DEFAULT_BASE_URL` und `PORTAL_BASE_URL` sind weiterhin auf `https://olieder.github.io/bbb-ics-generator/` hartcodiert (als Fallback bzw. Default), und `PORTAL_BASE_URL` wird pro Prozess global gesetzt statt pro Club aus der jeweiligen `config.json` gelesen — ein Multi-Owner-Szenario (mehrere Betreiber mit unterschiedlichen GitHub-Pages-Domains in derselben Cron-Ausführung) wäre damit noch nicht abgedeckt.
 
 | TD-04
 | *Kein Linting / Code-Formatting*: Es existieren keine ESLint- oder Prettier-Konfigurationen. Code-Stil ist inkonsistent (z. B. `var` vs. `const`, gemischte Callback- und Promise-Stile).

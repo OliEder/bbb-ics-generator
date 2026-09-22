@@ -32,6 +32,7 @@ a|
 * Negative: Keine Echtzeit-Updates (Client bestimmt die Sync-Frequenz, typischerweise stündlich). Keine bidirektionale Synchronisation möglich (Nutzer können keine Events bearbeiten).
 |===
 
+[[adr-002-eine-clubid-als-einzige-konfiguration]]
 === ADR-002: Eine clubId als einzige Konfiguration
 
 [cols="2,5", options="header"]
@@ -39,7 +40,7 @@ a|
 | Aspekt | Inhalt
 
 | *Status*
-| Akzeptiert
+| Ersetzt durch <<adr-014-automatische-bundesland-ableitung,ADR-014>> (Multi-Club-Umbau, 2026-09)
 
 | *Datum*
 | 2024
@@ -408,4 +409,96 @@ a|
 a|
 * Aktuelle Konsequenz: Alle Clients zeigen Plain-Text-Beschreibungen. Funktionalität vollständig erhalten.
 * Zukünftige Aktivierung: Muss `buildEvent()` `htmlDescription` wieder befüllen und `createHtmlDescription()` testen. Besondere Sorgfalt bei Line-Folding (75-Zeichen-Limit) und HTML-in-ICS-Escaping erforderlich.
+|===
+
+=== ADR-013: Dauerhafte Alt-Pfad-Duplikat-Ausgabe statt Redirects für Bestandsclubs
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-22
+
+| *Kontext*
+| Der Umbau auf ein Multi-Club-Datenmodell verschiebt die ICS- und HTML-Ausgabe vom bisherigen flachen Pfad (`generated/{teamId}_{type}.ics`, `generated/teams/{teamId}.html`) auf einen verschachtelten Pfad (`generated/<bundesland>/<club-slug>/...`). Zum Zeitpunkt des Umbaus existieren bereits von Nutzern abonnierte Kalender-Links auf den alten, flachen Pfad. GitHub Pages bietet keine serverseitigen Redirects für Verzeichnisse, und Kalender-Clients (Kalender.app, Google Calendar) folgen keinen HTML-Meta-Redirects bei `.ics`-Abrufen.
+
+| *Entscheidung*
+| Für Clubs, die zum Zeitpunkt des v1→v2-Übergangs bereits unter dem alten flachen Pfad liefen (markiert über `legacyRootOutput: true` in der jeweiligen `clubs/<bundesland>/<club>/config.json`), wird die ICS- und HTML-Ausgabe dauerhaft zusätzlich an ihrem alten Pfad erzeugt — als vollständiges Duplikat neben der neuen verschachtelten Struktur, nicht als Weiterleitung. Die Alt-Pfad-ICS-Dateien enthalten zusätzlich ein einmaliges, ganztägiges Hinweis-VEVENT mit der neuen Abo-URL; die Alt-Pfad-HTML-Seiten erhalten einen sichtbaren Migrationsbanner. Neue, nach dem Umbau hinzugefügte Clubs bekommen `legacyRootOutput` nicht gesetzt und somit ausschließlich die neue Struktur.
+
+| *Begründung*
+a|
+* Ein 404 auf einem abonnierten `.ics`-Link wird von Kalender-Clients unterschiedlich behandelt (teils stilles Nichtaktualisieren, teils Fehleranzeige) — beides ist für Nutzer unbefriedigend und für den Betreiber schwer zu diagnostizieren.
+* Ein Datei-Duplikat ist bei der überschaubaren Datenmenge dieses Projekts (ICS-Dateien im Kilobyte-Bereich) technisch vernachlässigbar teuer.
+* Das Hinweis-VEVENT erreicht Nutzer direkt im Kalender, ohne dass sie die Webseite erneut besuchen müssen — die reine Website-Banner-Lösung allein hätte Nutzer nicht erreicht, die nur noch den Kalender-Feed nutzen.
+* Es gibt bewusst keinen automatischen Abschaltzeitpunkt für die Alt-Pfad-Ausgabe in diesem ADR — das Entfernen ist eine spätere, manuelle Entscheidung, sobald die Migration der Nutzer als abgeschlossen gilt.
+
+| *Konsequenzen*
+a|
+* Positive: Kein bestehendes Kalender-Abo bricht durch den Umbau. Nutzer werden sowohl über die Website als auch direkt im Kalender auf die neue URL hingewiesen.
+* Negative: Doppelte Dateierzeugung und doppelter Speicherplatz für Clubs mit `legacyRootOutput: true` (dauerhaft, bis manuell entfernt). Der Alt-Pfad-Mechanismus ist technische Schuld, die nur für den/die zum Umbauzeitpunkt bereits laufenden Bestandsclub(s) gilt und bewusst nicht generalisiert wird.
+|===
+
+[[adr-014-automatische-bundesland-ableitung]]
+=== ADR-014: Automatische statt manuelle Bundesland-Zuordnung pro Club
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-22
+
+| *Kontext*
+| Der Multi-Club-Umbau organisiert Clubs über eine Bundesland-Ebene in der URL-Struktur (`generated/<bundesland-slug>/<club-slug>/...`). Ein Verein kann Teams in mehreren Ligen und damit mehreren Landesverbänden gleichzeitig haben (z.B. Jugendteams in einer Bezirksliga, eine Herrenmannschaft in einer bundesweiten Liga), und diese Zusammensetzung ändert sich über Zeit durch Auf- und Abstieg.
+
+| *Entscheidung*
+| Das Bundesland eines Clubs wird bei jedem Cron-Lauf neu aus den ohnehin abgerufenen API-Liga-Daten berechnet (`src/verbandMapping.js`, `deriveClubBundesland`): für jedes Team wird der Verband seiner aktuellen Liga ermittelt (`verbandId`), Verbände die auf keinen einzelnen Bundesland abbilden (z.B. bundesweite Ligen) werden ignoriert, und das häufigste verbleibende Bundesland gewinnt. Der Ordnername unter `clubs/<bundesland-slug>/<club-slug>/` im Quellbaum ist davon unabhängig — er ist nur eine Organisationshilfe für Menschen im Repo und wird nicht als Datenquelle verwendet.
+
+| *Begründung*
+a|
+* Eine manuell gepflegte Bundesland-Zuordnung würde bei jedem Auf-/Abstieg zwischen Landesverbänden veralten und müsste manuell nachgepflegt werden — die API liefert diese Information aber bereits strukturiert (`verbandId`/`verbandName` in `ligaData`).
+* Die Mehrheitsregel bildet die tatsächliche regionale Verwurzelung eines Vereins ab, auch wenn einzelne Mannschaften bundesweit spielen.
+* Die Trennung zwischen Repo-Ordnername (Mensch-lesbare Organisation) und berechnetem Wert (verbindliche Quelle) vermeidet, dass ein falsch benannter Ordner stillschweigend zu einer falschen URL führt.
+
+| *Konsequenzen*
+a|
+* Positive: Keine manuelle Pflege der Bundesland-Zuordnung nötig, bleibt automatisch korrekt bei Liga-Wechseln.
+* Negative: Ein Club kann bei einem Cron-Lauf theoretisch das Bundesland wechseln (wenn sich die Mehrheitsverhältnisse seiner Ligen ändern), was seine URL ändert und dadurch bestehende Links auf diesen Club brechen könnte — dieses Risiko ist für die aktuell einzige betroffene Konstellation (Fibalon, `legacyRootOutput: true`, siehe ADR-013) durch die Alt-Pfad-Duplikat-Ausgabe abgefedert, gilt aber uneingeschränkt für alle künftig hinzukommenden Clubs ohne diese Absicherung.
+|===
+
+=== ADR-015: Verzeichnis-pro-Club (`clubs/<bundesland>/<club>/config.json`) statt zentraler Config-Datei mit Array
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-22
+
+| *Kontext*
+| Ersetzt <<adr-002-eine-clubid-als-einzige-konfiguration,ADR-002>>: Das Projekt unterstützt jetzt mehrere Clubs. Es musste entschieden werden, ob deren Konfiguration in einer einzigen Datei (z.B. `config.json` mit einem `clubs`-Array) oder über mehrere Dateien organisiert wird.
+
+| *Entscheidung*
+| Jeder Club bekommt eine eigene `config.json` unter `clubs/<bundesland-slug>/<club-slug>/`. Ein neues Modul `src/clubs.js` (`loadClubs`) liest diese Struktur rekursiv ein.
+
+| *Begründung*
+a|
+* Neue Vereine werden über einen neuen Ordner hinzugefügt, nicht über eine Änderung an einer bestehenden, gemeinsam genutzten Datei — das minimiert Merge-Konflikte, wenn mehrere Vereine gleichzeitig via Pull Request hinzugefügt oder geändert werden.
+* Die Ordnerstruktur macht das Repo für Menschen navigierbar, ohne eine große JSON-Datei durchsuchen zu müssen.
+* Passt zu dem in ADR-014 etablierten Prinzip, dass der Ordnername nur Organisationshilfe ist.
+
+| *Konsequenzen*
+a|
+* Positive: Isolierte, unabhängig review- und mergebare Änderungen pro Club. Einfaches Onboarding: ein neuer Ordner mit einer `config.json` genügt.
+* Negative: Ein Überblick über alle Clubs auf einmal erfordert das Einlesen mehrerer Dateien (`loadClubs` kapselt das), statt eine einzige Datei zu öffnen.
 |===

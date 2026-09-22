@@ -87,6 +87,10 @@ flowchart TD
 | Font Awesome CSS und Webfont-Dateien; clientseitiger Abruf pro Seitenaufruf; keine Authentifizierung; IP-Adresse des Nutzers wird übertragen
 |===
 
+=== Multi-Club-Datenfluss
+
+Seit dem Multi-Club-Umbau beginnt der Datenfluss nicht mehr bei einer einzigen Root-`config.json`, sondern potenziell bei vielen Konfigurationsquellen: `src/clubs.js` liest rekursiv jede `clubs/<bundesland-slug>/<club-slug>/config.json` ein und liefert pro gefundenem Club eine `clubId` sowie optionale Theme-, Cup-Farb- und Legal-Einstellungen. `cronUpdate.js` verarbeitet danach jeden Club unabhängig: Für jedes Team eines Clubs wird über die Basketball-Bund-API die `verbandId` seiner aktuellen Liga ermittelt und per `src/verbandMapping.js` auf ein Bundesland abgebildet; das Bundesland des gesamten Clubs ergibt sich als Mehrheitsvotum über alle seine Teams (`deriveClubBundesland`). Dieses Bundesland wird bei jedem Update-Lauf neu aus den ohnehin abgerufenen Liga-Daten berechnet — es ist keine manuell gepflegte Konfiguration, und der Ordnername im Quellbaum (`clubs/<bundesland-slug>/...`) ist davon unabhängig und dient nur der menschlichen Organisation im Repository. Die generierten ICS- und HTML-Dateien landen entsprechend unter `generated/<bundesland-slug>/<club-slug>/`. Ein Club, der bereits vor dem Umbau unter dem alten, flachen Pfad (`generated/{teamId}_{type}.ics`) lief und dessen Kalender-Links bereits von Nutzern abonniert sind, kann in seiner `config.json` mit `legacyRootOutput: true` markiert werden; für solche Clubs wird zusätzlich zur neuen, verschachtelten Struktur ein vollständiges Duplikat der ICS- und HTML-Ausgabe am alten, flachen Pfad erzeugt (inklusive einem Migrationshinweis-Termin im Kalender und einem Banner auf der Website), damit bestehende Abonnements nicht brechen.
+
 === Externe API-Endpunkte im Detail
 
 [cols="3,2,4", options="header"]
