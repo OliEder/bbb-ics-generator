@@ -1211,15 +1211,8 @@ function genHTML(theme = {}, legal = {}, options = {}) {
 module.exports = { genHTML };
 module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket, buildNavScript, buildSharedStyles, buildTabScript, buildTeamPage, buildIndexPage, buildNextGameTeaser, buildSpotlightBlock, spotlightTeamLabel, buildFooter, buildImpressum, buildDatenschutz, buildBarrierefreiheit, buildCalHelp, buildTabPanel, isWin, resultIcon, buildMigrationBanner };
 
-if (require.main === module) {
-  const config = require('../config.json');
-  genHTML(
-    {
-      primary:  config.theme?.primary  || '#004174',
-      accent:   config.theme?.accent   || '#009ef3',
-      logoUrl:  config.theme?.logoUrl  || null,
-      cupColor: config.theme?.cupColor || '#7c3aed',
-    },
-    config.legal || {}
-  );
-}
+// Kein eigenständiger CLI-Einstiegspunkt mehr: seit der Multi-Club-Umstellung ruft
+// cronUpdate.js genHTML() bereits pro Club mit dem passenden Theme/outputDir auf
+// (siehe updateClub in src/cronUpdate.js). Ein separater "node src/generateHTML.js"-Aufruf
+// bräuchte eine eigene Club-Iteration über loadClubs() und wäre nur eine Duplizierung
+// der Logik in cronUpdate.js — deshalb entfernt statt auf loadClubs() umgestellt.

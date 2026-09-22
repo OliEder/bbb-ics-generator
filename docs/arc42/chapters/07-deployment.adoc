@@ -8,8 +8,7 @@ Das System kennt zwei Umgebungen: die lokale Entwicklungsumgebung und die Produk
 ----
 flowchart LR
     subgraph LOCAL["Lokale Entwicklung"]
-        DEV["Developer\nMaschine"] --> NS["node src/cronUpdate.js"]
-        DEV --> NH["node src/generateHTML.js"]
+        DEV["Developer\nMaschine"] --> NS["node src/cronUpdate.js\n(ruft genHTML() je Club intern auf)"]
         DEV --> NS2["node src/server.js\nPort 3000"]
     end
     subgraph GITHUB["Produktionsumgebung (GitHub)"]
@@ -63,9 +62,7 @@ Der Workflow benötigt drei spezifische Permissions:
 
 . *Install dependencies* (`npm install`): Installiert alle npm-Abhängigkeiten aus `package.json` (`axios`, `ics`, `express`, `node-cron`). Kein `--ci`-Flag, kein Lockfile-Enforcement.
 
-. *Generate ICS files* (`npm run update` → `node src/cronUpdate.js`): Hauptschritt. Ruft die Basketball-Bund-API ab, erzeugt alle ICS-Dateien und schreibt `metadata.json` in `generated/`.
-
-. *Generate HTML* (`npm run generate-html` → `node src/generateHTML.js`): Erzeugt `generated/index.html` aus `metadata.json`.
+. *Generate ICS files and HTML* (`npm run update` → `node src/cronUpdate.js`): Hauptschritt. Iteriert über alle Clubs (`loadClubs()`), ruft je Club die Basketball-Bund-API ab, erzeugt alle ICS-Dateien, schreibt `metadata.json` und ruft `genHTML()` intern auf (pro Club unter `generated/<bundesland>/<club-slug>/`; für Clubs mit `legacyRootOutput: true` zusätzlich als Alt-Pfad-Duplikat direkt unter `generated/`). Ein separater `generate-html`-Schritt existiert seit der Multi-Club-Umstellung nicht mehr — er wäre redundant, da `cronUpdate.js` die HTML-Generierung bereits übernimmt.
 
 . *List generated files (debug)* (`ls -la generated/`, `find generated/ -name "*.ics" -ls`): Diagnostik-Schritt, listet alle erzeugten Dateien im Actions-Log.
 

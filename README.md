@@ -147,11 +147,9 @@ GitHub Actions aktualisiert die Seite:
 ```bash
 npm install
 
-# Alle Daten von der API laden und ICS + metadata.json generieren
+# Alle Daten von der API laden und ICS + metadata.json + HTML generieren
+# (pro Club aus clubs/<bundesland>/<club-slug>/config.json; genHTML() wird intern aufgerufen)
 npm run update
-
-# HTML aus metadata.json generieren (ohne API-Aufruf)
-npm run generate-html
 
 # Lokalen Server starten (http://localhost:3000)
 npm start

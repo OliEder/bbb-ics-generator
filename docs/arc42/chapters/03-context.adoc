@@ -41,7 +41,7 @@ flowchart TD
 
 | *GitHub Actions*
 | GitHub Actions → BBB Vereinsportal (triggert Build)
-| Führt den Node.js-Prozess (`npm run update` und `npm run generate-html`) in einer Ubuntu-Runner-Umgebung aus. Trigger: Cron alle 6 Stunden, Push auf `main`, manueller `workflow_dispatch`.
+| Führt den Node.js-Prozess (`npm run update`, der ICS- und HTML-Generierung pro Club übernimmt) in einer Ubuntu-Runner-Umgebung aus. Trigger: Cron alle 6 Stunden, Push auf `main`, manueller `workflow_dispatch`.
 
 | *GitHub Pages*
 | BBB Vereinsportal → GitHub Pages (HTTP Upload via Actions)
