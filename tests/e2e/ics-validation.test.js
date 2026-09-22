@@ -127,3 +127,31 @@ test('VALARM Auswärtsspiel: TRIGGER enthält -PT60M', async () => {
   const ics = await generateICS(match5002, details, TEAM_ID, 'all', TEAM_NAME);
   assert.ok(ics.includes('-PT60M'), `TRIGGER -PT60M fehlt:\n${ics}`);
 });
+
+// ---- migrationNotice ----
+
+test('generateICS: ohne migrationNotice enthält kein Hinweis-Event', async () => {
+  const matches = [{
+    matchId: 1, homeTeam: { teamPermanentId: 111, teamname: 'A' }, guestTeam: { teamPermanentId: 222, teamname: 'B' },
+    kickoffDate: '2026-10-01', kickoffTime: '18:00', matchNo: 1, ligaData: { liganame: 'Test-Liga', seasonName: '2026' },
+  }];
+  const details = { 1: null };
+  const ics = await generateICS(matches, details, '111', 'all', 'Team A');
+  assert.ok(!ics.includes('Kalender-Abo aktualisieren'));
+});
+
+test('generateICS: mit migrationNotice enthält ein Hinweis-VEVENT mit der neuen URL', async () => {
+  const matches = [{
+    matchId: 1, homeTeam: { teamPermanentId: 111, teamname: 'A' }, guestTeam: { teamPermanentId: 222, teamname: 'B' },
+    kickoffDate: '2026-10-01', kickoffTime: '18:00', matchNo: 1, ligaData: { liganame: 'Test-Liga', seasonName: '2026' },
+  }];
+  const details = { 1: null };
+  const newUrl = 'https://olieder.github.io/bbb-ics-generator/bayern/fibalon/111_all.ics';
+  const ics = await generateICS(matches, details, '111', 'all', 'Team A', { newUrl });
+
+  assert.ok(ics.includes('Kalender-Abo aktualisieren'));
+  assert.ok(ics.includes(newUrl));
+  // Genau zwei VEVENT-Blöcke: das Hinweis-Event + das eine Spiel-Event
+  const eventCount = (ics.match(/BEGIN:VEVENT/g) || []).length;
+  assert.equal(eventCount, 2);
+});

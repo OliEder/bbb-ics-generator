@@ -151,8 +151,25 @@ async function buildEvent(match, matchInfo, teamId, calendarType = 'all') {
   return event;
 }
 
-async function generateICS(matches, details, teamId, type = 'all', teamName = 'Basketball Team') {
+async function generateICS(matches, details, teamId, type = 'all', teamName = 'Basketball Team', migrationNotice = null) {
   const events = [];
+
+  if (migrationNotice && migrationNotice.newUrl) {
+    const today = new Date();
+    events.push({
+      uid: `migration-notice-${teamId}-${type}@basketball-bund.net`,
+      title: 'Kalender-Abo aktualisieren',
+      description: `Dieser Kalender ist umgezogen. Bitte abonniere die neue Adresse:\n${migrationNotice.newUrl}`,
+      start: [today.getFullYear(), today.getMonth() + 1, today.getDate()],
+      startInputType: 'local',
+      startOutputType: 'local',
+      end: [today.getFullYear(), today.getMonth() + 1, today.getDate() + 1],
+      endInputType: 'local',
+      endOutputType: 'local',
+      busyStatus: 'FREE',
+    });
+  }
+
   for (const match of matches) {
     const matchInfo = details[match.matchId];
     events.push(await buildEvent(match, matchInfo, teamId, type));
