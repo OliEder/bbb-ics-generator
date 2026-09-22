@@ -43,3 +43,23 @@ test('mapWithConcurrency: propagiert einen Fehler aus dem Mapper', async () => {
     /boom/
   );
 });
+
+test('mapWithConcurrency: limit = 0 wirft einen Fehler statt still falsche Ergebnisse zu liefern', async () => {
+  await assert.rejects(
+    () => mapWithConcurrency([1, 2, 3], 0, async (x) => x),
+    /limit/
+  );
+});
+
+test('mapWithConcurrency: negatives limit wirft einen Fehler', async () => {
+  await assert.rejects(
+    () => mapWithConcurrency([1, 2, 3], -1, async (x) => x),
+    /limit/
+  );
+});
+
+test('mapWithConcurrency: limit größer als items.length verarbeitet trotzdem alle Elemente korrekt', async () => {
+  const items = [1, 2, 3];
+  const results = await mapWithConcurrency(items, 100, async (x) => x * 10);
+  assert.deepEqual(results, [10, 20, 30]);
+});

@@ -8,6 +8,10 @@ const BASE_URL = 'https://www.basketball-bund.net/rest';
 // bricht den gesamten Aufruf ab (Promise.all-Semantik), damit Fehler in cronUpdate.js
 // nicht stillschweigend verschluckt werden.
 async function mapWithConcurrency(items, limit, mapper) {
+  if (!Number.isInteger(limit) || limit <= 0) {
+    throw new Error(`mapWithConcurrency: limit muss eine positive ganze Zahl sein, war ${limit}`);
+  }
+
   const results = new Array(items.length);
   let nextIndex = 0;
 
