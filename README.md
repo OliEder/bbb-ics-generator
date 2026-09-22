@@ -89,36 +89,37 @@ bbb-ics-generator/
 
 Jeder Verein bekommt ein eigenes Verzeichnis unter `clubs/<bundesland-slug>/<club-slug>/config.json`. Der Ordnername (`<bundesland-slug>`) ist dabei nur eine Organisationshilfe im Repository — welches Bundesland tatsächlich für die Ausgabe-URL verwendet wird, ermittelt `cronUpdate.js` bei jedem Lauf automatisch aus den echten Liga-Daten der Teams (siehe `src/verbandMapping.js`).
 
-Beispiel: `clubs/bayern/fibalon/config.json`
+Beispiel (illustrativ, angelehnt an `clubs/bayern/fibalon/config.json`):
 
 ```json
 {
   "clubId": "4468",
-  "legacyRootOutput": true,
-  "legal": {
-    "operator": "Fibalon Baskets Neumarkt e.V.",
-    "address": "Musterstraße 1, 92318 Neumarkt i.d.OPf.",
-    "email": "",
-    "phone": "",
-    "responsible": ""
-  },
-  "_theme_example": {
-    "comment": "Optionale Overrides — entferne '_example' um sie zu aktivieren",
+  "legacyRootOutput": false,
+  "theme": {
     "primary": "#004174",
     "accent": "#009ef3",
     "logoUrl": "https://example.com/logo.png"
   },
+  "cupColor": "#7c3aed",
+  "legal": {
+    "operator": "Musterverein Beispielstadt e.V.",
+    "address": "Musterstraße 1, 92318 Beispielstadt",
+    "email": "",
+    "phone": "",
+    "responsible": ""
+  },
   "onboarding": {
-    "status": "confirmed"
+    "status": "pending"
   }
 }
 ```
 
 - `clubId` (Pflichtfeld) — die Basketball-Bund-Vereins-ID.
-- `theme` (optional) — `primary`/`accent`/`logoUrl` überschreiben das Standard-Theme.
+- `theme` (optional) — `primary`/`accent`/`logoUrl` überschreiben das Standard-Theme. **Wichtig:** Der Schlüssel muss exakt `theme` heißen — `cronUpdate.js` liest `club.config.theme`; ein anderer Schlüsselname (z.B. `_theme_example`) wird stillschweigend ignoriert und das Standard-Theme greift.
 - `cupColor` (optional) — Akzentfarbe für Pokalwettbewerbe.
 - `legal` (optional) — steuert Footer-Links und rechtliche Pflichtseiten (siehe unten).
 - `legacyRootOutput` (optional, `true`/`false`) — nur für Vereine, die bereits vor dem Multi-Club-Umbau unter dem alten, flachen Pfad (`generated/{teamId}_{type}.ics`) liefen und bestehende Kalender-Abos haben. Erzeugt zusätzlich zur neuen, verschachtelten Ausgabe ein Duplikat am alten Pfad, inklusive Migrationshinweis im Kalender und Banner auf der Website. Neue Vereine setzen dieses Feld nicht.
+- `onboarding` (optional, informativ) — `status`-Feld zur manuellen Nachverfolgung des Onboarding-Fortschritts eines Clubs, aktuell die Werte `"pending"` oder `"confirmed"`. Wird von keinem Modul ausgewertet (kein Code liest dieses Feld) — reine Organisationshilfe für die Betreiber, vergleichbar mit dem Bundesland-Ordnernamen im Quellbaum.
 
 Das `legal`-Objekt steuert Footer-Links und rechtliche Pflichtseiten:
 - Alle Felder sind optionale Strings.

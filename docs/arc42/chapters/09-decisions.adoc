@@ -411,6 +411,7 @@ a|
 * Zukünftige Aktivierung: Muss `buildEvent()` `htmlDescription` wieder befüllen und `createHtmlDescription()` testen. Besondere Sorgfalt bei Line-Folding (75-Zeichen-Limit) und HTML-in-ICS-Escaping erforderlich.
 |===
 
+[[adr-013-alt-pfad-duplikat-ausgabe]]
 === ADR-013: Dauerhafte Alt-Pfad-Duplikat-Ausgabe statt Redirects für Bestandsclubs
 
 [cols="2,5", options="header"]
@@ -470,7 +471,7 @@ a|
 | *Konsequenzen*
 a|
 * Positive: Keine manuelle Pflege der Bundesland-Zuordnung nötig, bleibt automatisch korrekt bei Liga-Wechseln.
-* Negative: Ein Club kann bei einem Cron-Lauf theoretisch das Bundesland wechseln (wenn sich die Mehrheitsverhältnisse seiner Ligen ändern), was seine URL ändert und dadurch bestehende Links auf diesen Club brechen könnte — dieses Risiko ist für die aktuell einzige betroffene Konstellation (Fibalon, `legacyRootOutput: true`, siehe ADR-013) durch die Alt-Pfad-Duplikat-Ausgabe abgefedert, gilt aber uneingeschränkt für alle künftig hinzukommenden Clubs ohne diese Absicherung.
+* Negative: Ein Club kann bei einem Cron-Lauf theoretisch das Bundesland wechseln (wenn sich die Mehrheitsverhältnisse seiner Ligen ändern), was seine URL ändert und dadurch bestehende Links auf diesen Club brechen könnte — dieses Risiko ist für die aktuell einzige betroffene Konstellation (Fibalon, `legacyRootOutput: true`, siehe <<adr-013-alt-pfad-duplikat-ausgabe,ADR-013>>) durch die Alt-Pfad-Duplikat-Ausgabe abgefedert, gilt aber uneingeschränkt für alle künftig hinzukommenden Clubs ohne diese Absicherung.
 |===
 
 === ADR-015: Verzeichnis-pro-Club (`clubs/<bundesland>/<club>/config.json`) statt zentraler Config-Datei mit Array
