@@ -461,6 +461,9 @@ function buildSharedStyles(primary, accent, cupColor) {
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--color-surface); color: var(--color-text); min-height: 100vh; }
+    /* Migration banner */
+    .migration-banner { background: var(--color-info-bg); border-bottom: 1px solid var(--color-info-border); color: var(--color-text); padding: 10px 16px; font-size: 0.85rem; text-align: center; }
+    .migration-banner a { color: var(--color-primary); font-weight: 600; }
     /* Navigation */
     .site-nav { background: var(--color-primary); position: sticky; top: 0; z-index: 100; }
     .nav-bar { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; }

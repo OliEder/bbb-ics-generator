@@ -1345,7 +1345,9 @@ test('genHTML: ohne options.migrationNotice erscheint kein Banner', () => {
     const { genHTML } = requireGenHTML(dir);
     genHTML(DEFAULT_THEME);
     const index = readFileSync(join(dir, 'index.html'), 'utf8');
-    assert.ok(!/migration-banner/i.test(index));
+    // Note: the CSS stylesheet always defines a .migration-banner rule (static styling),
+    // so we assert on the absence of the rendered element, not the bare class name string.
+    assert.ok(!/class="migration-banner"/i.test(index));
   } finally {
     rmSync(dir, { recursive: true });
   }
