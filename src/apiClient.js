@@ -3,6 +3,27 @@
 const axios = require('axios');
 const BASE_URL = 'https://www.basketball-bund.net/rest';
 
+// Verarbeitet `items` mit `mapper`, wobei höchstens `limit` Aufrufe gleichzeitig laufen.
+// Ergebnisse behalten die Original-Reihenfolge von `items`. Ein Fehler in `mapper`
+// bricht den gesamten Aufruf ab (Promise.all-Semantik), damit Fehler in cronUpdate.js
+// nicht stillschweigend verschluckt werden.
+async function mapWithConcurrency(items, limit, mapper) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex++;
+      results[currentIndex] = await mapper(items[currentIndex], currentIndex);
+    }
+  }
+
+  const workerCount = Math.min(limit, items.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
+}
+
 async function fetchTeamMatches(teamId) {
   const url = `${BASE_URL}/team/id/${teamId}/matches`;
   try {
@@ -188,4 +209,4 @@ async function fetchTournamentRounds(ligaId) {
   }
 }
 
-module.exports = { fetchTeamMatches, fetchMatchInfo, fetchClubTeams, fetchLeagueTable, fetchTournamentRounds };
+module.exports = { fetchTeamMatches, fetchMatchInfo, fetchClubTeams, fetchLeagueTable, fetchTournamentRounds, mapWithConcurrency };
