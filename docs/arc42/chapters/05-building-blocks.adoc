@@ -29,7 +29,7 @@ graph LR
 
 | *Schnittstellen (ausgehend)*
 | `apiClient.js`: `fetchTeamMatches(teamId)`, `fetchMatchInfo(matchId)`, `fetchClubTeams(clubId)` +
-`icsGenerator.js`: `generateICS(matches, details, teamId, kind, teamName)` +
+`icsGenerator.js`: `generateICS(matches, details, teamId, kind, teamName, migrationNotice)` +
 `storage.js`: `saveICS(teamId, type, data)`, `saveTeamsCache(teams)`, `loadTeamsCache()` +
 `config.json`: `clubId`
 
@@ -82,7 +82,8 @@ a|
 
 | *Exportierte Funktionen*
 a|
-* `generateICS(matches, details, teamId, type, teamName)` → `Promise<string \| null>`
+* `generateICS(matches, details, teamId, type, teamName, migrationNotice)` → `Promise<string \| null>` +
+  `migrationNotice` ist optional (`{ newUrl: string } \| null`, Default `null`). Bei Angabe wird ein zusätzliches, ganztägiges VEVENT ("Kalender-Abo aktualisieren") mit der neuen URL vorangestellt — für den Übergangszeitraum, in dem ICS-Dateien am alten Pfad noch weiterverteilt werden. Ohne diesen Parameter ist das Verhalten unverändert (Rückwärtskompatibilität).
 
 | *Interne Funktionen*
 a|
