@@ -920,7 +920,8 @@ function buildSpotlightBlock(teams, cupColor) {
 </section>`;
 }
 
-function buildTeamPage(team, allTeams, theme, legal = {}, baseUrl = DEFAULT_BASE_URL) {
+function buildTeamPage(team, allTeams, theme, legal = {}, renderOptions = {}) {
+  const baseUrl = renderOptions.baseUrl || DEFAULT_BASE_URL;
   const { primary, accent, cupColor } = theme;
 
   const logoHtml = team.logoUrl
@@ -1177,7 +1178,7 @@ function genHTML(theme = {}, legal = {}, options = {}) {
   for (const team of teams) {
     fs.writeFileSync(
       path.join(teamsDir, `${team.teamId}.html`),
-      buildTeamPage(team, teams, resolvedTheme, legal, baseUrl),
+      buildTeamPage(team, teams, resolvedTheme, legal, { baseUrl }),
       'utf8'
     );
   }
