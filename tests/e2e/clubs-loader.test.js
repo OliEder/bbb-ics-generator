@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { mkdtempSync, rmSync, mkdirSync, writeFileSync } = require('node:fs');
+const { mkdtempSync, rmSync, mkdirSync, writeFileSync, chmodSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 
@@ -59,6 +59,44 @@ test('loadClubs: config.json ohne clubId wird übersprungen und geloggt', () => 
     const clubs = loadClubs(dir);
     assert.deepEqual(clubs, []);
   } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('loadClubs: unlesbares Bundesland-Verzeichnis bricht nicht die gesamte Funktion ab', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-clubs-'));
+  const unreadableDir = join(dir, 'gesperrt');
+  try {
+    mkdirSync(join(unreadableDir, 'irrelevant'), { recursive: true });
+    mkdirSync(join(dir, 'bayern', 'fibalon'), { recursive: true });
+    writeFileSync(
+      join(dir, 'bayern', 'fibalon', 'config.json'),
+      JSON.stringify({ clubId: '4468' })
+    );
+
+    chmodSync(unreadableDir, 0o000);
+
+    // Manche Umgebungen (z.B. root-Prozesse) ignorieren Verzeichnis-Berechtigungen —
+    // in dem Fall ist der Fehlerpfad nicht provozierbar, der Test bleibt dann ohne Aussage.
+    let readable = true;
+    try {
+      require('node:fs').readdirSync(unreadableDir);
+    } catch {
+      readable = false;
+    }
+
+    const { loadClubs } = requireClubs();
+    assert.doesNotThrow(() => loadClubs(dir));
+
+    const clubs = loadClubs(dir);
+    const fibalon = clubs.find(c => c.slug === 'fibalon');
+    assert.ok(fibalon, 'fibalon-Club sollte trotz unlesbarem Nachbarverzeichnis gefunden werden');
+
+    if (!readable) {
+      assert.equal(clubs.length, 1, 'unlesbares Verzeichnis sollte übersprungen, nicht ausgewertet werden');
+    }
+  } finally {
+    chmodSync(unreadableDir, 0o755);
     rmSync(dir, { recursive: true });
   }
 });

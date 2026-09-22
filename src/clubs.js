@@ -16,8 +16,15 @@ function loadClubs(clubsRootDir) {
 
   for (const bundeslandEntry of bundeslandDirs) {
     const bundeslandPath = path.join(clubsRootDir, bundeslandEntry.name);
-    const clubDirs = fs.readdirSync(bundeslandPath, { withFileTypes: true })
-      .filter(entry => entry.isDirectory());
+
+    let clubDirs;
+    try {
+      clubDirs = fs.readdirSync(bundeslandPath, { withFileTypes: true })
+        .filter(entry => entry.isDirectory());
+    } catch (err) {
+      console.error(`[ERROR] Konnte Verzeichnis ${bundeslandPath} nicht lesen:`, err.message);
+      continue;
+    }
 
     for (const clubEntry of clubDirs) {
       const configPath = path.join(bundeslandPath, clubEntry.name, 'config.json');
