@@ -1089,7 +1089,7 @@ function buildIndexPage(teams, theme, legal = {}, migrationNotice = null) {
 }
 
 
-function buildLegalSkeleton(title, content, allTeams, theme, legal, navOverride) {
+function buildLegalSkeleton(title, content, allTeams, theme, legal, navOverride, extraStyles = '') {
   const { primary, accent, cupColor } = theme;
   const nav = navOverride || buildNavigation(allTeams, 'index');
   return `<!DOCTYPE html>
@@ -1098,7 +1098,7 @@ function buildLegalSkeleton(title, content, allTeams, theme, legal, navOverride)
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(title)}</title>
-  ${buildSharedStyles(primary, accent, cupColor)}
+  ${buildSharedStyles(primary, accent, cupColor)}${extraStyles ? '\n  ' + extraStyles : ''}
 </head>
 <body>
   ${nav}
@@ -1111,7 +1111,7 @@ function buildLegalSkeleton(title, content, allTeams, theme, legal, navOverride)
 </html>`;
 }
 
-function buildImpressum(legal, allTeams, theme, nav) {
+function buildImpressum(legal, allTeams, theme, nav, extraStyles) {
   const op      = escapeHtml(legal.operator    || '');
   const addr    = escapeHtml(legal.address     || '');
   const email   = escapeHtml(legal.email       || '');
@@ -1131,10 +1131,10 @@ ${respRow}
 <p>Diese Seite aggregiert öffentlich verfügbare Spielplandaten von
 <a href="https://www.basketball-bund.net" target="_blank" rel="noopener">basketball-bund.net</a>.
 Für die Richtigkeit der Daten wird keine Gewähr übernommen.</p>`;
-  return buildLegalSkeleton('Impressum', content, allTeams, theme, legal, nav);
+  return buildLegalSkeleton('Impressum', content, allTeams, theme, legal, nav, extraStyles);
 }
 
-function buildDatenschutz(legal, allTeams, theme, nav) {
+function buildDatenschutz(legal, allTeams, theme, nav, extraStyles) {
   const op    = escapeHtml(legal.operator || '');
   const email = escapeHtml(legal.email    || '');
   const year  = new Date().getFullYear();
@@ -1154,10 +1154,10 @@ function buildDatenschutz(legal, allTeams, theme, nav) {
 </ul>
 <h2>Auskunft und Löschung</h2>
 <p>${email ? `Anfragen richten Sie bitte per E-Mail an: <a href="mailto:${email}">${email}</a>` : 'Bitte wenden Sie sich an den Seitenbetreiber (siehe Impressum).'}</p>`;
-  return buildLegalSkeleton('Datenschutzerklärung', content, allTeams, theme, legal, nav);
+  return buildLegalSkeleton('Datenschutzerklärung', content, allTeams, theme, legal, nav, extraStyles);
 }
 
-function buildBarrierefreiheit(legal, allTeams, theme, nav) {
+function buildBarrierefreiheit(legal, allTeams, theme, nav, extraStyles) {
   const email = escapeHtml(legal.email || '');
   const year  = new Date().getFullYear();
   const content = `
@@ -1176,7 +1176,7 @@ function buildBarrierefreiheit(legal, allTeams, theme, nav) {
 <h2>Durchsetzungsverfahren</h2>
 <p>Wenn Sie nach Kontaktaufnahme keine zufriedenstellende Antwort erhalten haben, können Sie die
 <a href="https://www.schlichtungsstelle-bgg.de/" target="_blank" rel="noopener">Schlichtungsstelle nach dem Behindertengleichstellungsgesetz (BGG)</a> einschalten.</p>`;
-  return buildLegalSkeleton('Barrierefreiheitserklärung', content, allTeams, theme, legal, nav);
+  return buildLegalSkeleton('Barrierefreiheitserklärung', content, allTeams, theme, legal, nav, extraStyles);
 }
 
 // ---- Portal-Seiten (Plan B): Bund-Übersicht, Land-Seiten, Portal-Legal ----
@@ -1255,7 +1255,7 @@ function buildBundPage({ regions, showMigrationBanner }, legal) {
     return `<li class="portal-region">` +
       `<h2><a href="${escapeHtml(r.slug)}/index.html">${escapeHtml(r.name)}</a></h2>` +
       `<p class="portal-meta">${plural(r.clubs.length, 'Verein', 'Vereine')} · ${plural(r.ligaCount, 'Liga', 'Ligen')}</p>` +
-      `<ul class="portal-list">${clubs}</ul></li>`;
+      `${clubs ? `<ul class="portal-list">${clubs}</ul>` : ''}</li>`;
   }).join('');
   const content = regions.length > 0
     ? `<ul class="portal-regions">${blocks}</ul>`
@@ -1318,7 +1318,7 @@ function buildLandPage(region, regions, legal) {
     </div>
     <section class="portal-section" aria-labelledby="vereine-heading">
       <h2 id="vereine-heading">Vereine</h2>
-      <ul class="portal-list">${clubList}</ul>
+      ${clubList ? `<ul class="portal-list">${clubList}</ul>` : ''}
     </section>
     ${body}
   </main>
@@ -1332,10 +1332,11 @@ function buildLandPage(region, regions, legal) {
 // Impressum/Datenschutz/Barrierefreiheit des Portal-Betreibers (liegen unter generated/).
 function buildPortalLegalPages(legal, regions) {
   const nav = buildPortalNav('./', regions, null);
+  const styles = buildPortalStyles();
   return {
-    impressum: buildImpressum(legal, [], PORTAL_THEME, nav),
-    datenschutz: buildDatenschutz(legal, [], PORTAL_THEME, nav),
-    barrierefreiheit: buildBarrierefreiheit(legal, [], PORTAL_THEME, nav),
+    impressum: buildImpressum(legal, [], PORTAL_THEME, nav, styles),
+    datenschutz: buildDatenschutz(legal, [], PORTAL_THEME, nav, styles),
+    barrierefreiheit: buildBarrierefreiheit(legal, [], PORTAL_THEME, nav, styles),
   };
 }
 

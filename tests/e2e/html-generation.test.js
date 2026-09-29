@@ -1386,7 +1386,6 @@ test('buildBundPage: Regionen mit Links/Anzahlen, escapt Namen, Portal-Footer mi
   assert.ok(html.includes('1 Verein · 0 Ligen'), 'Plural bei 0');
   assert.ok(html.includes('href="./impressum.html"'));
   assert.ok(html.includes('href="./datenschutz.html"'));
-  assert.ok(!html.includes('<b>X</b>'), 'Nutzerdaten dürfen nicht unescaped erscheinen');
   assert.ok(!html.includes('<div class="migration-banner"'));
 });
 
@@ -1452,4 +1451,61 @@ test('buildPortalLegalPages: Impressum/Datenschutz/Barrierefreiheit mit Portal-N
   assert.ok(pages.impressum.includes('BBB Vereinsportal'));
   assert.ok(!pages.impressum.includes('Fibalon Baskets Neumarkt'), 'kein Club-Branding im Portal-Impressum');
   assert.ok(pages.datenschutz.includes('<a href="mailto:a@b.de">a@b.de</a>'));
+});
+
+test('buildPortalLegalPages: Portal-Impressum enthält Portal-Styles, Club-Impressum nicht', () => {
+  const mod = requireGenHTML(tmpdir());
+  const pages = mod.buildPortalLegalPages(PORTAL_LEGAL, PORTAL_REGIONS);
+  const rule = '.site-footer a { color: var(--color-text)';
+  for (const key of ['impressum', 'datenschutz', 'barrierefreiheit']) {
+    assert.ok(pages[key].includes(rule), `${key}: Portal-Regel erwartet`);
+  }
+  const club = mod._testExports.buildImpressum(PORTAL_LEGAL, [], mod.PORTAL_THEME);
+  assert.ok(!club.includes(rule), 'Club-Impressum darf Portal-Styles nicht enthalten');
+});
+
+test('buildBundPage: Sonderzeichen in Region, Club-Name und href werden escaped', () => {
+  const { buildBundPage } = requireGenHTML(tmpdir());
+  const regions = [{ slug: 'by', name: 'Bayern <script>', ligaCount: 0, clubs: [{ name: 'A & B', href: 'x"y/index.html' }] }];
+  const html = buildBundPage({ regions, showMigrationBanner: false }, PORTAL_LEGAL);
+  assert.ok(html.includes('Bayern &lt;script&gt;'));
+  assert.ok(html.includes('A &amp; B'));
+  assert.ok(html.includes('href="x&quot;y/index.html"'));
+  assert.ok(!html.includes('Bayern <script>'));
+  assert.ok(!html.includes('A & B'));
+  assert.ok(!html.includes('x"y'));
+});
+
+test('buildBundPage: Region ohne Clubs rendert kein leeres <ul class="portal-list">', () => {
+  const { buildBundPage } = requireGenHTML(tmpdir());
+  const html = buildBundPage({ regions: [{ slug: 'by', name: 'Bayern', ligaCount: 0, clubs: [] }], showMigrationBanner: false }, PORTAL_LEGAL);
+  assert.ok(!html.includes('<ul class="portal-list">'));
+});
+
+test('buildLandPage: Sonderzeichen in Gruppe, Club-href, Nav-Name und Tabellen-href werden escaped', () => {
+  const { buildLandPage } = requireGenHTML(tmpdir());
+  const region = {
+    slug: 'bayern', name: 'Bayern',
+    clubs: [{ name: 'Club', href: 'c"d/index.html' }],
+    groups: [{ heading: 'Bezirk <i>', ligen: [{ ligaId: '1', liganame: 'Liga', table: [
+      { rank: 1, teamName: 'T', teamId: '1', played: 1, won: 1, lost: 0, points: 2, korbdiff: 1, isOwn: true, href: 't"u/index.html' },
+    ] }] }],
+  };
+  const nav = [{ slug: 'bayern', name: 'Bay<ern' }];
+  const html = buildLandPage(region, nav, PORTAL_LEGAL);
+  assert.ok(html.includes('Bezirk &lt;i&gt;'));
+  assert.ok(html.includes('href="c&quot;d/index.html"'));
+  assert.ok(html.includes('Bay&lt;ern'));
+  assert.ok(html.includes('href="t&quot;u/index.html"'));
+  assert.ok(!html.includes('Bezirk <i>'));
+  assert.ok(!html.includes('c"d'));
+  assert.ok(!html.includes('Bay<ern'));
+  assert.ok(!html.includes('t"u'));
+});
+
+test('buildLandPage: ohne Clubs kein leeres <ul class="portal-list">, Vereine-Überschrift bleibt', () => {
+  const { buildLandPage } = requireGenHTML(tmpdir());
+  const html = buildLandPage({ slug: 'bayern', name: 'Bayern', clubs: [], groups: [] }, PORTAL_REGIONS, PORTAL_LEGAL);
+  assert.ok(!html.includes('<ul class="portal-list">'));
+  assert.ok(html.includes('<h2 id="vereine-heading">Vereine</h2>'));
 });
