@@ -5,10 +5,16 @@
 // In CI-Umgebungen ohne Netzwerkzugang schlagen sie fehl — das ist beabsichtigt (Smoke Tests).
 
 const { test, expect } = require('@playwright/test');
-const config = require('../../config.json');
+const path = require('node:path');
+const { loadClubs } = require('../../src/clubs');
+
+// Seit der Multi-Club-Umstellung (Plan A) gibt es kein Root-config.json mehr: der Smoke-Test
+// nutzt den ersten Club unter clubs/<bundesland>/<club>/config.json.
+const [smokeClub] = loadClubs(path.resolve(__dirname, '../../clubs'));
+if (!smokeClub) throw new Error('Kein Club unter clubs/ gefunden — API-Smoke-Tests brauchen mindestens einen.');
 
 const BASE = 'https://www.basketball-bund.net/rest';
-const CLUB_ID = config.clubId;
+const CLUB_ID = smokeClub.config.clubId;
 
 test.describe('BBB API Smoke Tests @network', () => {
   test('Club-Matches Endpoint antwortet mit HTTP 200', async ({ request }) => {
