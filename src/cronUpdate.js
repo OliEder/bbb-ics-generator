@@ -4,6 +4,9 @@ const { saveICS, saveTeamsCache, loadTeamsCache, sanitizeSlug } = require('./sto
 const { genHTML } = require('./generateHTML');
 const { loadClubs } = require('./clubs');
 const { deriveClubBundesland } = require('./verbandMapping');
+const { loadPortalConfig } = require('./portalConfig');
+const { loadWamCache } = require('./wamCache');
+const { aggregatePages } = require('./aggregatePages');
 const fs = require('fs');
 const path = require('path');
 
@@ -325,6 +328,17 @@ async function updateAll() {
       console.error(`[ERROR] Club ${club.slug} fehlgeschlagen:`, err.stack || err);
       failures.push({ slug: club.slug, error: err.message });
     }
+  }
+
+  // Bund-/Land-/Portal-Legal-Seiten (ADR-017). Ein Fehler hier (z.B. fehlende portal.json)
+  // verhindert nur die Portal-Seiten, nicht die bereits geschriebene Club-Ausgabe.
+  try {
+    const portalLegal = loadPortalConfig();
+    const { cache, stale } = loadWamCache();
+    aggregatePages(results, { generatedRootDir, portalLegal, wamCache: cache, wamCacheStale: stale });
+  } catch (err) {
+    console.error('[ERROR] Portal-Seiten (Bund/Land) nicht erzeugt:', err.message);
+    failures.push({ slug: '(portal)', error: err.message });
   }
 
   return { results, failures };
