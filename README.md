@@ -224,9 +224,17 @@ npm start
 # WAM-Liga-Cache aktualisieren (data/wam-ligen-cache.json)
 npm run wam:refresh
 
-# Tests ausführen
+# Tests ausführen (Unit/E2E, ohne Netzwerk)
 npm test
+
+# Playwright: A11y- und UI-Tests ohne die Live-API-Smoke-Tests (wie im PR-Lauf)
+npx playwright test --grep-invert @network
+
+# API-Smoke-Tests gegen basketball-bund.net (Live-Netzwerk, prüfen die Antwortform aller genutzten Endpunkte)
+npx playwright test --project=chromium-ui --grep @network
 ```
+
+Die `@network`-Smoke-Tests (`tests/ui/api.spec.js`) laufen nicht im PR-Lauf, sondern wöchentlich über `.github/workflows/api-smoke.yml` (auch manuell per `workflow_dispatch`). Ein roter Lauf bedeutet, dass sich die Antwortform eines genutzten Endpunkts geändert hat.
 
 ---
 

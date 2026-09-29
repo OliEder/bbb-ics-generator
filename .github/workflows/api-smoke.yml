@@ -1,0 +1,43 @@
+name: API Smoke Tests
+
+on:
+  schedule:
+    - cron: '0 5 * * 1'  # wöchentlich, montags 05:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  api-smoke:
+    name: API-Vertrag gegen basketball-bund.net (@network)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      # Rot bedeutet: die Antwortform eines genutzten Endpunkts hat sich geändert
+      # (siehe tests/ui/api.spec.js und ADR-018). Der Deploy-Lauf ist davon unabhängig.
+      - name: Run API smoke tests
+        run: npx playwright test --project=chromium-ui --grep @network
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: api-smoke-report
+          path: playwright-report/
+          retention-days: 30

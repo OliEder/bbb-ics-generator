@@ -154,8 +154,12 @@ Der Workflow hat zwei parallele Jobs:
 | Führt `node --test tests/e2e/*.test.js` aus — alle Unit- und E2E-Tests mit Node.js built-in test runner.
 
 | `accessibility`
-| Installiert Playwright + Chromium, führt `npx playwright test` aus (WCAG 2.1 AA Tests via axe-core). Lädt den Playwright HTML Report als Artifact hoch (30 Tage aufbewahrt, abrufbar unter Actions → Run → Artifacts).
+| Installiert Playwright + Chromium, führt `npx playwright test --grep-invert @network` aus (WCAG 2.1 AA Tests via axe-core, UI-Tests; ohne die Live-API-Smoke-Tests, damit PRs nicht von basketball-bund.net abhängen). Lädt den Playwright HTML Report als Artifact hoch (30 Tage aufbewahrt, abrufbar unter Actions → Run → Artifacts).
 |===
+
+==== Workflow api-smoke.yml (API-Vertragstests)
+
+Der Workflow `.github/workflows/api-smoke.yml` führt wöchentlich (montags 05:00 UTC) sowie manuell (`workflow_dispatch`) die `@network`-Tests aus `tests/ui/api.spec.js` aus (`npx playwright test --project=chromium-ui --grep @network`). Sie prüfen gegen die Live-API die Felder, die der Code aus allen sieben genutzten Endpunkten liest (`club/actualmatches`, `team/matches`, `match/matchInfo`, `competition/table`, `competition/spielplan` samt `matchday`, `wam/liga/list`), inklusive der von der OpenAPI-Spec abweichenden flachen WAM-Antwortform (<<adr-018-wam-cache-versioniert,ADR-018>>) und des `ligaId`-Joins zwischen Match-Daten und WAM. Fehlen in der Saison passende Daten (Saisonpause, kein Pokal), werden einzelne Tests übersprungen. Ein roter Lauf meldet eine geänderte Antwortform; er blockiert weder PRs noch den Deploy. Bei Fehlern wird der Playwright-Report als Artifact `api-smoke-report` hochgeladen.
 
 ==== Playwright Report Artifact
 
