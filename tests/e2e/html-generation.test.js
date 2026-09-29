@@ -1624,7 +1624,7 @@ test('Team MIT Archiv-Eintrag: Archiv-Tab erscheint mit Saison-Label und Gegner/
   const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
   try {
     writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
-    const archiveDir = join(dir, 'archive');
+    const archiveDir = join(dir, 'archive', '4468');
     require('fs').mkdirSync(archiveDir, { recursive: true });
     writeFileSync(join(archiveDir, '2025.json'), JSON.stringify({
       season: 2025,
@@ -1643,7 +1643,7 @@ test('Team MIT Archiv-Eintrag: Archiv-Tab erscheint mit Saison-Label und Gegner/
       },
     }));
     const { genHTML } = requireGenHTML(dir);
-    genHTML(DEFAULT_THEME);
+    genHTML(DEFAULT_THEME, {}, { archiveDir });
     const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
     assert.ok(html.includes('tab-167881-archive'), 'Archiv-Tab-Button fehlt');
     assert.ok(html.includes('panel-167881-archive'), 'Archiv-Tab-Panel fehlt');
@@ -1659,7 +1659,7 @@ test('Archivierte Saison mit status "provisional" zeigt "vorläufig" Hinweis', (
   const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
   try {
     writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
-    const archiveDir = join(dir, 'archive');
+    const archiveDir = join(dir, 'archive', '4468');
     require('fs').mkdirSync(archiveDir, { recursive: true });
     writeFileSync(join(archiveDir, '2025.json'), JSON.stringify({
       season: 2025,
@@ -1676,7 +1676,7 @@ test('Archivierte Saison mit status "provisional" zeigt "vorläufig" Hinweis', (
       },
     }));
     const { genHTML } = requireGenHTML(dir);
-    genHTML(DEFAULT_THEME);
+    genHTML(DEFAULT_THEME, {}, { archiveDir });
     const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
     assert.ok(/vorläufig/i.test(html), '"vorläufig" Hinweis fehlt bei status: provisional');
   } finally {
@@ -1707,7 +1707,7 @@ test('Archivierter Gegnername mit <script> wird escaped ausgegeben', () => {
   const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
   try {
     writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
-    const archiveDir = join(dir, 'archive');
+    const archiveDir = join(dir, 'archive', '4468');
     require('fs').mkdirSync(archiveDir, { recursive: true });
     writeFileSync(join(archiveDir, '2025.json'), JSON.stringify({
       season: 2025,
@@ -1726,7 +1726,7 @@ test('Archivierter Gegnername mit <script> wird escaped ausgegeben', () => {
       },
     }));
     const { genHTML } = requireGenHTML(dir);
-    genHTML(DEFAULT_THEME);
+    genHTML(DEFAULT_THEME, {}, { archiveDir });
     const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
     assert.ok(!html.includes('<script>alert(1337)'), 'raw script tag aus Archiv-Gegnername darf nicht im Output sein');
     assert.ok(html.includes('&lt;script&gt;alert(1337)&lt;/script&gt;'), 'escaped Form des Archiv-Gegnernamens fehlt');
@@ -1735,10 +1735,51 @@ test('Archivierter Gegnername mit <script> wird escaped ausgegeben', () => {
   }
 });
 
+test('genHTML: ohne options.archiveDir kein Archiv-Tab, auch wenn ein (altes, globales) archive/<season>.json existiert', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    require('fs').mkdirSync(join(dir, 'archive'), { recursive: true });
+    writeFileSync(join(dir, 'archive', '2025.json'), JSON.stringify({
+      season: 2025,
+      teams: { '167881': { teamName: 'T', ageGroup: 'U10', gender: '', status: 'final', lastSeenAt: '', matches: [], competitions: [] } },
+    }));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
+    assert.ok(!html.includes('tab-167881-archive'), 'ohne club-spezifisches archiveDir darf kein Archiv gelesen werden');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('genHTML: liest nur das Archiv des übergebenen Clubs (archive/<clubId>/), nicht das eines anderen Clubs', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const entry = (opponent) => ({
+      season: 2025,
+      teams: { '167881': { teamName: 'T', ageGroup: 'U10', gender: '', status: 'final', lastSeenAt: '', competitions: [],
+        matches: [{ date: '2025-10-12', time: '15:00', opponent, isHome: true, result: '55:40', competition: 'Kreisliga', isNext: false, venueName: '', venueAddress: '', opponentLogoUrl: '' }] } },
+    });
+    for (const [clubId, opponent] of [['4468', 'EigenerArchivGegner'], ['5000', 'FremderArchivGegner']]) {
+      require('fs').mkdirSync(join(dir, 'archive', clubId), { recursive: true });
+      writeFileSync(join(dir, 'archive', clubId, '2025.json'), JSON.stringify(entry(opponent)));
+    }
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME, {}, { archiveDir: join(dir, 'archive', '4468') });
+    const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
+    assert.ok(html.includes('EigenerArchivGegner'));
+    assert.ok(!html.includes('FremderArchivGegner'), 'Archiv eines anderen Clubs darf nicht erscheinen');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
 test('loadTeamArchives: liest Archivdateien, ignoriert kaputte Dateien, sortiert absteigend', () => {
   const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
   try {
-    const archiveDir = join(dir, 'archive');
+    const archiveDir = join(dir, 'archive', '4468');
     require('fs').mkdirSync(archiveDir, { recursive: true });
     writeFileSync(join(archiveDir, '2024.json'), JSON.stringify({
       season: 2024,
@@ -1759,7 +1800,7 @@ test('loadTeamArchives: liest Archivdateien, ignoriert kaputte Dateien, sortiert
     const { _testExports } = require('../../src/generateHTML.js');
     const { loadTeamArchives } = _testExports;
 
-    const archives = loadTeamArchives(dir, '167881');
+    const archives = loadTeamArchives(archiveDir, '167881');
     assert.equal(archives.length, 2, 'sollte nur die 2 Archive mit passender teamId liefern');
     assert.equal(archives[0].season, 2025, 'sollte absteigend sortiert sein');
     assert.equal(archives[1].season, 2024, 'sollte absteigend sortiert sein');

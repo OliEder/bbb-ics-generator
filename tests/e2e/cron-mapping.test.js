@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } = require('node:fs');
+const { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const axios = require('axios');
@@ -325,10 +325,16 @@ test('updateAll: archiviert ältere Saison beim Übergang (Integrationstest)', a
     await cronUpdate.updateAll();
 
     const { loadArchive } = require('../../src/seasonArchive');
-    const archive2024 = loadArchive(2024);
+    const archive2024 = loadArchive(SINGLE_CLUB_ID, 2024);
     assert.ok(archive2024, 'Archiv für 2024 wurde beim Update angelegt');
     assert.equal(archive2024.teams['100'].status, 'provisional');
     assert.equal(archive2024.teams['100'].matches[0].result, '80:70');
+    assert.ok(existsSync(join(run.dir, 'archive', SINGLE_CLUB_ID, '2024.json')), 'Archiv liegt club-spezifisch unter archive/<clubId>/');
+
+    // Archiv-Tab auf der Team-Seite im Club-Ausgabepfad (generated/<bundesland>/<club>/teams/)
+    const teamPage = readFileSync(join(run.clubOutDir, 'teams', '100.html'), 'utf8');
+    assert.ok(teamPage.includes('tab-100-archive'), 'Archiv-Tab auf der Club-Team-Seite erwartet');
+    assert.ok(teamPage.includes('Saison 2024/25'));
 
     // Die aktuelle Saison landet weiterhin in metadata.json des Clubs, nicht im Archiv.
     const meta = JSON.parse(readFileSync(join(run.clubOutDir, 'metadata.json'), 'utf8'));

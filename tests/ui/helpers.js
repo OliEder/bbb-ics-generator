@@ -64,8 +64,10 @@ const sampleArchive = {
 function generatePages(theme = sampleTheme, metadata = _sampleMetadata, legal = sampleLegal, archives = null) {
   const dir = mkdtempSync(join(tmpdir(), 'bbb-ui-'));
   writeFileSync(join(dir, 'metadata.json'), JSON.stringify(metadata));
+  // Das Archiv ist pro Club gescoped (generated/archive/<clubId>/<season>.json, ADR-026);
+  // genHTML liest es nur aus dem explizit übergebenen options.archiveDir.
+  const archiveDir = archives ? join(dir, 'archive', '4468') : null;
   if (archives) {
-    const archiveDir = join(dir, 'archive');
     mkdirSync(archiveDir, { recursive: true });
     for (const archive of archives) {
       writeFileSync(join(archiveDir, `${archive.season}.json`), JSON.stringify(archive));
@@ -76,7 +78,7 @@ function generatePages(theme = sampleTheme, metadata = _sampleMetadata, legal = 
   const prev = process.env.BBB_GENERATED_DIR;
   process.env.BBB_GENERATED_DIR = dir;
   const { genHTML } = require('../../src/generateHTML.js');
-  genHTML(theme, legal);
+  genHTML(theme, legal, archiveDir ? { archiveDir } : {});
   if (prev === undefined) delete process.env.BBB_GENERATED_DIR;
   else process.env.BBB_GENERATED_DIR = prev;
   return {

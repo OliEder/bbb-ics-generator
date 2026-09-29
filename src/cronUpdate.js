@@ -2,7 +2,7 @@ const { fetchTeamMatches, fetchMatchInfo, fetchClubTeams, fetchLeagueTable, fetc
 const { generateICS } = require('./icsGenerator');
 const { saveICS, saveTeamsCache, loadTeamsCache, sanitizeSlug } = require('./storage');
 const { genHTML } = require('./generateHTML');
-const { groupBySeasonId, updateArchiveForTeam } = require('./seasonArchive');
+const { groupBySeasonId, updateArchiveForTeam, clubArchiveDir } = require('./seasonArchive');
 const { loadClubs } = require('./clubs');
 const { deriveClubBundesland } = require('./verbandMapping');
 const { loadPortalConfig } = require('./portalConfig');
@@ -289,10 +289,18 @@ async function writeLegacyOutput(rawTeamData, baseUrl) {
 // legacyRootOutput: true — zusätzlich ein Alt-Pfad-Duplikat direkt unter generatedRootDir
 // (mit Migrationshinweis), das die ECHTEN Spieldaten behält (nicht nur den Hinweis-Event) — nur ICS, kein HTML.
 async function updateClub(club, generatedRootDir) {
-  const teams = await getTeams(club.config.clubId);
+  const clubId = club.config.clubId;
+  const teams = await getTeams(clubId);
   const theme = resolveTheme(club, teams);
+  // Archiv-Verzeichnis des Clubs: generated/archive/<clubId>/ (ADR-026). Wird hier bereits
+  // aufgelöst, damit eine ungültige clubId den Club laut scheitern lässt, bevor etwas
+  // geschrieben wird.
+  const archiveDir = clubArchiveDir(clubId);
 
   const meta = [];
+  // Archiv-Fehler je Team: das Team bleibt mit seiner aktuellen Saison erhalten (Club-Seite,
+  // ICS, Portal), der Fehler wird aber an updateAll() gemeldet (→ failures, Exitcode 1).
+  const archiveErrors = [];
   // Rohdaten je Team (matches ungefiltert + details), für die eventuelle
   // Alt-Pfad-Regenerierung mit echten Spielen weiter unten.
   const rawTeamData = new Map();
@@ -303,13 +311,19 @@ async function updateClub(club, generatedRootDir) {
       const result = await fetchTeamData(t);
       if (!result) continue;
       const { seasonId, groupedBySeason, details, teamGender } = result.raw;
-      await updateArchiveForTeam(
-        { id: t.id, name: t.name, ageGroup: t.ageGroup, gender: teamGender || t.gender },
-        groupedBySeason,
-        seasonId,
-        details,
-        { fetchLeagueTable, fetchTournamentRounds }
-      );
+      try {
+        await updateArchiveForTeam(
+          clubId,
+          { id: t.id, name: t.name, ageGroup: t.ageGroup, gender: teamGender || t.gender },
+          groupedBySeason,
+          seasonId,
+          details,
+          { fetchLeagueTable, fetchTournamentRounds }
+        );
+      } catch (archiveErr) {
+        console.error(`[ERROR] Archiv-Update für Team ${t.id} (Club ${clubId}) fehlgeschlagen:`, archiveErr.stack || archiveErr);
+        archiveErrors.push({ teamId: t.id, error: archiveErr.message });
+      }
       rawTeamData.set(t.id, result.raw);
       teamVerbandIds.push(result.verbandId);
       meta.push(result.metaEntry);
@@ -344,13 +358,13 @@ async function updateClub(club, generatedRootDir) {
 
   fs.mkdirSync(clubOutputDir, { recursive: true });
   fs.writeFileSync(path.join(clubOutputDir, 'metadata.json'), JSON.stringify([...meta, ...missingTeams], null, 2));
-  genHTML(theme, club.config.legal || {}, { outputDir: clubOutputDir, baseUrl });
+  genHTML(theme, club.config.legal || {}, { outputDir: clubOutputDir, baseUrl, archiveDir });
 
   if (club.config.legacyRootOutput) {
     await writeLegacyOutput(rawTeamData, baseUrl);
   }
 
-  return { bundesland, meta };
+  return { bundesland, meta, archiveErrors };
 }
 
 async function updateAll() {
@@ -370,8 +384,16 @@ async function updateAll() {
   for (const club of clubs) {
     try {
       sanitizeSlug(club.slug); // wirft bei ungültigem Slug
-      const { bundesland, meta } = await updateClub(club, generatedRootDir);
+      const { bundesland, meta, archiveErrors } = await updateClub(club, generatedRootDir);
       results.push({ club, bundesland, meta });
+      // Archiv-Fehler machen den Lauf rot, verwerfen aber nicht die bereits geschriebene
+      // Club-Ausgabe (Club bleibt in results und damit auf den Portal-Seiten).
+      if (archiveErrors.length > 0) {
+        failures.push({
+          slug: club.slug,
+          error: `Archiv: ${archiveErrors.map(e => `Team ${e.teamId}: ${e.error}`).join('; ')}`,
+        });
+      }
     } catch (err) {
       console.error(`[ERROR] Club ${club.slug} fehlgeschlagen:`, err.stack || err);
       failures.push({ slug: club.slug, error: err.message });

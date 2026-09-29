@@ -7,6 +7,14 @@ const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 
 const SHARED_LIGA_ID = '7002';
+
+// Saison-IDs der Fixture. Die aktuelle Saison wird im Produktivcode NICHT aus dem Datum,
+// sondern pro Team aus der höchsten seasonId der Rohspiele abgeleitet
+// (currentSeasonId() in src/cronUpdate.js). Die Tests hängen daher nur von diesen beiden
+// Konstanten ab und kippen an keinem Kalenderdatum.
+const FIXTURE_SEASON_ID = 2026;
+const FIXTURE_PAST_SEASON_ID = FIXTURE_SEASON_ID - 1;
+const seasonName = seasonId => `${seasonId - 1}/${String(seasonId % 100).padStart(2, '0')}`;
 const SHARED_LIGA_NAME = 'Bezirksliga Gemeinsam';
 
 const CLUBS = [
@@ -42,18 +50,37 @@ function ligaFor(club) {
 
 const teamFor = club => ({ id: teamIdFor(club.clubId), name: `Team ${club.clubId}`, ageGroup: 'Herren', gender: 'männlich' });
 
-function matchFor(club) {
+// verbandId: optional abweichender Landesverband (z.B. Wechsel in eine Bundesliga → 100).
+function matchFor(club, verbandId = club.verbandId) {
   const { ligaId, liganame } = ligaFor(club);
   const team = teamFor(club);
   return {
     matchId: Number(club.clubId) * 10 + 1,
-    kickoffDate: '2026-05-01',
+    kickoffDate: `${FIXTURE_SEASON_ID}-05-01`,
     kickoffTime: '18:00',
     matchNo: '1',
     result: null,
     homeTeam: { teamPermanentId: team.id, teamname: team.name, teamnameSmall: team.name.slice(0, 2) },
     guestTeam: { teamPermanentId: 999, teamname: 'Gegner', teamnameSmall: 'GG' },
-    ligaData: { liganame, seasonId: 2026, seasonName: '2025/26', ligaId, verbandId: club.verbandId },
+    ligaData: { liganame, seasonId: FIXTURE_SEASON_ID, seasonName: seasonName(FIXTURE_SEASON_ID), ligaId, verbandId },
+  };
+}
+
+// Ein bereits gespieltes Spiel der VORSAISON (Übergangsphase: die API liefert es noch mit) —
+// Grundlage für die Saison-Archivierung. Gegnername enthält die clubId, damit Tests die
+// Herkunft eines Archiv-Eintrags eindeutig zuordnen können.
+function pastMatchFor(club, verbandId = club.verbandId) {
+  const { ligaId, liganame } = ligaFor(club);
+  const team = teamFor(club);
+  return {
+    matchId: Number(club.clubId) * 10 + 2,
+    kickoffDate: `${FIXTURE_PAST_SEASON_ID}-03-01`,
+    kickoffTime: '18:00',
+    matchNo: '2',
+    result: '80:70',
+    homeTeam: { teamPermanentId: team.id, teamname: team.name, teamnameSmall: team.name.slice(0, 2) },
+    guestTeam: { teamPermanentId: 998, teamname: `Vorsaison-Gegner ${club.clubId}`, teamnameSmall: 'VG' },
+    ligaData: { liganame, seasonId: FIXTURE_PAST_SEASON_ID, seasonName: seasonName(FIXTURE_PAST_SEASON_ID), ligaId, verbandId },
   };
 }
 
@@ -81,7 +108,12 @@ function tableFor(ligaId, ownTeamId) {
 }
 
 // failClubIds: fetchClubTeams wirft (simulierter API-Ausfall). emptyClubIds: liefert keine Teams.
-function installApiMocks(apiClient, { failClubIds = [], emptyClubIds = [] } = {}) {
+// Optionen für die Saison-Archivierung (alle optional, Default = bisheriges Verhalten):
+//  pastSeason: true → jedes Team liefert zusätzlich ein Spiel der Vorsaison (FIXTURE_PAST_SEASON_ID)
+//  emptyMatchClubIds: fetchTeamMatches liefert für die Teams dieser Clubs keine Spiele
+//    (API-Ausfall auf Team-Ebene; der Teams-Cache greift hier nicht → Club fällt auf 'bundesweit')
+//  verbandOverrides: { [clubId]: verbandId } — abweichender Landesverband aller Spiele eines Clubs
+function installApiMocks(apiClient, { failClubIds = [], emptyClubIds = [], pastSeason = false, emptyMatchClubIds = [], verbandOverrides = {} } = {}) {
   apiClient.fetchClubTeams = async clubId => {
     if (failClubIds.includes(String(clubId))) throw new Error(`Simulierter API-Ausfall für Club ${clubId}`);
     if (emptyClubIds.includes(String(clubId))) return [];
@@ -90,7 +122,11 @@ function installApiMocks(apiClient, { failClubIds = [], emptyClubIds = [] } = {}
   };
   apiClient.fetchTeamMatches = async teamId => {
     const club = CLUBS.find(c => teamIdFor(c.clubId) === String(teamId));
-    return club ? { matches: [matchFor(club)], gender: 'männlich' } : { matches: [], gender: 'männlich' };
+    if (!club || emptyMatchClubIds.includes(club.clubId)) return { matches: [], gender: 'männlich' };
+    const verbandId = verbandOverrides[club.clubId] ?? club.verbandId;
+    const matches = [matchFor(club, verbandId)];
+    if (pastSeason) matches.push(pastMatchFor(club, verbandId));
+    return { matches, gender: 'männlich' };
   };
   apiClient.fetchMatchInfo = async () => null;
   apiClient.fetchLeagueTable = async (ligaId, ownTeamId) => tableFor(String(ligaId), String(ownTeamId));
@@ -109,7 +145,10 @@ const ENV_KEYS = ['BBB_ICS_DIR', 'BBB_CLUBS_DIR', 'BBB_PORTAL_CONFIG', 'BBB_WAM_
 //  configOverrides: { [clubId]: extraConfig }  (z.B. { '3001': { legacyRootOutput: true } })
 //  portal: Objekt für portal.json, oder null → Datei fehlt
 //  wamCache: Objekt für den WAM-Cache, oder null → Datei fehlt
-function createRun({ configOverrides = {}, failClubIds = [], emptyClubIds = [], portal = DEFAULT_PORTAL, wamCache = null } = {}) {
+//  mockOptions: weitere Optionen für installApiMocks (pastSeason, emptyMatchClubIds, verbandOverrides)
+// rerun(apiOptions) lädt cronUpdate.js mit neuen API-Mocks frisch, behält aber Verzeichnisse
+// und Configs bei — für Tests über mehrere aufeinanderfolgende Läufe (z.B. Rolling-Update).
+function createRun({ configOverrides = {}, failClubIds = [], emptyClubIds = [], portal = DEFAULT_PORTAL, wamCache = null, ...mockOptions } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'bbb-portal-out-'));
   const clubsDir = mkdtempSync(join(tmpdir(), 'bbb-portal-clubs-'));
   const cfgDir = mkdtempSync(join(tmpdir(), 'bbb-portal-cfg-'));
@@ -135,24 +174,32 @@ function createRun({ configOverrides = {}, failClubIds = [], emptyClubIds = [], 
 
   // Reihenfolge: cronUpdate.js destrukturiert apiClient-Funktionen beim require() — Mocks
   // müssen VOR dem frischen Laden von cronUpdate.js gesetzt werden.
-  freshRequire('../../src/storage.js');
-  freshRequire('../../src/generateHTML.js');
-  const apiClient = freshRequire('../../src/apiClient.js');
-  installApiMocks(apiClient, { failClubIds, emptyClubIds });
-  freshRequire('../../src/wamCache.js');
-  freshRequire('../../src/portalConfig.js');
-  freshRequire('../../src/aggregatePages.js');
-  const cronModule = freshRequire('../../src/cronUpdate.js');
+  function loadCronModule(apiOptions) {
+    freshRequire('../../src/storage.js');
+    freshRequire('../../src/generateHTML.js');
+    freshRequire('../../src/seasonArchive.js');
+    const apiClient = freshRequire('../../src/apiClient.js');
+    installApiMocks(apiClient, apiOptions);
+    freshRequire('../../src/wamCache.js');
+    freshRequire('../../src/portalConfig.js');
+    freshRequire('../../src/aggregatePages.js');
+    return freshRequire('../../src/cronUpdate.js');
+  }
+  const cronModule = loadCronModule({ failClubIds, emptyClubIds, ...mockOptions });
 
   return {
     dir,
     clubsDir,
     cronModule,
+    rerun(apiOptions = {}) {
+      return loadCronModule(apiOptions);
+    },
     paths: {
       bund: join(dir, 'index.html'),
       land: slug => join(dir, slug, 'index.html'),
       club: (bundesland, clubId) => join(dir, bundesland, clubSlug(clubId), 'index.html'),
       legal: name => join(dir, `${name}.html`),
+      archive: (clubId, seasonId) => join(dir, 'archive', clubId, `${seasonId}.json`),
     },
     cleanup() {
       for (const key of ENV_KEYS) {
@@ -164,4 +211,7 @@ function createRun({ configOverrides = {}, failClubIds = [], emptyClubIds = [], 
   };
 }
 
-module.exports = { CLUBS, DEFAULT_PORTAL, SHARED_LIGA_ID, SHARED_LIGA_NAME, clubSlug, teamIdFor, ligaFor, installApiMocks, createRun };
+module.exports = {
+  CLUBS, DEFAULT_PORTAL, SHARED_LIGA_ID, SHARED_LIGA_NAME, FIXTURE_SEASON_ID, FIXTURE_PAST_SEASON_ID,
+  clubSlug, teamIdFor, ligaFor, installApiMocks, createRun,
+};

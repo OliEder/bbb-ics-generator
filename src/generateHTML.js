@@ -203,9 +203,11 @@ function buildCalHelp() {
 </details>`;
 }
 
-function loadTeamArchives(generatedDir, teamId) {
-  const archiveDir = path.join(generatedDir, 'archive');
-  if (!fs.existsSync(archiveDir)) return [];
+// archiveDir ist das Archiv-Verzeichnis EINES Clubs (generated/archive/<clubId>/, siehe
+// seasonArchive.clubArchiveDir und ADR-026). Ohne archiveDir gibt es keine Archive — es wird
+// bewusst kein globales generated/archive/ als Fallback gelesen (Vermischung mehrerer Clubs).
+function loadTeamArchives(archiveDir, teamId) {
+  if (!archiveDir || !fs.existsSync(archiveDir)) return [];
 
   const files = fs.readdirSync(archiveDir).filter(f => /^\d{4}\.json$/.test(f));
   const entries = [];
@@ -1482,7 +1484,7 @@ function genHTML(theme = {}, legal = {}, options = {}) {
   const teamsDir = path.join(generatedDir, 'teams');
   fs.mkdirSync(teamsDir, { recursive: true });
   for (const team of teams) {
-    const archives = loadTeamArchives(generatedDir, team.teamId);
+    const archives = loadTeamArchives(options.archiveDir, team.teamId);
     fs.writeFileSync(
       path.join(teamsDir, `${team.teamId}.html`),
       buildTeamPage(team, teams, resolvedTheme, legal, { baseUrl, migrationNotice, archives }),
