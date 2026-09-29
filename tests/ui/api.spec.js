@@ -127,7 +127,7 @@ test.describe('BBB API Smoke Tests @network', () => {
     expect(res.status()).toBe(200);
     const data = (await res.json())?.data;
     expect(data, 'data fehlt').toBeTruthy();
-    // Spec ↔ Realität (ADR-018): Ändert die API die Form Richtung Spec, muss wamClient.js angepasst werden.
+    // Spec ↔ Realität (ADR-021): Ändert die API die Form Richtung Spec, muss wamClient.js angepasst werden.
     expect(data.ligaListe, 'API liefert jetzt data.ligaListe (wie in der Spec) — src/wamClient.js anpassen!').toBeUndefined();
     expect(Array.isArray(data.ligen), 'data.ligen muss ein Array sein').toBe(true);
     expect(typeof data.hasMoreData).toBe('boolean');
@@ -148,7 +148,7 @@ test.describe('BBB API Smoke Tests @network', () => {
     expect(second.ligen[0].ligaId, 'Seite 2 liefert dieselbe Liga wie Seite 1 — startAtIndex wirkt nicht mehr').not.toBe(first.ligen[0].ligaId);
   });
 
-  test('wam/liga/list: jede ligaId aus den Match-Daten kommt im WAM-Ergebnis vor (Join-Schlüssel, ADR-018)', async () => {
+  test('wam/liga/list: jede ligaId aus den Match-Daten kommt im WAM-Ergebnis vor (Join-Schlüssel, ADR-021)', async () => {
     test.skip(matches.length === 0, 'Keine Spiele im Zeitfenster (Saisonpause?)');
     test.setTimeout(180_000);
     const verbandId = Number(matches[0].ligaData.verbandId);

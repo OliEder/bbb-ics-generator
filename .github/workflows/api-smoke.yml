@@ -30,7 +30,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       # Rot bedeutet: die Antwortform eines genutzten Endpunkts hat sich geändert
-      # (siehe tests/ui/api.spec.js und ADR-018). Der Deploy-Lauf ist davon unabhängig.
+      # (siehe tests/ui/api.spec.js und ADR-021). Der Deploy-Lauf ist davon unabhängig.
       - name: Run API smoke tests
         run: npx playwright test --project=chromium-ui --grep @network
 

@@ -5,7 +5,7 @@
 // Reine Unit-Tests für mapMatches()/computeSpotlight() liegen in tests/e2e/cron-mapping.test.js.
 // Diese Trennung wurde vorgenommen, weil die kombinierte Datei mit zunehmender Zahl schwerer
 // Multi-Club-Integrationstests (siehe CLAUDE.md-Regel zu Multi-Club-Orchestrierungstests,
-// ADR-016) unübersichtlich groß wurde.
+// ADR-019) unübersichtlich groß wurde.
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -126,7 +126,7 @@ test('updateAll: legacyRootOutput=true erzeugt Alt-Pfad-Duplikat MIT echten Spie
     assert.ok(legacyContent.includes('Kalender-Abo aktualisieren'), 'Alt-Pfad muss Migrationshinweis enthalten');
     assert.ok(legacyContent.includes('Auswärtiger Gegner'), 'Alt-Pfad muss ZUSÄTZLICH das echte Spiel enthalten (nicht nur den Hinweis)');
 
-    // Seit Plan B (ADR-020) gibt es kein Alt-Pfad-HTML mehr: nur die ICS-Dateien sind
+    // Seit Plan B (ADR-023) gibt es kein Alt-Pfad-HTML mehr: nur die ICS-Dateien sind
     // rückwärtskompatibel. generated/index.html ist die Bund-Seite und wird in
     // portal-aggregation-integration.test.js geprüft.
     assert.ok(!existsSync(join(dir, 'teams')), 'Kein Alt-Pfad-Team-HTML (generated/teams/)');
@@ -303,7 +303,7 @@ test('updateAll: 9 Clubs über 8 Bundesländer + 1 bundesweiter Club — jeder C
   try {
     // Einzige Quelle der Wahrheit: clubId, verbandId (siehe src/verbandMapping.js für die
     // verbandId->Bundesland-Tabelle) und der Bundesland-Ordnername, unter dem der Club im
-    // Test-clubsDir angelegt wird (nur eine organisatorische Ablage-Hilfe, siehe ADR-014 —
+    // Test-clubsDir angelegt wird (nur eine organisatorische Ablage-Hilfe, siehe ADR-017 —
     // NICHT die Quelle für den erwarteten Ausgabepfad, der wird per verbandIdToBundesland
     // aus verbandId hergeleitet).
     const CLUBS = [

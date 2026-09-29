@@ -2,7 +2,7 @@
 
 // Aktualisiert data/wam-ligen-cache.json für alle Bundesländer, in denen mindestens ein
 // Club unter clubs/ liegt. Die verbandIds werden aus dem Ordnernamen abgeleitet
-// (clubs/<bundesland>/…, nur Organisationshilfe — siehe ADR-014); 'bundesweit' hat keine
+// (clubs/<bundesland>/…, nur Organisationshilfe — siehe ADR-017); 'bundesweit' hat keine
 // einzelne verbandId und wird übersprungen. Exit-Code 1, wenn ein Verband unvollständig war.
 const fs = require('fs');
 const path = require('path');

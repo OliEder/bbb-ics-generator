@@ -101,7 +101,7 @@ bbb-ics-generator/
 │   │       ├── teams/          # Individuelle Team-Seiten
 │   │       │   └── {teamId}.html
 │   │       └── {teamId}_{type}.ics
-│   └── {teamId}_{type}.ics       # Alt-Pfad-Duplikat (nur ICS) für Clubs mit legacyRootOutput: true (siehe ADR-013/ADR-020 in docs/arc42)
+│   └── {teamId}_{type}.ics       # Alt-Pfad-Duplikat (nur ICS) für Clubs mit legacyRootOutput: true (siehe ADR-016/ADR-023 in docs/arc42)
 ├── tests/
 │   └── e2e/               # End-to-End Tests (node:test)
 └── .github/workflows/     # GitHub Actions (automatisches Update alle 6h)

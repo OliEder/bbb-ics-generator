@@ -62,7 +62,7 @@ Der Workflow benötigt drei spezifische Permissions:
 
 . *Install dependencies* (`npm install`): Installiert alle npm-Abhängigkeiten aus `package.json` (`axios`, `ics`, `express`, `node-cron`). Kein `--ci`-Flag, kein Lockfile-Enforcement.
 
-. *Generate ICS files and HTML* (`id: generate`, `continue-on-error: true`; `npm run update` → `node src/cronUpdate.js`): Hauptschritt. Iteriert über alle Clubs (`loadClubs()`), ruft je Club die Basketball-Bund-API ab, erzeugt alle ICS-Dateien, schreibt `metadata.json` und ruft `genHTML()` intern auf (pro Club unter `generated/<bundesland>/<club-slug>/`; für Clubs mit `legacyRootOutput: true` zusätzlich nur die Alt-Pfad-ICS direkt unter `generated/`, siehe <<adr-020-wegfall-legacy-html,ADR-020>>), aggregiert danach die Bund-/Land-Seiten (`aggregatePages()`). Ein separater `generate-html`-Schritt existiert seit der Multi-Club-Umstellung nicht mehr — er wäre redundant, da `cronUpdate.js` die HTML-Generierung bereits übernimmt. Endet der Prozess mit Exitcode 1 (Fehler bei einzelnen Clubs oder in der Portal-Aggregation), bricht der Schritt den Job dank `continue-on-error` nicht ab; das Ergebnis steht in `steps.generate.outcome` (<<adr-022-fehlerisolation-pro-club,ADR-022>>).
+. *Generate ICS files and HTML* (`id: generate`, `continue-on-error: true`; `npm run update` → `node src/cronUpdate.js`): Hauptschritt. Iteriert über alle Clubs (`loadClubs()`), ruft je Club die Basketball-Bund-API ab, erzeugt alle ICS-Dateien, schreibt `metadata.json` und ruft `genHTML()` intern auf (pro Club unter `generated/<bundesland>/<club-slug>/`; für Clubs mit `legacyRootOutput: true` zusätzlich nur die Alt-Pfad-ICS direkt unter `generated/`, siehe <<adr-023-wegfall-legacy-html,ADR-023>>), aggregiert danach die Bund-/Land-Seiten (`aggregatePages()`). Ein separater `generate-html`-Schritt existiert seit der Multi-Club-Umstellung nicht mehr — er wäre redundant, da `cronUpdate.js` die HTML-Generierung bereits übernimmt. Endet der Prozess mit Exitcode 1 (Fehler bei einzelnen Clubs oder in der Portal-Aggregation), bricht der Schritt den Job dank `continue-on-error` nicht ab; das Ergebnis steht in `steps.generate.outcome` (<<adr-025-fehlerisolation-pro-club,ADR-025>>).
 
 . *Verify generated output* (Guard): Bricht den Job mit `::error::` ab, wenn unter `generated/` keine einzige `*.ics`-Datei existiert. So ersetzt ein Totalausfall nicht die funktionierende Seite durch eine leere.
 
@@ -78,11 +78,11 @@ Der Workflow benötigt drei spezifische Permissions:
 
 . *Fail job if generation reported errors* (`if: steps.generate.outcome == 'failure'`): Markiert den Job nach dem Deployment als fehlgeschlagen (rot), obwohl die übrigen Clubs bereits deployt wurden. Der Fehler bleibt so sichtbar.
 
-*Bewusste Konsequenz (ADR-022):* Der Guard prüft ausschließlich auf ICS-Dateien, nicht auf `generated/index.html` — Kalender-Abos haben Vorrang. Fehlt `portal.json`, werden keine Bund-/Land-Seiten erzeugt; es wird dennoch (mit den ICS und den Club-Seiten) deployt und der Job anschließend rot markiert.
+*Bewusste Konsequenz (ADR-025):* Der Guard prüft ausschließlich auf ICS-Dateien, nicht auf `generated/index.html` — Kalender-Abos haben Vorrang. Fehlt `portal.json`, werden keine Bund-/Land-Seiten erzeugt; es wird dennoch (mit den ICS und den Club-Seiten) deployt und der Job anschließend rot markiert.
 
 ==== Workflow wam-refresh.yml (WAM-Liga-Cache)
 
-Der Workflow `.github/workflows/wam-refresh.yml` aktualisiert quartalsweise den versionierten Cache `data/wam-ligen-cache.json` (<<adr-018-wam-cache-versioniert,ADR-018>>).
+Der Workflow `.github/workflows/wam-refresh.yml` aktualisiert quartalsweise den versionierten Cache `data/wam-ligen-cache.json` (<<adr-021-wam-cache-versioniert,ADR-021>>).
 
 [cols="2,4", options="header"]
 |===
@@ -98,7 +98,7 @@ Der Workflow `.github/workflows/wam-refresh.yml` aktualisiert quartalsweise den 
 | `actions/checkout@v5`, `actions/setup-node@v5` (Node.js 24, npm-Cache), `npm ci`, `npm run wam:refresh`, dann Commit von `data/wam-ligen-cache.json` mit der Message `chore(data): refresh WAM liga cache [skip ci]` (nur bei Änderungen) und Push.
 
 | Fehlerfall
-| Wurde ein Verband nur unvollständig abgerufen, endet `npm run wam:refresh` mit Fehler; der Job bricht ab und es wird nichts committet (<<adr-019-graceful-degradation-wam-cache,ADR-019>>).
+| Wurde ein Verband nur unvollständig abgerufen, endet `npm run wam:refresh` mit Fehler; der Job bricht ab und es wird nichts committet (<<adr-022-graceful-degradation-wam-cache,ADR-022>>).
 
 | Deployment
 | Ein Push mit `GITHUB_TOKEN` löst keine Workflows aus; der neue Cache wird spätestens vom nächsten 6-Stunden-Lauf von `deploy.yml` übernommen.
@@ -161,7 +161,7 @@ Der Workflow hat zwei parallele Jobs:
 
 ==== Workflow api-smoke.yml (API-Vertragstests)
 
-Der Workflow `.github/workflows/api-smoke.yml` führt wöchentlich (montags 05:00 UTC) sowie manuell (`workflow_dispatch`) die `@network`-Tests aus `tests/ui/api.spec.js` aus (`npx playwright test --project=chromium-ui --grep @network`). Sie prüfen gegen die Live-API die Felder, die der Code aus allen sieben genutzten Endpunkten liest (`club/actualmatches`, `team/matches`, `match/matchInfo`, `competition/table`, `competition/spielplan` samt `matchday`, `wam/liga/list`), inklusive der von der OpenAPI-Spec abweichenden flachen WAM-Antwortform (<<adr-018-wam-cache-versioniert,ADR-018>>) und des `ligaId`-Joins zwischen Match-Daten und WAM. Fehlen in der Saison passende Daten (Saisonpause, kein Pokal), werden einzelne Tests übersprungen. Ein roter Lauf meldet eine geänderte Antwortform; er blockiert weder PRs noch den Deploy. Bei Fehlern wird der Playwright-Report als Artifact `api-smoke-report` hochgeladen.
+Der Workflow `.github/workflows/api-smoke.yml` führt wöchentlich (montags 05:00 UTC) sowie manuell (`workflow_dispatch`) die `@network`-Tests aus `tests/ui/api.spec.js` aus (`npx playwright test --project=chromium-ui --grep @network`). Sie prüfen gegen die Live-API die Felder, die der Code aus allen sieben genutzten Endpunkten liest (`club/actualmatches`, `team/matches`, `match/matchInfo`, `competition/table`, `competition/spielplan` samt `matchday`, `wam/liga/list`), inklusive der von der OpenAPI-Spec abweichenden flachen WAM-Antwortform (<<adr-021-wam-cache-versioniert,ADR-021>>) und des `ligaId`-Joins zwischen Match-Daten und WAM. Fehlen in der Saison passende Daten (Saisonpause, kein Pokal), werden einzelne Tests übersprungen. Ein roter Lauf meldet eine geänderte Antwortform; er blockiert weder PRs noch den Deploy. Bei Fehlern wird der Playwright-Report als Artifact `api-smoke-report` hochgeladen.
 
 ==== Playwright Report Artifact
 

@@ -1,6 +1,6 @@
 'use strict';
 
-// Multi-Club-Orchestrierungstest (ADR-016): 10 Clubs / 8 Bundesländer / 1 bundesweit.
+// Multi-Club-Orchestrierungstest (ADR-019): 10 Clubs / 8 Bundesländer / 1 bundesweit.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { existsSync, readFileSync } = require('node:fs');

@@ -274,7 +274,7 @@ async function writeClubIcs(meta, rawTeamData, clubOutputDir) {
 // enthalten (nicht nur den Migrationshinweis) — deshalb werden hier dieselben
 // Rohdaten (rawTeamData) erneut verwendet, statt eine leere/hinweis-only ICS zu erzeugen.
 // Seit Plan B ausschließlich ICS: kein Alt-Pfad-HTML und kein Root-metadata.json mehr —
-// generated/index.html ist die Bund-Seite (ADR-020).
+// generated/index.html ist die Bund-Seite (ADR-023).
 async function writeLegacyOutput(rawTeamData, baseUrl) {
   for (const [teamId, data] of rawTeamData.entries()) {
     const { team, matches, homeMatches, awayMatches, details } = data;
@@ -377,7 +377,7 @@ async function updateAll() {
     return { results: [], failures: [] };
   }
 
-  // Fehlerisolation (ADR-022): ein fehlschlagender Club reißt weder die übrigen Clubs
+  // Fehlerisolation (ADR-025): ein fehlschlagender Club reißt weder die übrigen Clubs
   // noch die Aggregation mit. Fehler werden gesammelt; der CLI-Einstieg setzt den Exitcode.
   const results = [];
   const failures = [];
@@ -400,7 +400,7 @@ async function updateAll() {
     }
   }
 
-  // Bund-/Land-/Portal-Legal-Seiten (ADR-017). Ein Fehler hier (z.B. fehlende portal.json)
+  // Bund-/Land-/Portal-Legal-Seiten (ADR-020). Ein Fehler hier (z.B. fehlende portal.json)
   // verhindert nur die Portal-Seiten, nicht die bereits geschriebene Club-Ausgabe.
   try {
     const portalLegal = loadPortalConfig();

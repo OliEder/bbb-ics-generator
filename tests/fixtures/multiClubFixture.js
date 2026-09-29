@@ -1,6 +1,6 @@
 'use strict';
 
-// Gemeinsame Testdaten für Multi-Club-Portal-Tests (CLAUDE.md-Policy, ADR-016):
+// Gemeinsame Testdaten für Multi-Club-Portal-Tests (CLAUDE.md-Policy, ADR-019):
 // 10 Clubs, 8 Bundesländer + 1 bundesweiter Club, davon 2 Clubs in DERSELBEN Liga (Bayern).
 const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = require('node:fs');
 const { tmpdir } = require('node:os');

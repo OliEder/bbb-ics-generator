@@ -22,7 +22,7 @@ function mapLiga(l) {
 }
 
 // Holt alle Ligen eines Verbands aus dem WAM-Endpunkt (in der OpenAPI-Spec als `searchLigen`,
-// Tag WAM, beschrieben; siehe ADR-018). ACHTUNG: Die Spec beschreibt die Antwort als
+// Tag WAM, beschrieben; siehe ADR-021). ACHTUNG: Die Spec beschreibt die Antwort als
 // data.ligaListe.{ligen,hasMoreData,size}; die reale API liefert diese Felder (Stand
 // 2026-09-29, live geprüft) flach unter data — der Client liest daher data.ligen. Pagination ist inhärent sequenziell (jede Seite liefert hasMoreData), deshalb
 // kein mapWithConcurrency. startAtIndex ist ein QUERY-Parameter, kein Body-Feld.

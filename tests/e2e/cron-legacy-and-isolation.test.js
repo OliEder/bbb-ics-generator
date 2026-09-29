@@ -1,7 +1,7 @@
 'use strict';
 
-// Legacy-Pfad nur ICS (ADR-020) und Fehlerisolation pro Club (ADR-022).
-// Nutzt die ADR-016-konforme 10-Club-Fixture. Portal-Seiten selbst werden in
+// Legacy-Pfad nur ICS (ADR-023) und Fehlerisolation pro Club (ADR-025).
+// Nutzt die ADR-019-konforme 10-Club-Fixture. Portal-Seiten selbst werden in
 // portal-aggregation-integration.test.js geprüft.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');

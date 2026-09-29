@@ -15,7 +15,7 @@ function cachePath() {
 }
 
 // Gibt { cache, stale } zurück. Fehlende oder unlesbare Datei → { cache: null, stale: false }
-// (graceful degradation, siehe ADR-019). Ein veralteter Cache wird zurückgegeben, aber
+// (graceful degradation, siehe ADR-022). Ein veralteter Cache wird zurückgegeben, aber
 // als stale markiert; der Aufrufer entscheidet über die Verwendung.
 function loadWamCache(filePath = cachePath(), now = Date.now()) {
   if (!fs.existsSync(filePath)) return { cache: null, stale: false };
@@ -33,7 +33,7 @@ function loadWamCache(filePath = cachePath(), now = Date.now()) {
 }
 
 // Map<String(ligaId), liga> über alle Verbände. ligaId ist bundesweit eindeutig
-// (Join-Schlüssel zu ligaData.ligaId der Match-Daten, verifiziert — ADR-018).
+// (Join-Schlüssel zu ligaData.ligaId der Match-Daten, verifiziert — ADR-021).
 function buildLigaIndex(cache) {
   const index = new Map();
   for (const ligen of Object.values(cache?.ligenByVerbandId || {})) {
@@ -44,7 +44,7 @@ function buildLigaIndex(cache) {
 
 // Baut einen neuen Cache. Schlägt der Abruf eines Verbands teilweise fehl, wird dessen
 // ALTER Stand übernommen (nicht der Teilabruf) und der Verband in partialVerbandIds
-// vermerkt — sonst würde ein frisches generatedAt Lücken tarnen (ADR-019).
+// vermerkt — sonst würde ein frisches generatedAt Lücken tarnen (ADR-022).
 async function refreshWamCache({ verbandIds, existingCache = null, fetchLeagues = fetchLeaguesForVerband, now = new Date() }) {
   const ligenByVerbandId = {};
   const partialVerbandIds = [];

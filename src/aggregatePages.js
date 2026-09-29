@@ -91,7 +91,7 @@ function writePage(filePath, html) {
 
 // results: [{ club, bundesland, meta }] aus updateAll(). Schreibt generated/index.html (Bund),
 // generated/<region>/index.html (Land, inkl. bundesweit) und die Portal-Legal-Seiten.
-// Clubs ohne Team-Daten (meta leer) werden nicht aufgelistet (ADR-017).
+// Clubs ohne Team-Daten (meta leer) werden nicht aufgelistet (ADR-020).
 function aggregatePages(results, { generatedRootDir, portalLegal, wamCache = null, wamCacheStale = false }) {
   const usable = results.filter(r => r.meta.length > 0);
   for (const r of results) {

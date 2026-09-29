@@ -38,7 +38,7 @@ jobs:
         run: npm install
         
       # Fehler einzelner Clubs (Exitcode 1) sollen das Deployment der übrigen Clubs nicht
-      # verhindern (ADR-022): Schritt darf fehlschlagen, der Job wird am Ende rot markiert.
+      # verhindern (ADR-025): Schritt darf fehlschlagen, der Job wird am Ende rot markiert.
       - name: Generate ICS files and HTML
         id: generate
         continue-on-error: true
