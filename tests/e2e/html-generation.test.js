@@ -948,6 +948,26 @@ test('buildSpotlightBlock: rendert Spiele aller Teams chronologisch', () => {
   assert.ok(html.includes('Roth'), 'Gegner fehlt');
 });
 
+test('buildSpotlightBlock: Sonderzeichen in teamName werden nicht doppelt escaped (Fallback-Pfad ohne teamAkjId/teamNumber)', () => {
+  // Bewusst OHNE teamAkjId/teamNumber: buildTeamLabel() nutzt teamName nur im
+  // Fallback-Pfad (via teamLabel()) — mit teamAkjId/teamNumber gesetzt würde
+  // das Label rein aus ageGroup+Nummer gebaut und teamName nie durchlaufen,
+  // wodurch dieser Test den eigentlichen Bug (doppeltes escapeHtml() am
+  // Spotlight-Aufrufer) fälschlich nie ausgelöst hätte.
+  const { buildSpotlightBlock } = require('../../src/generateHTML.js')._testExports;
+  const teams = [
+    {
+      teamId: 'T1', teamName: 'TV Bar & Ball', ageGroup: 'U16', gender: 'männlich',
+      spotlightMatches: [
+        { date: '2026-04-20', time: '18:00', isHome: true, opponent: 'Gegner', opponentShort: 'GG', ownShort: 'NM', result: null, competition: 'Bezirksliga', isNext: true },
+      ],
+    },
+  ];
+  const html = buildSpotlightBlock(teams, '#7c3aed');
+  assert.ok(html.includes('TV Bar &amp; Ball'), 'teamName sollte genau einmal escaped sein ("&amp;")');
+  assert.ok(!html.includes('&amp;amp;'), 'Kein doppelt escaptes "&" im spotlight-team-Label');
+});
+
 test('buildSpotlightBlock: Heim-Tab enthält nur Heimspiele', () => {
   const { buildSpotlightBlock } = require('../../src/generateHTML.js')._testExports;
   const teams = [
@@ -1284,6 +1304,80 @@ test('buildTabScript: enthält Clipboard-Handler für btn--copy', () => {
   });
 }
 
+// --- buildTeamLabel ---
+{
+  const { _testExports } = require('../../src/generateHTML.js');
+  const { buildTeamLabel } = _testExports;
+
+  test('buildTeamLabel: Herren ohne Nummer', () => {
+    const label = buildTeamLabel({ teamName: 'Fibalon Baskets Neumarkt', ageGroup: 'Senioren', gender: 'männlich', teamAkjId: 1, teamNumber: 1 });
+    assert.match(label, /^Herren($| )/);
+    assert.ok(!label.includes('Herren 1'), 'Bei teamNumber 1 keine Nummer anhängen');
+  });
+
+  test('buildTeamLabel: Herren mit Nummer', () => {
+    const label = buildTeamLabel({ teamName: 'Fibalon Baskets Neumarkt 2', ageGroup: 'Senioren', gender: 'männlich', teamAkjId: 1, teamNumber: 2 });
+    assert.ok(label.startsWith('Herren 2'), `Erwartet "Herren 2..." bekommen: ${label}`);
+  });
+
+  test('buildTeamLabel: Damen ohne Nummer', () => {
+    const label = buildTeamLabel({ teamName: 'Fibalon Baskets Neumarkt', ageGroup: 'Senioren', gender: 'weiblich', teamAkjId: 1, teamNumber: 1 });
+    assert.ok(label.startsWith('Damen'), `Erwartet "Damen..." bekommen: ${label}`);
+    assert.ok(!label.includes('Damen 1'));
+  });
+
+  test('buildTeamLabel: Jugend männlich ohne Nummer (U16m)', () => {
+    const label = buildTeamLabel({ teamName: 'Fibalon Baskets Neumarkt', ageGroup: 'U16', gender: 'männlich', teamAkjId: 16, teamNumber: 1 });
+    assert.ok(label.startsWith('U16m'), `Erwartet "U16m..." bekommen: ${label}`);
+  });
+
+  test('buildTeamLabel: Jugend weiblich mit Nummer (U14w 2)', () => {
+    const label = buildTeamLabel({ teamName: 'Fibalon Baskets Neumarkt', ageGroup: 'U14', gender: 'weiblich', teamAkjId: 14, teamNumber: 2 });
+    assert.ok(label.startsWith('U14w 2'), `Erwartet "U14w 2..." bekommen: ${label}`);
+  });
+
+  test('buildTeamLabel: Fallback auf alten Vereinsnamen wenn teamAkjId/teamNumber fehlen', () => {
+    const label = buildTeamLabel({ teamName: 'Fibalon Baskets Neumarkt', ageGroup: 'U16', gender: 'männlich' });
+    assert.ok(label.includes('Fibalon Baskets Neumarkt'), `Fallback sollte teamName enthalten, bekommen: ${label}`);
+    assert.ok(label.includes('U16'), `Fallback sollte Altersklasse enthalten, bekommen: ${label}`);
+  });
+
+  test('buildTeamLabel: enthält weiterhin das Gender-Icon', () => {
+    const label = buildTeamLabel({ teamName: 'Fibalon Baskets Neumarkt', ageGroup: 'U16', gender: 'männlich', teamAkjId: 16, teamNumber: 1 });
+    assert.ok(label.includes('gender-sym'), 'Gender-Icon-Span sollte weiterhin enthalten sein');
+  });
+
+  test('buildTeamLabel: escaped teamName im Fallback-Pfad', () => {
+    const label = buildTeamLabel({ teamName: '<script>alert(1)</script>', ageGroup: 'U16', gender: 'männlich' });
+    assert.ok(!label.includes('<script>'), 'Roher <script>-Tag darf nicht im Output landen');
+    assert.ok(label.includes('&lt;script&gt;'), 'teamName muss escaped sein');
+  });
+
+  test('buildTeamLabel: includeIcon=false liefert reinen Text ohne Gender-Icon-Span', () => {
+    const label = buildTeamLabel({ teamName: 'Fibalon Baskets Neumarkt', ageGroup: 'U16', gender: 'männlich', teamAkjId: 16, teamNumber: 1 }, false);
+    assert.ok(!label.includes('gender-sym'), 'Kein eingebettetes Icon-Span wenn includeIcon=false');
+    assert.equal(label, 'U16m');
+  });
+
+  test('buildTeamLabel: includeIcon=false im Fallback-Pfad liefert ebenfalls reinen Text ohne Icon', () => {
+    const label = buildTeamLabel({ teamName: 'Fibalon Baskets Neumarkt', ageGroup: 'U16', gender: 'männlich' }, false);
+    assert.ok(!label.includes('gender-sym'), 'Kein eingebettetes Icon-Span im Fallback-Pfad');
+    assert.ok(label.includes('Fibalon Baskets Neumarkt'));
+  });
+
+  test('buildTeamLabel: escaped teamName im Fallback-Pfad auch bei includeIcon=false', () => {
+    const label = buildTeamLabel({ teamName: '<script>alert(1)</script>', ageGroup: 'U16', gender: 'männlich' }, false);
+    assert.ok(!label.includes('<script>'), 'Roher <script>-Tag darf auch im includeIcon=false-Fallback-Pfad nicht im Output landen');
+    assert.ok(label.includes('&lt;script&gt;'), 'teamName muss escaped sein');
+  });
+
+  test('spotlightTeamLabel: liefert reinen Text ohne eingebettetes Icon', () => {
+    const { spotlightTeamLabel } = require('../../src/generateHTML.js')._testExports;
+    const label = spotlightTeamLabel({ teamName: 'Fibalon Baskets Neumarkt 2', ageGroup: 'Senioren', gender: 'männlich', teamAkjId: 1, teamNumber: 2 }, []);
+    assert.equal(label, 'Herren 2', 'spotlightTeamLabel darf kein Icon-HTML einbetten, da buildSpotlightBlock es separat rendert');
+  });
+}
+
 // --- buildSpotlightBlock: result icons ---
 {
   const { _testExports } = require('../../src/generateHTML.js');
@@ -1508,4 +1602,168 @@ test('buildLandPage: ohne Clubs kein leeres <ul class="portal-list">, Vereine-Ü
   const html = buildLandPage({ slug: 'bayern', name: 'Bayern', clubs: [], groups: [] }, PORTAL_REGIONS, PORTAL_LEGAL);
   assert.ok(!html.includes('<ul class="portal-list">'));
   assert.ok(html.includes('<h2 id="vereine-heading">Vereine</h2>'));
+});
+
+// --- Archiv-Tab & "nicht gemeldet" Banner ---
+
+test('Team ohne Archiv-Dateien: kein Archiv-Tab in generierter Seite', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
+    assert.ok(!html.includes('tab-167881-archive'), 'Archiv-Tab-Button darf ohne Archivdaten nicht existieren');
+    assert.ok(!html.includes('panel-167881-archive'), 'Archiv-Tab-Panel darf ohne Archivdaten nicht existieren');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('Team MIT Archiv-Eintrag: Archiv-Tab erscheint mit Saison-Label und Gegner/Ergebnis', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const archiveDir = join(dir, 'archive');
+    require('fs').mkdirSync(archiveDir, { recursive: true });
+    writeFileSync(join(archiveDir, '2025.json'), JSON.stringify({
+      season: 2025,
+      teams: {
+        '167881': {
+          teamName: 'Fibalon Baskets Neumarkt U10',
+          ageGroup: 'U10',
+          gender: 'männlich',
+          status: 'final',
+          lastSeenAt: new Date().toISOString(),
+          matches: [
+            { date: '2025-10-12', time: '15:00', opponent: 'ArchivGegner', isHome: true, result: '55:40', competition: 'Kreisliga', isNext: false, venueName: '', venueAddress: '', opponentLogoUrl: '' },
+          ],
+          competitions: [],
+        },
+      },
+    }));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
+    assert.ok(html.includes('tab-167881-archive'), 'Archiv-Tab-Button fehlt');
+    assert.ok(html.includes('panel-167881-archive'), 'Archiv-Tab-Panel fehlt');
+    assert.ok(html.includes('Saison 2025/26'), 'Saison-Label fehlt');
+    assert.ok(html.includes('ArchivGegner'), 'Gegnername aus Archiv fehlt');
+    assert.ok(html.includes('55:40'), 'Ergebnis aus Archiv fehlt');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('Archivierte Saison mit status "provisional" zeigt "vorläufig" Hinweis', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const archiveDir = join(dir, 'archive');
+    require('fs').mkdirSync(archiveDir, { recursive: true });
+    writeFileSync(join(archiveDir, '2025.json'), JSON.stringify({
+      season: 2025,
+      teams: {
+        '167881': {
+          teamName: 'Fibalon Baskets Neumarkt U10',
+          ageGroup: 'U10',
+          gender: 'männlich',
+          status: 'provisional',
+          lastSeenAt: new Date().toISOString(),
+          matches: [],
+          competitions: [],
+        },
+      },
+    }));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
+    assert.ok(/vorläufig/i.test(html), '"vorläufig" Hinweis fehlt bei status: provisional');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('Team mit notCurrentlyListed: true zeigt "nicht gemeldet" Hinweis, Team ohne Flag nicht', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    const meta = [
+      { ...sampleMetadata[0], notCurrentlyListed: true },
+      { ...sampleMetadata[1] },
+    ];
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(meta));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const htmlFlagged = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
+    const htmlNormal = readFileSync(join(dir, 'teams', '167882.html'), 'utf8');
+    assert.ok(/nicht gemeldet/i.test(htmlFlagged), '"nicht gemeldet" Hinweis fehlt bei notCurrentlyListed: true');
+    assert.ok(!/nicht gemeldet/i.test(htmlNormal), '"nicht gemeldet" Hinweis darf ohne Flag nicht erscheinen');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('Archivierter Gegnername mit <script> wird escaped ausgegeben', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const archiveDir = join(dir, 'archive');
+    require('fs').mkdirSync(archiveDir, { recursive: true });
+    writeFileSync(join(archiveDir, '2025.json'), JSON.stringify({
+      season: 2025,
+      teams: {
+        '167881': {
+          teamName: 'Fibalon Baskets Neumarkt U10',
+          ageGroup: 'U10',
+          gender: 'männlich',
+          status: 'final',
+          lastSeenAt: new Date().toISOString(),
+          matches: [
+            { date: '2025-10-12', time: '15:00', opponent: '<script>alert(1337)</script>', isHome: true, result: '55:40', competition: 'Kreisliga', isNext: false, venueName: '', venueAddress: '', opponentLogoUrl: '' },
+          ],
+          competitions: [],
+        },
+      },
+    }));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
+    assert.ok(!html.includes('<script>alert(1337)'), 'raw script tag aus Archiv-Gegnername darf nicht im Output sein');
+    assert.ok(html.includes('&lt;script&gt;alert(1337)&lt;/script&gt;'), 'escaped Form des Archiv-Gegnernamens fehlt');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('loadTeamArchives: liest Archivdateien, ignoriert kaputte Dateien, sortiert absteigend', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    const archiveDir = join(dir, 'archive');
+    require('fs').mkdirSync(archiveDir, { recursive: true });
+    writeFileSync(join(archiveDir, '2024.json'), JSON.stringify({
+      season: 2024,
+      teams: { '167881': { teamName: 'T', ageGroup: 'U10', gender: '', status: 'final', lastSeenAt: '', matches: [], competitions: [] } },
+    }));
+    writeFileSync(join(archiveDir, '2025.json'), JSON.stringify({
+      season: 2025,
+      teams: { '167881': { teamName: 'T', ageGroup: 'U10', gender: '', status: 'final', lastSeenAt: '', matches: [], competitions: [] } },
+    }));
+    writeFileSync(join(archiveDir, '2023.json'), JSON.stringify({
+      season: 2023,
+      teams: { '999999': { teamName: 'Other', ageGroup: 'U10', gender: '', status: 'final', lastSeenAt: '', matches: [], competitions: [] } },
+    }));
+    writeFileSync(join(archiveDir, '2022.json'), '{not valid json');
+
+    const modPath = require.resolve('../../src/generateHTML.js');
+    delete require.cache[modPath];
+    const { _testExports } = require('../../src/generateHTML.js');
+    const { loadTeamArchives } = _testExports;
+
+    const archives = loadTeamArchives(dir, '167881');
+    assert.equal(archives.length, 2, 'sollte nur die 2 Archive mit passender teamId liefern');
+    assert.equal(archives[0].season, 2025, 'sollte absteigend sortiert sein');
+    assert.equal(archives[1].season, 2024, 'sollte absteigend sortiert sein');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
 });

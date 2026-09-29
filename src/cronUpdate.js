@@ -2,6 +2,7 @@ const { fetchTeamMatches, fetchMatchInfo, fetchClubTeams, fetchLeagueTable, fetc
 const { generateICS } = require('./icsGenerator');
 const { saveICS, saveTeamsCache, loadTeamsCache, sanitizeSlug } = require('./storage');
 const { genHTML } = require('./generateHTML');
+const { groupBySeasonId, updateArchiveForTeam } = require('./seasonArchive');
 const { loadClubs } = require('./clubs');
 const { deriveClubBundesland } = require('./verbandMapping');
 const { loadPortalConfig } = require('./portalConfig');
@@ -10,7 +11,6 @@ const { aggregatePages } = require('./aggregatePages');
 const fs = require('fs');
 const path = require('path');
 
-const CURRENT_SEASON = 2026; // Saison 2025/26
 const BBB_MEDIA_BASE = 'https://www.basketball-bund.net/media/team';
 const PORTAL_BASE_URL = process.env.BBB_PORTAL_BASE_URL || 'https://olieder.github.io/bbb-ics-generator/';
 const MATCH_INFO_CONCURRENCY = Number(process.env.BBB_MATCH_INFO_CONCURRENCY) > 0
@@ -19,6 +19,19 @@ const MATCH_INFO_CONCURRENCY = Number(process.env.BBB_MATCH_INFO_CONCURRENCY) > 
 
 function isLiga(liganame) {
   return String(liganame || '').toLowerCase().includes('liga');
+}
+
+// Die API liefert Spiele mehrerer Saisons gemischt zurück (z.B. laufende Vorbereitung
+// der Folgesaison). Statt eines hartcodierten Jahres wird die aktuelle Saison pro Team
+// aus der höchsten vorkommenden seasonId bestimmt — funktioniert saisonübergreifend
+// ohne jährliche manuelle Anpassung.
+function currentSeasonId(matches) {
+  let max = null;
+  for (const m of matches) {
+    const id = m.ligaData?.seasonId;
+    if (typeof id === 'number' && (max === null || id > max)) max = id;
+  }
+  return max;
 }
 
 async function getTeams(clubId) {
@@ -139,7 +152,7 @@ function resolveTheme(club, teams) {
 async function fetchTeamData(team) {
   console.log(`[DEBUG] Starte Update für Team ${team.id} (${team.name})`);
 
-  const { matches, gender: teamGender } = await fetchTeamMatches(team.id);
+  const { matches, gender: teamGender, teamAkjId, teamNumber } = await fetchTeamMatches(team.id);
   console.log(`[DEBUG] API-Matches: ${matches.length}`);
 
   if (!Array.isArray(matches) || matches.length === 0) {
@@ -155,8 +168,11 @@ async function fetchTeamData(team) {
   const homeMatches = matches.filter(m => Number(m.homeTeam.teamPermanentId) === Number(team.id));
   const awayMatches = matches.filter(m => Number(m.guestTeam.teamPermanentId) === Number(team.id));
 
-  const seasonMatches = matches
-    .filter(m => m.ligaData?.seasonId === CURRENT_SEASON)
+  const seasonId = currentSeasonId(matches);
+  const groupedBySeason = groupBySeasonId(matches);
+
+  const seasonMatches = (groupedBySeason[seasonId] || [])
+    .slice()
     .sort((a, b) => {
       const da = (a.kickoffDate || '') + (a.kickoffTime || '');
       const db = (b.kickoffDate || '') + (b.kickoffTime || '');
@@ -197,6 +213,8 @@ async function fetchTeamData(team) {
     teamName:       team.name,
     ageGroup:       team.ageGroup,
     gender:         teamGender || team.gender,
+    teamAkjId,
+    teamNumber,
     lastUpdate:     new Date().toISOString(),
     matchCount:     matches.length,
     homeMatchCount: homeMatches.length,
@@ -207,7 +225,11 @@ async function fetchTeamData(team) {
     competitions,
   };
 
-  return { raw: { team, matches, homeMatches, awayMatches, details, teamGender }, metaEntry, verbandId };
+  return {
+    raw: { team, matches, homeMatches, awayMatches, details, teamGender, seasonId, groupedBySeason },
+    metaEntry,
+    verbandId,
+  };
 }
 
 // Erzeugt und speichert die ICS-Dateien für alle 3 Varianten (all/home/away) eines Teams.
@@ -280,6 +302,14 @@ async function updateClub(club, generatedRootDir) {
     try {
       const result = await fetchTeamData(t);
       if (!result) continue;
+      const { seasonId, groupedBySeason, details, teamGender } = result.raw;
+      await updateArchiveForTeam(
+        { id: t.id, name: t.name, ageGroup: t.ageGroup, gender: teamGender || t.gender },
+        groupedBySeason,
+        seasonId,
+        details,
+        { fetchLeagueTable, fetchTournamentRounds }
+      );
       rawTeamData.set(t.id, result.raw);
       teamVerbandIds.push(result.verbandId);
       meta.push(result.metaEntry);
@@ -294,8 +324,26 @@ async function updateClub(club, generatedRootDir) {
 
   await writeClubIcs(meta, rawTeamData, clubOutputDir);
 
+  // Ein Team kann vorübergehend oder dauerhaft aus der API-Team-Liste verschwinden
+  // (z.B. noch nicht für die neue Saison gemeldet, Saisonpause, selten: aufgelöst).
+  // Damit es nicht komplett aus metadata.json fällt, wird der alte Stand aus dem
+  // vorherigen Lauf DIESES Clubs (metadata.json im Club-Verzeichnis) für solche Teams
+  // unverändert übernommen und mit notCurrentlyListed:true markiert. Taucht das Team
+  // später wieder in der API-Team-Liste auf, durchläuft es wieder den normalen
+  // Update-Pfad oben, der das Flag nie setzt — es verschwindet also automatisch wieder.
+  // Diese Einträge gehen nur in metadata.json/HTML des Clubs, nicht in das für ICS und
+  // die Portal-Aggregation zurückgegebene meta (keine Rohdaten, veraltete Tabellen).
+  const previousMetaPath = path.join(clubOutputDir, 'metadata.json');
+  const previousMeta = fs.existsSync(previousMetaPath)
+    ? JSON.parse(fs.readFileSync(previousMetaPath, 'utf8'))
+    : [];
+  const activeTeamIds = new Set(teams.map(t => String(t.id)));
+  const missingTeams = previousMeta
+    .filter(m => !activeTeamIds.has(String(m.teamId)))
+    .map(m => ({ ...m, notCurrentlyListed: true }));
+
   fs.mkdirSync(clubOutputDir, { recursive: true });
-  fs.writeFileSync(path.join(clubOutputDir, 'metadata.json'), JSON.stringify(meta, null, 2));
+  fs.writeFileSync(path.join(clubOutputDir, 'metadata.json'), JSON.stringify([...meta, ...missingTeams], null, 2));
   genHTML(theme, club.config.legal || {}, { outputDir: clubOutputDir, baseUrl });
 
   if (club.config.legacyRootOutput) {
@@ -344,7 +392,7 @@ async function updateAll() {
   return { results, failures };
 }
 
-module.exports = { getTeams, updateAll, updateClub, mapMatches, computeSpotlight };
+module.exports = { getTeams, updateAll, updateClub, mapMatches, computeSpotlight, currentSeasonId };
 
 if (require.main === module) {
   updateAll()

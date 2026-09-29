@@ -2,7 +2,7 @@
 'use strict';
 
 const { test, expect } = require('@playwright/test');
-const { generatePages, sampleMetadata, sampleTheme, sampleLegal } = require('./helpers');
+const { generatePages, sampleMetadata, sampleArchive, sampleTheme, sampleLegal } = require('./helpers');
 const { TeamPage } = require('./pages/team.page');
 
 let pages;
@@ -27,6 +27,26 @@ test.describe('Spielplan-Tabs', () => {
     const awayTab = pg.scheduleTab('Auswärts');
     await awayTab.click();
     await expect(awayTab).toHaveAttribute('aria-selected', 'true');
+  });
+});
+
+test.describe('Archiv-Tab', () => {
+  let archivePages;
+  test.beforeAll(() => {
+    archivePages = generatePages(sampleTheme, sampleMetadata(), sampleLegal, [sampleArchive()]);
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto(`file://${archivePages.teamPath('167881')}`);
+  });
+
+  test('Tab "Archiv" ist klickbar, wird als aktiv markiert und zeigt das Panel', async ({ page }) => {
+    const pg = new TeamPage(page);
+    const archiveTab = pg.archiveTab();
+    await expect(archiveTab).toBeVisible();
+    await archiveTab.click();
+    await expect(archiveTab).toHaveAttribute('aria-selected', 'true');
+    await expect(pg.archivePanel('167881')).toBeVisible();
   });
 });
 

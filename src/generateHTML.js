@@ -26,6 +26,44 @@ function teamLabel(teamName, ageGroup, gender) {
   return `${escapeHtml(teamName || '')}${agPart}${sym ? ` ${sym}` : ''}`;
 }
 
+// Baut das Team-Label aus echten API-Feldern (teamAkjId, gender, teamNumber),
+// statt Team-Nummern anhand der Array-Position zu erraten (bisheriger Bug:
+// "Senioren 1"/"Senioren 2" statt "Herren"/"Damen"). Senioren (teamAkjId === 1)
+// bekommen "Herren"/"Damen", Jugend-Teams "{Altersklasse}{m|w}" (z.B. "U16m").
+// Bei teamNumber > 1 wird die Nummer angehängt. Fällt auf teamLabel() zurück,
+// wenn teamAkjId/teamNumber fehlen (z.B. alte metadata.json-Einträge).
+// includeIcon: false liefert reinen Text ohne eingebettetes Gender-Icon-Span —
+// nötig für Aufrufer wie buildSpotlightBlock, die das Icon bereits separat
+// rendern und den Rückgabewert selbst durch escapeHtml() schicken (ein
+// eingebettetes <i>-Tag würde dort doppelt escaped statt gerendert).
+function buildTeamLabel(team, includeIcon = true) {
+  if (team.teamAkjId == null || team.teamNumber == null) {
+    if (includeIcon) return teamLabel(team.teamName, team.ageGroup, team.gender);
+    const ag = String(team.ageGroup || '').trim().toUpperCase();
+    const isSenioren = ag === 'SENIOREN' || ag === 'HERREN' || !ag;
+    const agPart = (!isSenioren && team.ageGroup) ? ` ${escapeHtml(team.ageGroup)}` : '';
+    return `${escapeHtml(team.teamName || '')}${agPart}`;
+  }
+
+  const isSeniors = team.teamAkjId === 1;
+  const genderLetter = team.gender === 'weiblich' ? 'w' : 'm';
+  const numberSuffix = team.teamNumber > 1 ? ` ${team.teamNumber}` : '';
+
+  let base;
+  if (isSeniors) {
+    base = team.gender === 'weiblich' ? 'Damen' : 'Herren';
+  } else {
+    const ag = String(team.ageGroup || '').trim();
+    base = `${ag}${genderLetter}`;
+  }
+
+  if (!includeIcon) return `${escapeHtml(base)}${numberSuffix}`;
+
+  const sym = genderSpan(team.gender);
+  const symPart = sym ? ` ${sym}` : '';
+  return `${escapeHtml(base)}${numberSuffix}${symPart}`;
+}
+
 function genderSpan(gender) {
   if (!gender) return '';
   const g = String(gender).toLowerCase().trim();
@@ -165,6 +203,70 @@ function buildCalHelp() {
 </details>`;
 }
 
+function loadTeamArchives(generatedDir, teamId) {
+  const archiveDir = path.join(generatedDir, 'archive');
+  if (!fs.existsSync(archiveDir)) return [];
+
+  const files = fs.readdirSync(archiveDir).filter(f => /^\d{4}\.json$/.test(f));
+  const entries = [];
+  for (const file of files) {
+    let data;
+    try {
+      data = JSON.parse(fs.readFileSync(path.join(archiveDir, file), 'utf8'));
+    } catch {
+      continue;
+    }
+    const teamEntry = data && data.teams && data.teams[teamId];
+    if (!teamEntry) continue;
+    entries.push({ season: data.season, ...teamEntry });
+  }
+  return entries.sort((a, b) => b.season - a.season);
+}
+
+function buildArchiveSeasonBlock(archiveEntry, cupColor) {
+  const season = archiveEntry.season;
+  const seasonLabel = `Saison ${season}/${String((season + 1) % 100).padStart(2, '0')}`;
+  const provisionalNote = archiveEntry.status === 'provisional'
+    ? `<p class="archive-provisional-note">Vorläufiger Stand — diese Saison wird noch aktualisiert.</p>`
+    : '';
+
+  const competitions = Array.isArray(archiveEntry.competitions) ? archiveEntry.competitions : [];
+  const compBlocks = competitions.map(comp => {
+    const headingClass = isLiga(comp.liganame) ? 'comp-heading' : 'comp-heading comp-heading--cup';
+    const body = isLiga(comp.liganame)
+      ? buildStandingsTable(comp)
+      : buildBracket(comp, archiveEntry.teamName);
+    return `<section class="comp-section">
+  <h2 class="${headingClass}">${escapeHtml(comp.liganame)}</h2>
+  ${body}
+</section>`;
+  }).join('');
+
+  const matches = Array.isArray(archiveEntry.matches) ? archiveEntry.matches : [];
+  const rows = matches.map(m => buildScheduleRow(m, cupColor)).join('');
+  const scheduleHtml = rows
+    ? `<div class="schedule-list">${rows}</div>`
+    : `<p class="comp-unavailable">Keine Spiele für diese Saison gespeichert.</p>`;
+
+  return `<div class="archive-season">
+  <h3 class="archive-season-heading">${escapeHtml(seasonLabel)}</h3>
+  ${provisionalNote}
+  ${compBlocks}
+  ${scheduleHtml}
+</div>`;
+}
+
+function buildArchiveTab(teamId, archives, cupColor) {
+  if (!Array.isArray(archives) || archives.length === 0) return '';
+  const id = `panel-${teamId}-archive`;
+  const tabId = `tab-${teamId}-archive`;
+  const blocks = archives.map(a => buildArchiveSeasonBlock(a, cupColor)).join('');
+  return `
+    <div id="${id}" role="tabpanel" aria-labelledby="${tabId}" class="tab-panel" hidden>
+      ${blocks}
+    </div>`;
+}
+
 function buildTabPanel(teamId, type, webcalLink, googleLink, httpsLink, matches, cupColor) {
   const id     = `panel-${teamId}-${type}`;
   const tabId  = `tab-${teamId}-${type}`;
@@ -208,7 +310,7 @@ function buildNavigation(teams, activePage) {
     const href = homeActive
       ? `teams/${escapeHtml(t.teamId)}.html`
       : `${escapeHtml(t.teamId)}.html`;
-    const label = teamLabel(t.teamName, t.ageGroup, t.gender);
+    const label = buildTeamLabel(t);
     return `<a href="${href}"${active ? ' aria-current="page"' : ''}>${label}</a>`;
   }).join('');
 
@@ -305,7 +407,7 @@ function buildTeaserCard(team) {
   return `<div class="teaser-card">
   <div class="teaser-header">
     ${logoHtml}
-    <span class="teaser-team-name">${teamLabel(team.teamName, team.ageGroup, team.gender)}</span>
+    <span class="teaser-team-name">${buildTeamLabel(team)}</span>
   </div>
   ${streakText ? `<div class="teaser-streak-info"><span class="teaser-streak-label">Serie:</span> ${escapeHtml(streakText)}</div>` : ''}
   <div class="teaser-results">${resultRows}${upcomingRows}</div>
@@ -513,6 +615,11 @@ function buildSharedStyles(primary, accent, cupColor) {
     .comp-heading { font-size: 0.9rem; font-weight: 700; color: var(--color-primary); border-left: 3px solid var(--color-primary); padding-left: 10px; margin-bottom: 10px; }
     .comp-heading--cup { color: var(--color-cup); border-left-color: var(--color-cup); }
     .comp-unavailable { font-size: 0.82rem; color: var(--color-text); padding: 8px 0; }
+    .not-listed-note { background: var(--color-info-bg); border: 1px solid var(--color-info-border); border-radius: 8px; padding: 10px 14px; font-size: 0.82rem; color: var(--color-text); margin-bottom: 16px; }
+    .archive-season { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border); }
+    .archive-season:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+    .archive-season-heading { font-size: 1rem; font-weight: 700; color: var(--color-primary); margin-bottom: 8px; }
+    .archive-provisional-note { font-size: 0.78rem; color: var(--color-text); background: var(--color-info-bg); border: 1px solid var(--color-info-border); border-radius: 6px; padding: 6px 10px; margin-bottom: 10px; display: inline-block; }
     /* Standings */
     .standings-tabs { margin-bottom: 4px; }
     .standings-tab-bar { display: flex; gap: 4px; margin-bottom: 8px; }
@@ -845,15 +952,12 @@ function buildNextGameTeaser(team) {
 </section>`;
 }
 
-// Short label for a team in the spotlight: age group only, with suffix for duplicates.
-// E.g. "U16", "U16 2" when two U16 teams exist.
+// Short label for a team in the spotlight. Delegates to buildTeamLabel so
+// spotlight labels use the real API team number instead of guessing from
+// array position (previous bug: "Senioren 1"/"Senioren 2" for men's/women's
+// senior teams lumped together, "U14 1"/"U14 2" instead of "U14m"/"U14w").
 function spotlightTeamLabel(team, allTeams) {
-  const ag = String(team.ageGroup || '').trim() || 'Senioren';
-  const sameAg = allTeams.filter(t => String(t.ageGroup || '').trim() === ag);
-  if (sameAg.length <= 1) return ag;
-  // Number them by their order in the sorted list
-  const idx = sameAg.findIndex(t => t.teamId === team.teamId);
-  return `${ag} ${idx + 1}`;
+  return buildTeamLabel(team, false);
 }
 
 function buildSpotlightBlock(teams, cupColor) {
@@ -885,7 +989,10 @@ function buildSpotlightBlock(teams, cupColor) {
         rows.push(`<div class="spotlight-date-heading">${heading}</div>`);
       }
 
-      const shortLabel = escapeHtml(spotlightTeamLabel(team, teams));
+      // spotlightTeamLabel() bereits selbst escaped (via buildTeamLabel) — kein
+      // zusätzliches escapeHtml() hier, sonst würden Sonderzeichen in Team-/
+      // Altersklassennamen doppelt escaped (z.B. "&amp;" statt "&").
+      const shortLabel = spotlightTeamLabel(team, teams);
       const genderHtml = genderSpan(team.gender);
       const opponent = escapeHtml(m.opponent || (m.opponentShort || ''));
       const vsPrefix = m.isHome ? 'vs.' : '@';
@@ -940,9 +1047,12 @@ function buildSpotlightBlock(teams, cupColor) {
 </section>`;
 }
 
+// renderOptions: { baseUrl, migrationNotice, archives } — archives sind die per
+// loadTeamArchives() geladenen Archiv-Saisons dieses Teams (leer → kein Archiv-Tab).
 function buildTeamPage(team, allTeams, theme, legal = {}, renderOptions = {}) {
   const baseUrl = renderOptions.baseUrl || DEFAULT_BASE_URL;
   const migrationNotice = renderOptions.migrationNotice || null;
+  const archives = renderOptions.archives || [];
   const { primary, accent, cupColor } = theme;
 
   const logoHtml = team.logoUrl
@@ -977,6 +1087,11 @@ function buildTeamPage(team, allTeams, theme, legal = {}, renderOptions = {}) {
     return `<button id="tab-${escapeHtml(team.teamId)}-${type}" role="tab" aria-selected="${selected}" aria-controls="panel-${escapeHtml(team.teamId)}-${type}" tabindex="${tabindex}">${label}</button>`;
   }).join('');
 
+  const hasArchives = Array.isArray(archives) && archives.length > 0;
+  const archiveTabButton = hasArchives
+    ? `<button id="tab-${escapeHtml(team.teamId)}-archive" role="tab" aria-selected="false" aria-controls="panel-${escapeHtml(team.teamId)}-archive" tabindex="-1">Archiv</button>`
+    : '';
+
   const panels = variants.map(({ type }) =>
     buildTabPanel(
       team.teamId, type,
@@ -986,7 +1101,11 @@ function buildTeamPage(team, allTeams, theme, legal = {}, renderOptions = {}) {
       team.matches || [],
       cupColor,
     )
-  ).join('');
+  ).join('') + buildArchiveTab(team.teamId, archives, cupColor);
+
+  const notListedNote = team.notCurrentlyListed
+    ? `<p class="not-listed-note">Team aktuell nicht gemeldet — letzter bekannter Stand.</p>`
+    : '';
 
   const nav = buildNavigation(allTeams, team.teamId);
 
@@ -1007,15 +1126,16 @@ function buildTeamPage(team, allTeams, theme, legal = {}, renderOptions = {}) {
     <div class="team-page-header">
       ${logoHtml}
       <div>
-        <h1 class="team-page-title">${teamLabel(team.teamName, team.ageGroup, team.gender)}</h1>
+        <h1 class="team-page-title">${buildTeamLabel(team)}</h1>
         <p class="team-page-meta">Stand: ${lastUpdate}</p>
       </div>
     </div>
+    ${notListedNote}
     ${buildNextGameTeaser(team)}
     ${compBlocks}
     <section class="schedule-section">
       <div class="tab-bar" role="tablist" aria-label="Spielvariante für ${escapeHtml(team.teamName)}">
-        ${tabs}
+        ${tabs}${archiveTabButton}
       </div>
       ${panels}
     </section>
@@ -1362,9 +1482,10 @@ function genHTML(theme = {}, legal = {}, options = {}) {
   const teamsDir = path.join(generatedDir, 'teams');
   fs.mkdirSync(teamsDir, { recursive: true });
   for (const team of teams) {
+    const archives = loadTeamArchives(generatedDir, team.teamId);
     fs.writeFileSync(
       path.join(teamsDir, `${team.teamId}.html`),
-      buildTeamPage(team, teams, resolvedTheme, legal, { baseUrl, migrationNotice }),
+      buildTeamPage(team, teams, resolvedTheme, legal, { baseUrl, migrationNotice, archives }),
       'utf8'
     );
   }
@@ -1379,7 +1500,7 @@ function genHTML(theme = {}, legal = {}, options = {}) {
 }
 
 module.exports = { genHTML, buildBundPage, buildLandPage, buildPortalLegalPages, PORTAL_THEME };
-module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket, buildNavScript, buildSharedStyles, buildTabScript, buildTeamPage, buildIndexPage, buildNextGameTeaser, buildSpotlightBlock, spotlightTeamLabel, buildFooter, buildImpressum, buildDatenschutz, buildBarrierefreiheit, buildCalHelp, buildTabPanel, isWin, resultIcon, buildMigrationBanner, buildPortalNav, buildPortalMigrationBanner };
+module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket, buildNavScript, buildSharedStyles, buildTabScript, buildTeamPage, buildIndexPage, buildNextGameTeaser, buildSpotlightBlock, spotlightTeamLabel, buildTeamLabel, buildFooter, buildImpressum, buildDatenschutz, buildBarrierefreiheit, buildCalHelp, buildTabPanel, isWin, resultIcon, buildMigrationBanner, buildPortalNav, buildPortalMigrationBanner, loadTeamArchives, buildArchiveSeasonBlock, buildArchiveTab };
 
 // Kein eigenständiger CLI-Einstiegspunkt mehr: seit der Multi-Club-Umstellung ruft
 // cronUpdate.js genHTML() bereits pro Club mit dem passenden Theme/outputDir auf

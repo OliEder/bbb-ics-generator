@@ -44,8 +44,8 @@ Der Workflow benötigt drei spezifische Permissions:
 |===
 | Permission | Zweck
 
-| `contents: read`
-| Checkout des Repository-Inhalts
+| `contents: write`
+| Checkout des Repository-Inhalts sowie Commit des `generated/archive/**`-Verzeichnisses zurück auf `main` (siehe Schritt „Commit season archive" unten). Ursprünglich `contents: read`; wurde auf `write` angehoben, als der Auto-Commit-Schritt für das Saison-Archiv eingeführt wurde (siehe ADR-014).
 
 | `pages: write`
 | Upload und Deployment auf GitHub Pages
@@ -65,6 +65,8 @@ Der Workflow benötigt drei spezifische Permissions:
 . *Generate ICS files and HTML* (`id: generate`, `continue-on-error: true`; `npm run update` → `node src/cronUpdate.js`): Hauptschritt. Iteriert über alle Clubs (`loadClubs()`), ruft je Club die Basketball-Bund-API ab, erzeugt alle ICS-Dateien, schreibt `metadata.json` und ruft `genHTML()` intern auf (pro Club unter `generated/<bundesland>/<club-slug>/`; für Clubs mit `legacyRootOutput: true` zusätzlich nur die Alt-Pfad-ICS direkt unter `generated/`, siehe <<adr-020-wegfall-legacy-html,ADR-020>>), aggregiert danach die Bund-/Land-Seiten (`aggregatePages()`). Ein separater `generate-html`-Schritt existiert seit der Multi-Club-Umstellung nicht mehr — er wäre redundant, da `cronUpdate.js` die HTML-Generierung bereits übernimmt. Endet der Prozess mit Exitcode 1 (Fehler bei einzelnen Clubs oder in der Portal-Aggregation), bricht der Schritt den Job dank `continue-on-error` nicht ab; das Ergebnis steht in `steps.generate.outcome` (<<adr-022-fehlerisolation-pro-club,ADR-022>>).
 
 . *Verify generated output* (Guard): Bricht den Job mit `::error::` ab, wenn unter `generated/` keine einzige `*.ics`-Datei existiert. So ersetzt ein Totalausfall nicht die funktionierende Seite durch eine leere.
+
+. *Commit season archive* (`stefanzweifel/git-auto-commit-action@v5`): Committet ausschließlich `generated/archive/**` zurück auf den `main`-Branch, mit Commit-Message `chore: update season archive [skip ci]` (das `[skip ci]`-Suffix verhindert, dass dieser Commit den Deploy-Workflow erneut auslöst — sonst würde jeder Lauf einen weiteren Lauf triggern). Autor ist `github-actions[bot]`. Hintergrund: `generated/` ist ansonsten vollständig `.gitignore`t und reines, flüchtiges Build-Output — auf GitHub-Actions-Runnern (ephemer) geht es nach jedem Lauf verloren. Das Saison-Archiv (`src/seasonArchive.js`) muss davon abweichend dauerhaft erhalten bleiben, da die Basketball-Bund-API Match- und Tabellendaten einer abgelaufenen Saison irgendwann endgültig nicht mehr zurückliefert — ohne diesen Commit-Schritt gäbe es keine Möglichkeit, diese Daten zwischen den 6-stündigen Läufen zu bewahren. Details zur Architekturentscheidung siehe ADR-014 in `09-decisions.adoc`. Voraussetzung ist die Permission `contents: write` (siehe oben).
 
 . *List generated files (debug)* (`ls -la generated/`, `find generated/ -name "*.ics" -ls`): Diagnostik-Schritt, listet alle erzeugten Dateien im Actions-Log.
 
@@ -175,7 +177,9 @@ generated/
 ├── ... (3 Dateien pro Team)
 ├── metadata.json          # Update-Metadaten für HTML-Generator
 ├── teams-cache.json       # Team-Cache (effektiv nur lokal relevant)
-└── index.html             # Übersichtsseite mit Subscription-Links
+├── archive/                # Archivierte Vorjahres-Saisons (persistiert via Git-Commit, siehe oben)
+│   └── {seasonId}.json     # Ein File pro Saison, alle Teams enthalten
+└── index.html              # Übersichtsseite mit Subscription-Links
 ....
 
 === Nutzer-Subscription

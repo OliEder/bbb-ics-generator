@@ -155,6 +155,37 @@ a|
 * Negative: Das Zeitfenster ist für alle Spiele gleich — Überstunden (Verlängerung, Overtime) werden nicht dynamisch erfasst. Die Kickoff-Zeit stammt aus der API; Zeitplanänderungen kurzfristig vor dem Spiel werden erst beim nächsten Update-Zyklus reflektiert.
 |===
 
+=== ADR-006: X-ALT-DESC für HTML-Beschreibungen (aktuell deaktiviert)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Deferred (vorläufig deaktiviert, Code vorhanden)
+
+| *Datum*
+| 2024
+
+| *Kontext*
+| ICS `DESCRIPTION` unterstützt nur Plain-Text. Microsoft Outlook und einige andere Clients unterstützen die nicht-standardisierte X-Property `X-ALT-DESC;FMTTYPE=text/html`, die eine HTML-Version der Beschreibung enthält und eine reichere Darstellung ermöglicht.
+
+| *Entscheidung*
+| Die Infrastruktur für `X-ALT-DESC` ist vollständig implementiert (`createHtmlDescription()`, Post-Processing-Logik in `generateICS()`), aber in der Event-Erzeugung temporär auskommentiert (`// htmlDescription`).
+
+| *Begründung*
+a|
+* `X-ALT-DESC` ist keine RFC-5545-Property — manche Clients ignorieren sie, andere verarbeiten sie fehlerhaft.
+* Debugging-Schwierigkeiten: HTML in ICS-Strings ist schwer zu verifizieren.
+* Implementierung ist fertig, Aktivierung erfordert Verifikation auf allen Zielclients.
+* Die Deaktivierung ist ein bewusstes temporäres Trade-off — Plain-Text DESCRIPTION ist universell kompatibel.
+
+| *Konsequenzen*
+a|
+* Aktuelle Konsequenz: Alle Clients zeigen Plain-Text-Beschreibungen. Funktionalität vollständig erhalten.
+* Zukünftige Aktivierung: Muss `buildEvent()` `htmlDescription` wieder befüllen und `createHtmlDescription()` testen. Besondere Sorgfalt bei Line-Folding (75-Zeichen-Limit) und HTML-in-ICS-Escaping erforderlich.
+|===
+
 === ADR-007: Tab-basierte UI statt Flat-Button-Liste
 
 [cols="2,5", options="header"]
@@ -233,20 +264,22 @@ a|
 | Die Übersichtsseite soll pro Team den Spielplan der aktuellen Saison anzeigen — vergangene Spiele mit Ergebnis, kommende ohne — direkt in den Tab-Panels, oberhalb der Kalender-Abo-Buttons.
 
 | *Entscheidung*
-| `cronUpdate.js` filtert die rohen API-Matches auf `seasonId === 2025`, sortiert sie aufsteigend und speichert sie als `matches[]`-Array in `metadata.json`. `generateHTML.js` rendert dieses Array als HTML-Tabelle im jeweiligen Tab-Panel (Alle/Heim/Auswärts). Liga-Erkennung per Namens-Heuristik: enthält `liganame` das Wort "Liga" → Liga-Typ, sonst Cup/Pokal. Cup-Farbe ist konfigurierbar via `config.theme.cupColor` (Default `#7c3aed`).
+| `cronUpdate.js` filtert die rohen API-Matches auf die aktuelle Saison, sortiert sie aufsteigend und speichert sie als `matches[]`-Array in `metadata.json`. `generateHTML.js` rendert dieses Array als HTML-Tabelle im jeweiligen Tab-Panel (Alle/Heim/Auswärts). Liga-Erkennung per Namens-Heuristik: enthält `liganame` das Wort "Liga" → Liga-Typ, sonst Cup/Pokal. Cup-Farbe ist konfigurierbar via `config.theme.cupColor` (Default `#7c3aed`).
++
+*Update 2026-09-08:* Die anfängliche Implementierung nutzte eine harte Konstante `CURRENT_SEASON` auf Modul-Ebene. Das führte zu einem Produktionsbug: Beim Saisonwechsel 2026/27 lieferte die API ausschließlich Matches mit `seasonId: 2026`, während `CURRENT_SEASON` noch auf `2025` stand — `matches[]` und `competitions[]` liefen für alle Teams leer, obwohl die (ungefiltert erzeugten) ICS-Kalender die neuen Spiele korrekt enthielten. Die Konstante wurde durch `currentSeasonId(matches)` ersetzt, das pro Team die höchste vorkommende `seasonId` aus den geladenen Matches ermittelt (die API liefert Matches mehrerer Saisons gemischt zurück, z.B. während der Übergangsphase).
 
 | *Begründung*
 a|
 * Matches sind bereits per `fetchTeamMatches()` geladen — kein zusätzlicher API-Aufruf nötig.
-* Saison-Filter (`seasonId === 2025`) ist im Daten-Layer (`cronUpdate.js`), nicht im View-Layer — `generateHTML.js` bekommt nur saubere, vorverarbeitete Daten.
+* Saison-Filter ist im Daten-Layer (`cronUpdate.js`), nicht im View-Layer — `generateHTML.js` bekommt nur saubere, vorverarbeitete Daten.
 * `isNext`-Flag kennzeichnet das nächste anstehende Spiel bereits beim Schreiben der Metadaten — keine Zeitberechnungen im Template nötig.
 * Konfigurierbare Cup-Farbe (`config.theme.cupColor`) ermöglicht Anpassung ohne Code-Änderung.
-* Harte Saison-Konstante (`CURRENT_SEASON = 2025`) auf Modul-Ebene ist dokumentierter Trade-off: einfach, aber erfordert jährliche Code-Änderung.
+* Dynamische Saison-Ermittlung (`currentSeasonId()`, höchste `seasonId` unter den geladenen Matches) statt harter Konstante — vermeidet die jährliche manuelle Code-Änderung und die Klasse von Bug, die die harte Konstante verursacht hat.
 
 | *Konsequenzen*
 a|
-* Positive: Spielplan ohne zusätzliche API-Calls, Tab-Filterung (Alle/Heim/Auswärts) konsistent mit Kalender-Abo-Struktur, WCAG-konform (axe-core-geprüft).
-* Negative: `CURRENT_SEASON` muss jährlich aktualisiert werden. `metadata.json` wächst durch das `matches`-Array (bei typisch 14–20 Spielen pro Team vernachlässigbar). Liga-Heuristik ("liga" im Namen) kann bei ungewöhnlichen Wettbewerbsnamen fehlschlagen.
+* Positive: Spielplan ohne zusätzliche API-Calls, Tab-Filterung (Alle/Heim/Auswärts) konsistent mit Kalender-Abo-Struktur, WCAG-konform (axe-core-geprüft), kein jährlicher manueller Eingriff mehr nötig.
+* Negative: `metadata.json` wächst durch das `matches`-Array (bei typisch 14–20 Spielen pro Team vernachlässigbar). Liga-Heuristik ("liga" im Namen) kann bei ungewöhnlichen Wettbewerbsnamen fehlschlagen. Falls die API für ein Team ausschließlich Matches einer alten, abgeschlossenen Saison zurückgibt (kein Nachfolgewettbewerb vorhanden), zeigt `currentSeasonId()` weiterhin diese als "aktuell" an — das ist aber identisch zum Vorgängerverhalten.
 |===
 
 === ADR-010: Statische Multi-Page-Site statt Single-Page-Application
@@ -342,7 +375,7 @@ a|
 * Negative: GB macht wenig Sinn bei sehr ungleicher Spielanzahl (unterschiedlich viele Spiele absolviert). Bei Gleichstand (GB = 0.5) wird `.toFixed(1)` angezeigt — leicht ungewohnt für deutsche Nutzer.
 |===
 
-=== ADR-007: Outline-SVG-Icons statt Farbe für Sieg/Niederlage-Anzeige
+=== ADR-013: Outline-SVG-Icons statt Farbe für Sieg/Niederlage-Anzeige
 
 [cols="2,5", options="header"]
 |===
@@ -380,35 +413,74 @@ a|
 * CSS: `.result-icon`, `.result-icon--win`, `.result-icon--loss` in `buildSharedStyles`
 |===
 
-=== ADR-006: X-ALT-DESC für HTML-Beschreibungen (aktuell deaktiviert)
+=== ADR-014: Saison-Archivierung mit Rolling-Update-Mechanismus und Persistenz nicht gemeldeter Teams
 
 [cols="2,5", options="header"]
 |===
 | Aspekt | Inhalt
 
 | *Status*
-| Deferred (vorläufig deaktiviert, Code vorhanden)
+| Akzeptiert
 
 | *Datum*
-| 2024
+| 2026-09-08
 
 | *Kontext*
-| ICS `DESCRIPTION` unterstützt nur Plain-Text. Microsoft Outlook und einige andere Clients unterstützen die nicht-standardisierte X-Property `X-ALT-DESC;FMTTYPE=text/html`, die eine HTML-Version der Beschreibung enthält und eine reichere Darstellung ermöglicht.
+a|
+* Die Basketball-Bund-API liefert Match-, Tabellen- und Turnierbaumdaten nur für einen begrenzten Zeitraum zurück. Ist eine Saison einmal abgeschlossen und eine neue begonnen, verschwinden die Daten der alten Saison irgendwann vollständig aus der API-Antwort — unwiederbringlich, da es keinen separaten „Historie"-Endpunkt gibt.
+* Der genaue Zeitpunkt, ab dem eine Saison aus der API verschwindet, ist nicht exakt vorhersagbar: Während der Übergangsphase liefert die API teilweise noch Matches der alten Saison zusätzlich zu denen der neuen (siehe auch ADR-009-Update zu `currentSeasonId()`).
+* Separat, aber verwandt: `fetchClubTeams()` liefert nur Teams, die aktuell für die laufende Saison gemeldet sind. Ein Team, das saisonbedingt vorübergehend nicht gemeldet ist (z. B. Sommerpause, Neuanmeldung verzögert), verschwindet dadurch komplett aus `metadata.json` und somit von der generierten Website — obwohl es keine dauerhafte Abmeldung ist.
 
 | *Entscheidung*
-| Die Infrastruktur für `X-ALT-DESC` ist vollständig implementiert (`createHtmlDescription()`, Post-Processing-Logik in `generateICS()`), aber in der Event-Erzeugung temporär auskommentiert (`// htmlDescription`).
+a|
+* Neues Modul `src/seasonArchive.js`: Für jede in den rohen API-Matches eines Teams vorkommende Saison außer der aktuellen wird bei jedem Lauf ein Archiv-Eintrag in `generated/archive/{seasonId}.json` geschrieben (ein File pro Saison, alle Teams darin) — mit `status: 'provisional'` und aktualisiertem `lastSeenAt`-Zeitstempel.
+* Rolling-Update-Mechanismus: Solange eine Saison noch in den API-Rohdaten eines Teams auftaucht, wird ihr Archiv-Eintrag bei jedem Lauf neu überschrieben (`provisional`). Taucht sie in einem Lauf erstmals nicht mehr auf, wird der zuletzt gespeicherte Stand auf `status: 'final'` gesetzt und danach nie wieder verändert (eingefroren).
+* `cronUpdate.js` ruft die Archivierung pro Team auf, bevor die aktuelle Saison verarbeitet wird.
+* CI-Persistenz: `.github/workflows/deploy.yml` committet nach jedem Lauf `generated/archive/**` per `stefanzweifel/git-auto-commit-action@v5` zurück auf `main` (Commit-Message mit `[skip ci]`), da `generated/` sonst vollständig `.gitignore`t ist und auf den ephemeren GitHub-Actions-Runnern nach jedem Lauf verloren ginge.
+* Separater, aber verwandter Mechanismus in `cronUpdate.js`: Vor der Verarbeitung wird die `metadata.json` des vorherigen Laufs mit der aktuellen Team-Liste (`fetchClubTeams()`) verglichen. Teams, die darin nicht mehr auftauchen, werden unverändert aus dem alten Lauf übernommen und mit `notCurrentlyListed: true` markiert, statt aus der Ausgabe zu verschwinden. Das Flag wird bei jedem Lauf frisch aus diesem Vergleich abgeleitet — es gibt keinen expliziten „Clear"-Schritt: Taucht das Team wieder in der Team-Liste auf, durchläuft es einfach wieder den normalen Update-Pfad und das Flag wird schlicht nicht mehr gesetzt.
 
 | *Begründung*
 a|
-* `X-ALT-DESC` ist keine RFC-5545-Property — manche Clients ignorieren sie, andere verarbeiten sie fehlerhaft.
-* Debugging-Schwierigkeiten: HTML in ICS-Strings ist schwer zu verifizieren.
-* Implementierung ist fertig, Aktivierung erfordert Verifikation auf allen Zielclients.
-* Die Deaktivierung ist ein bewusstes temporäres Trade-off — Plain-Text DESCRIPTION ist universell kompatibel.
+* Der Rolling-Update-Mechanismus ist robust gegenüber Teams, die zu unterschiedlichen Zeitpunkten in die neue Saison wechseln — es gibt keinen global synchronisierten „Saisonende"-Zeitpunkt, den man hart codieren könnte.
+* `status: 'provisional'` vermeidet, einen unvollständigen oder verfrühten Zwischenstand (z. B. Tabelle vor dem letzten Spieltag) fälschlich als endgültig einzufrieren.
+* Kein jährlicher manueller Eingriff nötig — vergleichbar mit der Motivation hinter ADR-009s `currentSeasonId()`-Fix.
+* Kein Datenverlust weder auf Saison-Ebene (Archiv) noch auf Team-Listen-Ebene (`notCurrentlyListed`) — beide Mechanismen verhindern, dass Nutzer beim Öffnen der Website plötzlich fehlende Inhalte vorfinden.
+* Der `notCurrentlyListed`-Ansatz ohne expliziten Clear-Schritt ist einfacher und weniger fehleranfällig als eine manuell zu pflegende Zustandsmaschine — die normale Verarbeitung eines wieder gemeldeten Teams setzt implizit den korrekten Zustand her.
 
 | *Konsequenzen*
 a|
-* Aktuelle Konsequenz: Alle Clients zeigen Plain-Text-Beschreibungen. Funktionalität vollständig erhalten.
-* Zukünftige Aktivierung: Muss `buildEvent()` `htmlDescription` wieder befüllen und `createHtmlDescription()` testen. Besondere Sorgfalt bei Line-Folding (75-Zeichen-Limit) und HTML-in-ICS-Escaping erforderlich.
+* Positive: Historische Saison-Daten (Tabellen, Turnierbäume, Spielpläne) bleiben dauerhaft über den „Archiv"-Tab auf der Team-Seite abrufbar, auch nachdem die API sie nicht mehr liefert. Team-Seiten verschwinden nicht kommentarlos, wenn ein Team saisonbedingt vorübergehend nicht in der API-Teamliste gelistet ist — stattdessen erscheint der Hinweis „Team aktuell nicht gemeldet".
+* Negative: Bot-Commits (`github-actions[bot]`) erscheinen regelmäßig in der Commit-Historie von `main`, zusätzlich zu echten Code-Änderungen. `generated/archive/` ist eine bewusste, hier dokumentierte Ausnahme vom sonst in diesem Repo geltenden Prinzip, dass `generated/` reines, unversioniertes Build-Output ist (vgl. `.gitignore` und ADR-Kontext an anderer Stelle) — diese Ausnahme muss bei zukünftigen Änderungen an der `.gitignore`-Strategie berücksichtigt werden.
+|===
+
+=== ADR-015: Team-Label-Ableitung aus teamAkjId/teamNumber statt Array-Position
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-08
+
+| *Kontext*
+| Auf der Live-Seite wurden Team-Labels teils falsch angezeigt (per Nutzer-Screenshot bestätigt): Senioren-Teams erschienen als "Senioren 1"/"Senioren 2"/"Senioren 3" — Herren- und Damen-Mannschaften wurden dabei in derselben Nummerierung vermischt, statt getrennt als "Herren"/"Damen" zu erscheinen. Jugend-Teams erschienen als "U14 1"/"U14 2" statt "U14m"/"U14w". Ursache: `spotlightTeamLabel()` nummerierte Teams anhand ihrer Position im `allTeams`-Array (bzw. der Iterationsreihenfolge), nicht anhand einer echten, stabilen Team-Kennung. Senioren-Teams erhielten zudem gar kein Kategorie-Präfix, sondern nur den rohen API-Teamnamen.
+
+| *Entscheidung*
+| Team-Labels werden aus den echten API-Feldern `teamAkjId` (Altersklassen-ID; `1` = Senioren), `teamGenderId` (als `gender` bereits vorhanden) und `teamNumber` (reale Team-Laufnummer) abgeleitet, die der bereits für Spieldaten aufgerufene Endpunkt `team/id/{id}/matches` liefert — kein zusätzlicher API-Aufruf nötig. Neue Funktion `buildTeamLabel(team, includeIcon = true)` in `generateHTML.js` kapselt die Ableitungslogik; `spotlightTeamLabel()` delegiert nun vollständig an sie, statt selbst zu nummerieren.
+
+| *Begründung*
+a|
+* Echte API-Daten (`teamAkjId`, `teamNumber`) sind stabil und korrekt unabhängig von Iterations- oder Sortierreihenfolge — im Gegensatz zur array-positionsbasierten Nummerierung, die von zufälliger/inzidenteller Ordnung abhing und Herren- und Damen-Teams derselben Altersklasse vermischte.
+* Der Endpunkt wird ohnehin für Spieldaten aufgerufen (`fetchTeamMatches`) — die zusätzlichen Felder sind ohne Mehrkosten verfügbar.
+* Eine zentrale Label-Funktion (`buildTeamLabel`) statt verstreuter Nummerierungslogik in mehreren Aufrufern reduziert das Risiko künftiger Inkonsistenzen zwischen Startseite, Team-Seite und Spotlight-Block.
+
+| *Konsequenzen*
+a|
+* Positive: Korrekte, stabile Team-Labels unabhängig von Array-Reihenfolge; keine geratene Nummerierung mehr; einheitliche Formatierung ("Herren"/"Damen" bzw. "{Altersklasse}{m\|w}") über alle Aufrufer hinweg.
+* Negative: Für alte oder unvollständige `metadata.json`-Einträge (geschrieben vor diesem Fix, ohne `teamAkjId`/`teamNumber`) greift ein weniger präziser Fallback (`teamLabel()`, rohe API-Teamname + Altersgruppe ohne Nummerierung), bis der nächste Update-Zyklus die Felder nachliefert.
 |===
 
 [[adr-013-alt-pfad-duplikat-ausgabe]]
