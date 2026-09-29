@@ -114,7 +114,6 @@ test('updateAll: legacyRootOutput=true erzeugt Alt-Pfad-Duplikat MIT echten Spie
 
     const newPathIcs = join(dir, 'bayern', 'fibalon', `${TEAM_ID}_all.ics`);
     const legacyIcs = join(dir, `${TEAM_ID}_all.ics`);
-    const legacyIndex = join(dir, 'index.html');
     const newIndex = join(dir, 'bayern', 'fibalon', 'index.html');
 
     assert.ok(existsSync(newPathIcs), 'Neuer Pfad muss ICS-Datei enthalten');
@@ -127,18 +126,15 @@ test('updateAll: legacyRootOutput=true erzeugt Alt-Pfad-Duplikat MIT echten Spie
     assert.ok(legacyContent.includes('Kalender-Abo aktualisieren'), 'Alt-Pfad muss Migrationshinweis enthalten');
     assert.ok(legacyContent.includes('Auswärtiger Gegner'), 'Alt-Pfad muss ZUSÄTZLICH das echte Spiel enthalten (nicht nur den Hinweis)');
 
-    // Hinweis: 'migration-banner' als CSS-Klassenname steht immer im <style>-Block
-    // (buildSharedStyles), unabhängig davon ob der Banner tatsächlich gerendert wird.
-    // Wir prüfen daher gezielt auf das <div class="migration-banner" ...>-Markup.
-    const MIGRATION_BANNER_MARKUP = '<div class="migration-banner"';
-
-    assert.ok(existsSync(legacyIndex), 'Alt-Pfad index.html muss existieren');
-    const legacyIndexContent = readFileSync(legacyIndex, 'utf8');
-    assert.ok(legacyIndexContent.includes(MIGRATION_BANNER_MARKUP), 'Alt-Pfad index.html muss das Migrations-Banner-Markup enthalten');
+    // Seit Plan B (ADR-020) gibt es kein Alt-Pfad-HTML mehr: nur die ICS-Dateien sind
+    // rückwärtskompatibel. generated/index.html ist die Bund-Seite und wird in
+    // portal-aggregation-integration.test.js geprüft.
+    assert.ok(!existsSync(join(dir, 'teams')), 'Kein Alt-Pfad-Team-HTML (generated/teams/)');
+    assert.ok(!existsSync(join(dir, 'metadata.json')), 'Kein Root-metadata.json');
 
     assert.ok(existsSync(newIndex), 'Neuer Pfad index.html muss existieren');
     const newIndexContent = readFileSync(newIndex, 'utf8');
-    assert.ok(!newIndexContent.includes(MIGRATION_BANNER_MARKUP), 'Neuer Pfad index.html darf KEIN Migrations-Banner-Markup enthalten');
+    assert.ok(!newIndexContent.includes('<div class="migration-banner"'), 'Neuer Pfad index.html darf KEIN Migrations-Banner-Markup enthalten');
   } finally {
     rmSync(dir, { recursive: true });
     rmSync(clubsDir, { recursive: true });
@@ -187,7 +183,7 @@ test('updateAll: ohne legacyRootOutput entsteht KEIN Alt-Pfad-Duplikat unter gen
     assert.ok(existsSync(join(dir, 'bayern', 'fibalon', `${TEAM_ID}_all.ics`)), 'Neuer Pfad muss trotzdem geschrieben werden');
     assert.ok(!existsSync(join(dir, `${TEAM_ID}_all.ics`)), 'Ohne legacyRootOutput darf KEINE Alt-Pfad-ICS entstehen');
     assert.ok(!existsSync(join(dir, 'metadata.json')), 'Ohne legacyRootOutput darf KEINE Alt-Pfad-metadata.json unter generatedRootDir entstehen');
-    assert.ok(!existsSync(join(dir, 'index.html')), 'Ohne legacyRootOutput darf KEIN Alt-Pfad-index.html unter generatedRootDir entstehen');
+    assert.ok(!existsSync(join(dir, 'teams')), 'Ohne legacyRootOutput darf KEIN Alt-Pfad-Team-HTML unter generatedRootDir entstehen');
   } finally {
     rmSync(dir, { recursive: true });
     rmSync(clubsDir, { recursive: true });

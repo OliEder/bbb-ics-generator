@@ -248,26 +248,21 @@ async function writeClubIcs(meta, rawTeamData, clubOutputDir) {
 // und echte Kalender-Abonnenten haben. Die Alt-Pfad-ICS müssen die ECHTEN Spiele
 // enthalten (nicht nur den Migrationshinweis) — deshalb werden hier dieselben
 // Rohdaten (rawTeamData) erneut verwendet, statt eine leere/hinweis-only ICS zu erzeugen.
-async function writeLegacyOutput(club, rawTeamData, meta, bundesland, baseUrl, generatedRootDir, theme) {
+// Seit Plan B ausschließlich ICS: kein Alt-Pfad-HTML und kein Root-metadata.json mehr —
+// generated/index.html ist die Bund-Seite (ADR-020).
+async function writeLegacyOutput(rawTeamData, baseUrl) {
   for (const [teamId, data] of rawTeamData.entries()) {
     const { team, matches, homeMatches, awayMatches, details } = data;
     await writeIcsVariants(teamId, team.name, matches, homeMatches, awayMatches, details, null, kind => ({
       newUrl: `${baseUrl}${teamId}_${kind}.ics`,
     }));
   }
-
-  fs.writeFileSync(path.join(generatedRootDir, 'metadata.json'), JSON.stringify(meta, null, 2));
-  genHTML(theme, club.config.legal || {}, {
-    outputDir: generatedRootDir,
-    baseUrl: PORTAL_BASE_URL,
-    migrationNotice: { newBasePath: `/${bundesland}/${club.slug}/` },
-  });
 }
 
 // Verarbeitet einen einzelnen Club: holt Teams + Spiele, erzeugt die neuen
 // (nach Bundesland/Club verschachtelten) ICS-/HTML-Dateien, und — nur für Clubs mit
 // legacyRootOutput: true — zusätzlich ein Alt-Pfad-Duplikat direkt unter generatedRootDir
-// (mit Migrationshinweis), das die ECHTEN Spieldaten behält (nicht nur den Hinweis-Event).
+// (mit Migrationshinweis), das die ECHTEN Spieldaten behält (nicht nur den Hinweis-Event) — nur ICS, kein HTML.
 async function updateClub(club, generatedRootDir) {
   const teams = await getTeams(club.config.clubId);
   const theme = resolveTheme(club, teams);
@@ -301,7 +296,7 @@ async function updateClub(club, generatedRootDir) {
   genHTML(theme, club.config.legal || {}, { outputDir: clubOutputDir, baseUrl });
 
   if (club.config.legacyRootOutput) {
-    await writeLegacyOutput(club, rawTeamData, meta, bundesland, baseUrl, generatedRootDir, theme);
+    await writeLegacyOutput(rawTeamData, baseUrl);
   }
 
   return { bundesland, meta };
@@ -314,17 +309,39 @@ async function updateAll() {
   const clubs = loadClubs(clubsRootDir);
   if (clubs.length === 0) {
     console.error('[ERROR] Keine Clubs unter', clubsRootDir, 'gefunden');
-    return;
+    return { results: [], failures: [] };
   }
 
+  // Fehlerisolation (ADR-022): ein fehlschlagender Club reißt weder die übrigen Clubs
+  // noch die Aggregation mit. Fehler werden gesammelt; der CLI-Einstieg setzt den Exitcode.
+  const results = [];
+  const failures = [];
   for (const club of clubs) {
-    sanitizeSlug(club.slug); // wirft bei ungültigem Slug
-    await updateClub(club, generatedRootDir);
+    try {
+      sanitizeSlug(club.slug); // wirft bei ungültigem Slug
+      const { bundesland, meta } = await updateClub(club, generatedRootDir);
+      results.push({ club, bundesland, meta });
+    } catch (err) {
+      console.error(`[ERROR] Club ${club.slug} fehlgeschlagen:`, err.stack || err);
+      failures.push({ slug: club.slug, error: err.message });
+    }
   }
+
+  return { results, failures };
 }
 
 module.exports = { getTeams, updateAll, updateClub, mapMatches, computeSpotlight };
 
 if (require.main === module) {
-  updateAll();
+  updateAll()
+    .then(({ failures }) => {
+      if (failures.length > 0) {
+        console.error(`[ERROR] ${failures.length} Fehler beim Update: ${failures.map(f => f.slug).join(', ')}`);
+        process.exitCode = 1;
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      process.exitCode = 1;
+    });
 }
