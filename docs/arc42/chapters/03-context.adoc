@@ -129,5 +129,5 @@ Als separater, externer Datenfluss aktualisiert der Workflow `wam-refresh.yml` q
 
 | `/rest/wam/liga/list?startAtIndex=<n>`
 | POST
-| Body `{"token":0,"verbandIds":[<id>]}`; `startAtIndex` ist ein Query-Parameter. Antwort `data.ligen[]` (`ligaId`, `liganame`, `skEbeneId`, `bezirknr`, `bezirkName`, `kreisnr`, `kreisname`, …), `hasMoreData`, `size` (10). Undokumentiert; nur vom WAM-Refresh (`src/wamClient.js`) genutzt.
+| Body `{"token":0,"verbandIds":[<id>]}`; `startAtIndex` ist ein Query-Parameter. Antwort `data.ligen[]` (`ligaId`, `liganame`, `skEbeneId`, `bezirknr`, `bezirkName`, `kreisnr`, `kreisname`, …), `hasMoreData`, `size` (10). In der OpenAPI-Spec als `searchLigen` (Tag `WAM`) beschrieben, dort aber mit anderer Antwortstruktur (`data.ligaListe.ligen`) als die reale API (siehe ADR-018); nur vom WAM-Refresh (`src/wamClient.js`) genutzt.
 |===

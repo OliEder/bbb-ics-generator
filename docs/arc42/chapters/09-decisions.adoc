@@ -580,7 +580,7 @@ a|
 | 2026-09-29
 
 | *Kontext*
-| `POST /rest/wam/liga/list?startAtIndex=<n>` (Body `{"token":0,"verbandIds":[<id>]}`) liefert paginiert (10/Seite, Antwort unter `data.ligen`, Fortsetzung über `hasMoreData`) alle Ligen eines Verbands inkl. Ebene (`skEbeneId` 0/1/2) und Bezirk/Kreis. Der Endpunkt ist in der bekannten OpenAPI-Spec nicht dokumentiert. Bayern: 40 Seiten, ~391 Ligen (inkl. 9 Ligen mit `verbandId` 32). Verifiziert am 2026-09-29: alle 8 `ligaData.ligaId`-Werte aus `club/id/4468/actualmatches` kommen in der WAM-Liste vor — die `ligaId` ist der Join-Schlüssel zwischen Match-Daten und WAM.
+| `POST /rest/wam/liga/list?startAtIndex=<n>` (Body `{"token":0,"verbandIds":[<id>]}`) liefert paginiert (10/Seite, Antwort unter `data.ligen`, Fortsetzung über `hasMoreData`) alle Ligen eines Verbands inkl. Ebene (`skEbeneId` 0/1/2) und Bezirk/Kreis. Der Endpunkt ist in der OpenAPI-Spec des basketball-bund-api-Repos beschrieben (Tag `WAM`, operationId `searchLigen`). Abweichung Spec ↔ Realität (live geprüft am 2026-09-29): Die Spec beschreibt die Antwort verschachtelt unter `data.ligaListe.{ligen,hasMoreData,size}`, die reale API liefert `ligen`, `hasMoreData` und `size` flach unter `data`; der Client folgt der Realität. Bayern: 40 Seiten, ~391 Ligen (inkl. 9 Ligen mit `verbandId` 32). Verifiziert am 2026-09-29: alle 8 `ligaData.ligaId`-Werte aus `club/id/4468/actualmatches` kommen in der WAM-Liste vor — die `ligaId` ist der Join-Schlüssel zwischen Match-Daten und WAM.
 
 | *Entscheidung*
 | Die WAM-Daten werden alle 3 Monate per Workflow (`wam-refresh.yml`, `scripts/refresh-wam-cache.js`) für die Verbände der eingebundenen Bundesländer abgerufen und als `data/wam-ligen-cache.json` im Repo versioniert. Der 6-Stunden-Cron liest nur den Cache. TTL: 150 Tage (`WAM_CACHE_TTL_MS`, `src/wamCache.js`). Zugriff über `src/wamClient.js` (sequenzielle Pagination, `startAtIndex` als Query-Parameter).
@@ -590,7 +590,7 @@ a|
 * 40+ Requests pro Verband bei jedem 6-Stunden-Lauf wären unverhältnismäßig für Daten, die sich pro Saison ändern; der Cache hält die API-Last niedrig (Rate-Limit ~1 req/s).
 * Versionierung im Repo macht Änderungen nachvollziehbar und den Deploy unabhängig von WAM-Verfügbarkeit.
 * TTL 150 Tage statt exakt einem Quartal, damit der Cache kurz vor jedem Refresh nicht als veraltet gilt.
-* Der Endpunkt ist undokumentiert und kann sich ändern — der Cache entkoppelt das Portal davon.
+* Es gibt keine Stabilitätszusage der Plattform für diesen Endpunkt; er kann sich ändern — der Cache entkoppelt das Portal davon.
 
 | *Konsequenzen*
 a|
@@ -619,7 +619,7 @@ a|
 
 | *Begründung*
 a|
-* Portal-Seiten dürfen nicht von der Verfügbarkeit eines undokumentierten Endpunkts abhängen.
+* Portal-Seiten dürfen nicht von der Verfügbarkeit eines externen Endpunkts ohne Stabilitätszusage abhängen.
 * Ein Teilabruf mit frischem `generatedAt` würde Lücken tarnen und einen guten Cache durch einen schlechteren ersetzen.
 
 | *Konsequenzen*
