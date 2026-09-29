@@ -160,6 +160,8 @@ Die Bund-/Land-Seiten und die Portal-Rechtsseiten brauchen die Angaben des Porta
 - `operator`, `address`, `email` — Pflichtfelder
 - `phone`, `responsible` — optional
 
+**Deploy-Voraussetzung:** `portal.json` (mit den Betreiberangaben) muss im Repo-Root liegen, bevor nach `main` gemergt wird; sonst deployt `deploy.yml` ohne Bund-/Land-Seiten und der Job wird rot.
+
 Ohne gültige `portal.json` (Datei fehlt, Pflichtfeld leer) werden keine Bund-/Land-Seiten erzeugt und der Update-Lauf endet mit Fehler; die Ausgabe der einzelnen Vereine und die ICS-Dateien bleiben davon unberührt. Über die Umgebungsvariable `BBB_PORTAL_CONFIG` kann ein anderer Pfad angegeben werden.
 
 ### WAM-Liga-Cache

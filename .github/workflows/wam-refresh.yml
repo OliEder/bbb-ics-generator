@@ -38,5 +38,6 @@ jobs:
             echo "Keine Änderungen am WAM-Cache"
           else
             git commit -m "chore(data): refresh WAM liga cache [skip ci]"
+            git pull --rebase
             git push
           fi

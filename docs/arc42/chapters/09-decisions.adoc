@@ -718,4 +718,5 @@ a|
 a|
 * Positive: Teilausfälle sind toleriert und trotzdem sichtbar.
 * Negative: Ein Deploy mit Teilfehlern veröffentlicht einen unvollständigen Stand (bewusste Abwägung gegen Totalausfall).
+* Negative: Der Deploy-Guard prüft nur auf ICS-Dateien, nicht auf `generated/index.html`. Ohne `portal.json` wird ohne Bund-/Land-Seiten deployt (Job rot); Kalender-Abos haben Vorrang vor den Portal-Seiten.
 |===

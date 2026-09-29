@@ -2,7 +2,7 @@
 
 === Whitebox-Gesamtsystem
 
-Das System besteht aus elf aktiven Modulen. Die Module sind lose gekoppelt und kommunizieren ausschließlich über Funktionsaufrufe (CommonJS `require`).
+Das System besteht aus elf aktiven Modulen sowie dem nur lokal genutzten `server.js` (zwölf Spalten der Abhängigkeitsmatrix). `src/geocode.js` wird von keinem Modul eingebunden (Dead Code, siehe Kapitel 11) und ist weder hier noch in der Matrix aufgeführt. Die Module sind lose gekoppelt und kommunizieren ausschließlich über Funktionsaufrufe (CommonJS `require`).
 
 [source,mermaid]
 ----
