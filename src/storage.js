@@ -6,6 +6,10 @@ if (!fs.existsSync(ICS_DIR)) fs.mkdirSync(ICS_DIR, { recursive: true });
 
 const VALID_TYPES = new Set(['all', 'home', 'away']);
 const SLUG_PATTERN = /^[a-z0-9-]+$/;
+// Vorsorglich reserviert: "index" würde URLs wie /<bundesland>/index (Club) und
+// /<bundesland>/index.html (Land-Seite) mehrdeutig machen. Kein Dateisystem-Konflikt
+// (Ordner index/ und Datei index.html sind verschiedene Namen) — siehe ADR-021.
+const RESERVED_SLUGS = new Set(['index']);
 
 // Validiert Pfadsegmente (Bundesland-/Club-Slugs), die später von Aufrufern
 // zu Dateisystempfaden zusammengesetzt werden. Nur Kleinbuchstaben, Ziffern
@@ -14,6 +18,9 @@ const SLUG_PATTERN = /^[a-z0-9-]+$/;
 function sanitizeSlug(slug) {
   if (typeof slug !== 'string' || !SLUG_PATTERN.test(slug)) {
     throw new Error(`Ungültiger Slug: ${slug}`);
+  }
+  if (RESERVED_SLUGS.has(slug)) {
+    throw new Error(`Reservierter Slug: ${slug}`);
   }
   return slug;
 }
