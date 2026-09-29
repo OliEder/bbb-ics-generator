@@ -10,7 +10,13 @@ Automatisch generiertes Vereinsportal für die Fibalon Baskets Neumarkt. Ruft al
 
 ## Features
 
-### Startseite
+### Bund-/Land-Navigation
+- **Bund-Startseite** (`generated/index.html`) mit allen Bundesländern eingebundener Vereine, ergänzt um den Block „Bundesweite Wettbewerbe“ für Vereine, deren Teams nur in bundesweiten Ligen spielen
+- **Land-Seiten** (`generated/<bundesland>/index.html`) mit den Ligatabellen der eingebundenen Vereine; jede Liga erscheint nur einmal (dedupliziert über die `ligaId`), Tabellenzeilen eingebundener Vereine sind hervorgehoben und verlinkt. Mit WAM-Cache sind die Ligen nach Verbands-, Bezirks- und Kreisebene gruppiert
+- **Migrationsbanner** auf der Bund-Seite, wenn mindestens ein Verein `legacyRootOutput: true` gesetzt hat
+- **Portal-Rechtsseiten** (Impressum, Datenschutz, Barrierefreiheit) des Portal-Betreibers unter `generated/`
+
+### Vereins-Startseite
 - Übersicht aller Teams mit Teaser-Karten
 - Teaser zeigt adaptiv: bei Saisonbeginn zukünftige Spieltermine, bei laufender Saison letzte Ergebnisse + nächstes Spiel, am Saisonende Hinweis auf Saisonende
 - Streak-Anzeige (z.B. "Serie: 3 Siege")
@@ -43,10 +49,16 @@ flowchart TD
     CU --> AC["apiClient.js\nAPI-Facade"]
     CU --> IG["icsGenerator.js\nRFC 5545 Renderer"]
     CU --> ST["storage.js\nPersistenz"]
-    ST --> GEN["generated/\nICS-Dateien + metadata.json"]
-    GEN --> GH["generateHTML.js\nHTML-Generator"]
-    GH --> HTML["generated/\nindex.html + teams/*.html"]
+    ST --> GEN["generated/{bundesland}/{club}/\nICS-Dateien + metadata.json"]
+    CU --> GH["generateHTML.js\nHTML-Generator"]
+    GH --> HTML["generated/{bundesland}/{club}/\nindex.html + teams/*.html"]
+    CU --> AP["aggregatePages.js\nBund-/Land-Seiten"]
+    PJ["portal.json"] --> AP
+    WAM["data/wam-ligen-cache.json"] --> AP
+    AP --> PORTAL["generated/\nindex.html + {bundesland}/index.html"]
+    WR["wam-refresh.yml\nquartalsweise"] --> WAM
     HTML --> GP["GitHub Pages\nolieder.github.io/bbb-ics-generator/"]
+    PORTAL --> GP
 ```
 
 ---
@@ -57,27 +69,38 @@ flowchart TD
 bbb-ics-generator/
 ├── src/
 │   ├── server.js          # Express-Server (lokale Entwicklung)
-│   ├── cronUpdate.js      # Multi-Club-Orchestrator (API → ICS + metadata.json + HTML, pro Club)
+│   ├── cronUpdate.js      # Multi-Club-Orchestrator (API → ICS + metadata.json + HTML, pro Club; danach Aggregation)
+│   ├── aggregatePages.js  # Bund-/Land-Seiten und Portal-Legal-Seiten aus den Club-Ergebnissen
+│   ├── wamClient.js       # WAM-Liga-Abruf (paginiert)
+│   ├── wamCache.js        # Laden/TTL/Index/Refresh des WAM-Liga-Caches
+│   ├── portalConfig.js    # Lädt und validiert portal.json (Betreiberangaben)
 │   ├── clubs.js           # Lädt clubs/<bundesland>/<club>/config.json rekursiv
 │   ├── verbandMapping.js  # verbandId → Bundesland-Zuordnung + Mehrheitsvotum pro Club
 │   ├── apiClient.js       # Basketball-Bund API-Client (inkl. mapWithConcurrency-Helfer)
 │   ├── icsGenerator.js    # ICS-Datei-Generierung (RFC 5545)
 │   ├── storage.js         # Datei-I/O, Teams-Cache, Slug-Validierung (Path-Traversal-Schutz)
 │   └── generateHTML.js    # Statischer HTML-Generator (pro Club aufgerufen)
+├── scripts/
+│   └── refresh-wam-cache.js   # CLI: aktualisiert data/wam-ligen-cache.json (npm run wam:refresh)
+├── data/
+│   └── wam-ligen-cache.json   # Versionierter WAM-Liga-Cache (quartalsweise aktualisiert)
+├── portal.example.json    # Vorlage für portal.json (Betreiberangaben des Portals)
 ├── clubs/                 # Ein Verzeichnis pro Bundesland/Club
 │   └── bayern/
 │       └── fibalon/
 │           └── config.json    # Vereinskonfiguration (clubId, Theme, legal, legacyRootOutput)
 ├── generated/              # Ausgabeverzeichnis (von GitHub Actions befüllt)
+│   ├── index.html                # Bund-Startseite
+│   ├── {impressum,datenschutz,barrierefreiheit}.html   # Portal-Rechtsseiten
 │   ├── bayern/
+│   │   ├── index.html          # Land-Seite (Ligatabellen der eingebundenen Vereine)
 │   │   └── fibalon/
 │   │       ├── index.html      # Startseite mit Team-Teasern
 │   │       ├── metadata.json   # Team-Metadaten, Spielplandaten, Tabellen
 │   │       ├── teams/          # Individuelle Team-Seiten
 │   │       │   └── {teamId}.html
 │   │       └── {teamId}_{type}.ics
-│   ├── {teamId}_{type}.ics       # Alt-Pfad-Duplikat nur für Clubs mit legacyRootOutput: true
-│   └── teams/{teamId}.html       # (dito, siehe ADR-013 in docs/arc42)
+│   └── {teamId}_{type}.ics       # Alt-Pfad-Duplikat (nur ICS) für Clubs mit legacyRootOutput: true (siehe ADR-013/ADR-020 in docs/arc42)
 ├── tests/
 │   └── e2e/               # End-to-End Tests (node:test)
 └── .github/workflows/     # GitHub Actions (automatisches Update alle 6h)
@@ -117,8 +140,9 @@ Beispiel (illustrativ, angelehnt an `clubs/bayern/fibalon/config.json`):
 - `clubId` (Pflichtfeld) — die Basketball-Bund-Vereins-ID.
 - `theme` (optional) — `primary`/`accent`/`logoUrl` überschreiben das Standard-Theme. **Wichtig:** Der Schlüssel muss exakt `theme` heißen — `cronUpdate.js` liest `club.config.theme`; ein anderer Schlüsselname (z.B. `_theme_example`) wird stillschweigend ignoriert und das Standard-Theme greift.
 - `cupColor` (optional) — Akzentfarbe für Pokalwettbewerbe.
+- `name` (optional) — Anzeigename des Vereins auf den Portal-Seiten (Bund-/Land-Seiten); Fallback ist `legal.operator`, dann der Ordnername.
 - `legal` (optional) — steuert Footer-Links und rechtliche Pflichtseiten (siehe unten).
-- `legacyRootOutput` (optional, `true`/`false`) — nur für Vereine, die bereits vor dem Multi-Club-Umbau unter dem alten, flachen Pfad (`generated/{teamId}_{type}.ics`) liefen und bestehende Kalender-Abos haben. Erzeugt zusätzlich zur neuen, verschachtelten Ausgabe ein Duplikat am alten Pfad, inklusive Migrationshinweis im Kalender und Banner auf der Website. Neue Vereine setzen dieses Feld nicht.
+- `legacyRootOutput` (optional, `true`/`false`) — nur für Vereine, die bereits vor dem Multi-Club-Umbau unter dem alten, flachen Pfad (`generated/{teamId}_{type}.ics`) liefen und bestehende Kalender-Abos haben. Erzeugt zusätzlich zur neuen, verschachtelten Ausgabe ein ICS-Duplikat am alten Pfad, inklusive Migrationshinweis im Kalender; die Bund-Seite zeigt dann einen Migrationsbanner. Neue Vereine setzen dieses Feld nicht.
 - `onboarding` (optional, informativ) — `status`-Feld zur manuellen Nachverfolgung des Onboarding-Fortschritts eines Clubs, aktuell die Werte `"pending"` oder `"confirmed"`. Wird von keinem Modul ausgewertet (kein Code liest dieses Feld) — reine Organisationshilfe für die Betreiber, vergleichbar mit dem Bundesland-Ordnernamen im Quellbaum.
 
 Das `legal`-Objekt steuert Footer-Links und rechtliche Pflichtseiten:
@@ -128,6 +152,23 @@ Das `legal`-Objekt steuert Footer-Links und rechtliche Pflichtseiten:
 - Ist `legal` vollständig absent oder alle Felder leer, entfällt der Impressum-Link im Footer.
 
 Teams werden automatisch über die Basketball-Bund API ermittelt und für 30 Tage gecacht. Der Cache erneuert sich nach 30 Tagen automatisch.
+
+### Portal-Betreiberangaben (portal.json)
+
+Die Bund-/Land-Seiten und die Portal-Rechtsseiten brauchen die Angaben des Portal-Betreibers. Die Datei `portal.json` im Repo-Root wird vom Betreiber selbst angelegt: `portal.example.json` nach `portal.json` kopieren und ausfüllen.
+
+- `operator`, `address`, `email` — Pflichtfelder
+- `phone`, `responsible` — optional
+
+Ohne gültige `portal.json` (Datei fehlt, Pflichtfeld leer) werden keine Bund-/Land-Seiten erzeugt und der Update-Lauf endet mit Fehler; die Ausgabe der einzelnen Vereine und die ICS-Dateien bleiben davon unberührt. Über die Umgebungsvariable `BBB_PORTAL_CONFIG` kann ein anderer Pfad angegeben werden.
+
+### WAM-Liga-Cache
+
+`npm run wam:refresh` aktualisiert `data/wam-ligen-cache.json` für alle Bundesländer der Vereine unter `clubs/` (abgeleitet aus dem Ordnernamen `clubs/<bundesland>/…`; `bundesweit` wird übersprungen). Der Cache liefert die Ebenen-Zuordnung (Verband/Bezirk/Kreis) für die Gruppierung der Land-Seiten. Der Workflow `wam-refresh.yml` läuft quartalsweise und lässt sich manuell über `workflow_dispatch` starten; wurde ein Verband nur unvollständig abgerufen, endet er mit Fehler und committet nichts. Ohne Cache (oder wenn er älter als 150 Tage ist) funktioniert alles weiter, nur ohne Gruppierung nach Ebene.
+
+### Migration vom alten Fibalon-Pfad
+
+Die HTML-Seiten am alten Fibalon-Pfad entfallen. Die alten Kalender-URLs (`/{teamId}_{typ}.ics`) bleiben bestehen.
 
 ---
 
@@ -162,6 +203,8 @@ GitHub Actions aktualisiert die Seite:
 - **Cron `0 */6 * * *`** — alle 6 Stunden
 - **Manuell** — über das GitHub Actions UI
 
+Schlägt die Verarbeitung einzelner Vereine fehl, deployt `deploy.yml` trotzdem die übrigen (sofern mindestens eine ICS-Datei erzeugt wurde) und markiert den Job am Ende als fehlgeschlagen. Der WAM-Liga-Cache wird separat durch `wam-refresh.yml` quartalsweise aktualisiert.
+
 ---
 
 ## Lokale Entwicklung
@@ -175,6 +218,9 @@ npm run update
 
 # Lokalen Server starten (http://localhost:3000)
 npm start
+
+# WAM-Liga-Cache aktualisieren (data/wam-ligen-cache.json)
+npm run wam:refresh
 
 # Tests ausführen
 npm test

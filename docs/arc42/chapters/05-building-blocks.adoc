@@ -2,7 +2,7 @@
 
 === Whitebox-Gesamtsystem
 
-Das System besteht aus sieben aktiven Modulen. Die Module sind lose gekoppelt und kommunizieren ausschließlich über Funktionsaufrufe (CommonJS `require`).
+Das System besteht aus elf aktiven Modulen. Die Module sind lose gekoppelt und kommunizieren ausschließlich über Funktionsaufrufe (CommonJS `require`).
 
 [source,mermaid]
 ----
@@ -13,6 +13,14 @@ graph LR
     CU --> IG["icsGenerator.js\nRFC 5545 Renderer"]
     CU --> ST["storage.js\nPersistenz"]
     CU --> GH["generateHTML.js\nPortal-Generator"]
+    CU --> AP["aggregatePages.js\nBund-/Land-Seiten"]
+    CU --> PC["portalConfig.js\nBetreiberangaben"]
+    CU --> WC["wamCache.js\nWAM-Liga-Cache"]
+    AP --> GH
+    AP --> VM
+    AP --> ST
+    AP --> WC
+    WC --> WCL["wamClient.js\nWAM-Liga-Abruf"]
     GH --> ST
     SV["server.js\nDev-Server"] -.->|nur lokal| ST
 ----
@@ -24,10 +32,10 @@ graph LR
 | Aspekt | Beschreibung
 
 | *Verantwortlichkeit*
-| Einstiegspunkt des Update-Prozesses. Orchestriert den kompletten Daten-Refresh für **alle** konfigurierten Clubs: Club-Configs laden, pro Club Teams ermitteln, Spielpläne abrufen, Bundesland herleiten, ICS + HTML generieren, und für Bestandsclubs zusätzlich die Alt-Pfad-Ausgabe schreiben.
+| Einstiegspunkt des Update-Prozesses. Orchestriert den kompletten Daten-Refresh für **alle** konfigurierten Clubs: Club-Configs laden, pro Club Teams ermitteln, Spielpläne abrufen, Bundesland herleiten, ICS + HTML generieren, für Bestandsclubs zusätzlich die Alt-Pfad-ICS schreiben und nach der Club-Schleife die Bund-/Land-Seiten aggregieren (`aggregatePages()`, siehe <<adr-017-aggregation-aus-laufzeit-ergebnissen,ADR-017>>).
 
 | *Schnittstellen (eingehend)*
-| Keine. Wird direkt via `node src/cronUpdate.js` gestartet (durch GitHub Actions oder manuell). `module.exports = { getTeams, updateAll, updateClub, mapMatches, computeSpotlight }` — diese fünf Funktionen sind die öffentliche, testbare Oberfläche des Moduls.
+| Keine. Wird direkt via `node src/cronUpdate.js` gestartet (durch GitHub Actions oder manuell). `module.exports = { getTeams, updateAll, updateClub, mapMatches, computeSpotlight }` — diese fünf Funktionen sind die öffentliche, testbare Oberfläche des Moduls. Der CLI-Einstieg (`require.main === module`) ruft `updateAll()` auf und setzt `process.exitCode = 1`, wenn `failures` nicht leer ist (bewusst nicht in `updateAll()` selbst, damit `node:test`-Läufe nicht beeinflusst werden, siehe <<adr-022-fehlerisolation-pro-club,ADR-022>>).
 
 | *Interne (nicht exportierte) Funktionen*
 a|
@@ -35,7 +43,7 @@ a|
 * `fetchTeamData(team)` — lädt für ein Team Spiele, Match-Details (parallel via `mapWithConcurrency`), Saison-gefilterte `matches[]`, Tabellen/Turnierbäume je Wettbewerb, sowie die für die Bundesland-Herleitung benötigte `verbandId` des ersten Spiels (`firstVerbandId`); gibt `null` zurück, wenn das Team keine Spiele hat
 * `writeIcsVariants(teamId, teamName, matches, homeMatches, awayMatches, details, outputDir, makeMigrationNotice)` — erzeugt und speichert die drei ICS-Varianten (`all`/`home`/`away`) eines Teams; wird sowohl für den neuen Club-Pfad (`makeMigrationNotice = null`) als auch für den Alt-Pfad (mit `makeMigrationNotice`) verwendet; eine Variante ganz ohne Spiele wird übersprungen, bevor ein `migrationNotice` ins Spiel kommt
 * `writeClubIcs(meta, rawTeamData, clubOutputDir)` — ruft `writeIcsVariants` für alle Teams eines Clubs ohne Migrationshinweis auf (neuer, verschachtelter Pfad)
-* `writeLegacyOutput(club, rawTeamData, meta, bundesland, baseUrl, generatedRootDir, theme)` — schreibt für Clubs mit `legacyRootOutput: true` ein vollständiges Duplikat (echte Spieldaten, nicht nur ein Hinweis) direkt unter `generatedRootDir`, inkl. Migrationshinweis-VEVENT in jeder ICS-Variante und Migrationsbanner in der HTML-Ausgabe
+* `writeLegacyOutput(rawTeamData, baseUrl)` — schreibt für Clubs mit `legacyRootOutput: true` ausschließlich die Alt-Pfad-ICS (`generated/{teamId}_{kind}.ics`, echte Spieldaten plus Migrationshinweis-VEVENT in jeder Variante); kein Alt-Pfad-HTML und kein Root-`metadata.json` mehr (siehe <<adr-020-wegfall-legacy-html,ADR-020>>)
 * `firstVerbandId(matches)` — liefert die `verbandId` des ersten (ungefilterten) Rohspiels eines Teams, das eine besitzt; Basis für die Bundesland-Mehrheitsentscheidung
 * `isLiga(liganame)` — Namensheuristik: enthält der Wettbewerbsname "liga", gilt er als Liga (Tabelle), sonst als Cup/Pokal (Turnierbaum)
 
@@ -46,16 +54,19 @@ a|
 `icsGenerator.js`: `generateICS(matches, details, teamId, type, teamName, migrationNotice)` +
 `storage.js`: `saveICS(teamId, type, data, outputDir)`, `saveTeamsCache(teams, clubId)`, `loadTeamsCache(clubId)`, `sanitizeSlug(slug)` +
 `generateHTML.js`: `genHTML(theme, legal, options)` +
+`portalConfig.js`: `loadPortalConfig()` +
+`wamCache.js`: `loadWamCache()` +
+`aggregatePages.js`: `aggregatePages(results, { generatedRootDir, portalLegal, wamCache, wamCacheStale })` +
 `clubs/<bundesland>/<club>/config.json`: `clubId`, `legacyRootOutput`, `theme`, `cupColor`, `legal`
 
 | *Wichtige Logik*
-| `updateAll()` lädt alle Clubs via `loadClubs()`, validiert jeden `club.slug` per `sanitizeSlug()` (wirft bei ungültigem Slug) und ruft `updateClub(club, generatedRootDir)` pro Club auf. `updateClub()` ist eine schlanke Orchestrierungsfunktion: Teams laden (`getTeams`, zweistufige Cache-Strategie wie zuvor), pro Team `fetchTeamData()` aufrufen, daraus `teamVerbandIds` sammeln und per `deriveClubBundesland()` das Bundesland bestimmen, den verschachtelten Ausgabepfad `generated/<bundesland>/<club-slug>/` bauen, `writeClubIcs()` + `genHTML()` dorthin schreiben, und — nur bei `club.config.legacyRootOutput === true` — zusätzlich `writeLegacyOutput()` aufrufen. Pro Team werden weiterhin `spotlightMatches` (0–2 Einträge) via `computeSpotlight()` berechnet: letztes Ergebnis + nächstes Spiel, oder letzte 2 Ergebnisse, oder erste 2 zukünftige.
+| `updateAll()` lädt alle Clubs via `loadClubs()` und verarbeitet jeden Club isoliert in einem try/catch: `club.slug` wird per `sanitizeSlug()` validiert (wirft bei ungültigem Slug), danach folgt `updateClub(club, generatedRootDir)`. Erfolgreiche Clubs landen als `{ club, bundesland, meta }` in `results`, fehlgeschlagene als `{ slug, error }` in `failures`; die Funktion gibt `{ results, failures }` zurück (ohne gefundene Clubs `{ results: [], failures: [] }`). Nach der Club-Schleife lädt `updateAll()` `loadPortalConfig()` und `loadWamCache()` und ruft `aggregatePages(results, { generatedRootDir, portalLegal, wamCache, wamCacheStale })` auf (<<adr-017-aggregation-aus-laufzeit-ergebnissen,ADR-017>>). `updateClub()` ist eine schlanke Orchestrierungsfunktion: Teams laden (`getTeams`, zweistufige Cache-Strategie wie zuvor), pro Team `fetchTeamData()` aufrufen, daraus `teamVerbandIds` sammeln und per `deriveClubBundesland()` das Bundesland bestimmen, den verschachtelten Ausgabepfad `generated/<bundesland>/<club-slug>/` bauen, `writeClubIcs()` + `genHTML()` dorthin schreiben, und — nur bei `club.config.legacyRootOutput === true` — zusätzlich `writeLegacyOutput()` aufrufen; `updateClub()` gibt `{ bundesland, meta }` zurück. Pro Team werden weiterhin `spotlightMatches` (0–2 Einträge) via `computeSpotlight()` berechnet: letztes Ergebnis + nächstes Spiel, oder letzte 2 Ergebnisse, oder erste 2 zukünftige.
 
 | *Fehlerbehandlung*
-| Fehler pro Team werden in `updateClub()` geloggt, der Prozess läuft für die verbleibenden Teams weiter (Fail-Graceful per Team-Isolation in try/catch, unverändert gegenüber dem Single-Club-Modell). `loadClubs()` überspringt nicht lesbare Verzeichnisse und ungültige `config.json`-Dateien (loggt, wirft nicht) — ein defekter Club bricht den Lauf für die übrigen Clubs nicht ab.
+| Fehler pro Team werden in `updateClub()` geloggt, der Prozess läuft für die verbleibenden Teams weiter (Fail-Graceful per Team-Isolation in try/catch, unverändert gegenüber dem Single-Club-Modell). `loadClubs()` überspringt nicht lesbare Verzeichnisse und ungültige `config.json`-Dateien (loggt, wirft nicht) — ein defekter Club bricht den Lauf für die übrigen Clubs nicht ab. Fehler bei einem gesamten Club (z.B. ungültiger Slug oder Exception in `updateClub()`) werden in `updateAll()` gefangen, geloggt und in `failures` gesammelt (<<adr-022-fehlerisolation-pro-club,ADR-022>>). Schlägt die Portal-Aggregation fehl (z.B. fehlende `portal.json`), wird das als `{ slug: '(portal)', error }` in `failures` vermerkt; die bereits geschriebene Club-Ausgabe bleibt unberührt.
 
 | *Abhängigkeiten*
-| `./apiClient`, `./icsGenerator`, `./storage`, `./generateHTML`, `./clubs`, `./verbandMapping`, `fs`, `path`
+| `./apiClient`, `./icsGenerator`, `./storage`, `./generateHTML`, `./clubs`, `./verbandMapping`, `./portalConfig`, `./wamCache`, `./aggregatePages`, `fs`, `path`
 |===
 
 === Modul: clubs.js (neu — Club-Config-Loader)
@@ -98,6 +109,9 @@ a|
 a|
 * `verbandIdToBundesland(verbandId)` → Bundesland-Slug (z.B. `'bayern'`) oder `'bundesweit'`
 * `deriveClubBundesland(teamVerbandIds)` → Bundesland-Slug; Mehrheitsvotum über die übergebene Liste von `verbandId`-Werten (einer je Team)
+* `bundeslandName(slug)` → Anzeigename (z.B. `'Baden-Württemberg'`, für `'bundesweit'` `'Bundesweite Wettbewerbe'`); unbekannte Slugs werden unverändert zurückgegeben
+* `bundeslandToVerbandId(slug)` → `verbandId` (Zahl) oder `null` für `'bundesweit'` und unbekannte Slugs; Umkehrung von `verbandIdToBundesland`, genutzt vom WAM-Refresh (`scripts/refresh-wam-cache.js`)
+* `BUNDESLAND_NAMES` → Tabelle Slug → Anzeigename
 * `BUNDESWEIT` → Konstante `'bundesweit'`
 
 | *Mapping-Tabelle*
@@ -124,7 +138,7 @@ a|
 * `fetchTeamMatches(teamId)` → `{ matches: Array<Match>, gender: string }` (leeres Array bei Fehler)
 * `fetchMatchInfo(matchId)` → `MatchInfo \| null` (null bei Fehler)
 * `fetchClubTeams(clubId)` → `Array<Team> \| null` (null bei Fehler, leer wenn keine Matches)
-* `fetchLeagueTable(ligaId, ownTeamId)` → `Array<TableRow> \| null` (null bei Fehler)
+* `fetchLeagueTable(ligaId, ownTeamId)` → `Array<TableRow> \| null` (null bei Fehler); jede `TableRow` enthält zusätzlich `teamId` (`teamPermanentId` als String oder `null`), mit dem `aggregatePages.js` Tabellenzeilen eingebundener Teams auf die Club-Seite verlinkt
 * `fetchTournamentRounds(ligaId)` → `Array<Round> \| null` (null bei Fehler oder keinen Runden)
 * `mapWithConcurrency(items, limit, mapper)` → `Promise<Array>` (geänderte/neue Funktion, siehe unten)
 
@@ -200,13 +214,13 @@ a|
 * `readICS(teamId, type, outputDir)` → `string \| null` — ebenfalls um `outputDir` erweitert
 * `saveTeamsCache(teams, clubId)` → schreibt `teams-cache-<clubId>.json` — `clubId` ist erforderlich (wirft ohne)
 * `loadTeamsCache(clubId)` → `{ teams: Array \| null, stale: boolean }` — `clubId` ist erforderlich (wirft ohne)
-* `sanitizeSlug(slug)` → `string` (neu) — validiert und gibt den Slug unverändert zurück, oder wirft
+* `sanitizeSlug(slug)` → `string` (neu) — validiert und gibt den Slug unverändert zurück, oder wirft; lehnt zusätzlich den reservierten Slug `index` ab (`RESERVED_SLUGS`, siehe <<adr-021-bundesweit-eigener-block,ADR-021>>)
 
 | *`outputDir`-Parameter (neu)*
 | Ohne Angabe fallen `saveICS`/`readICS` auf das globale `ICS_DIR` zurück (Rückwärtskompatibilität mit dem Single-Club-Verhalten). Mit Angabe landet/liest die Datei im club-spezifischen Verzeichnis (z.B. `generated/bayern/fibalon/`); `resolveDir()` legt dieses Verzeichnis bei Bedarf automatisch an.
 
 | *`sanitizeSlug(slug)` (neu)*
-| Validiert Pfadsegmente (Bundesland-/Club-Slugs) gegen `/^[a-z0-9-]+$/` — nur Kleinbuchstaben, Ziffern und Bindestrich. Wirft bei jedem anderen Wert (inkl. nicht-Strings). Zentrale Path-Traversal-Verteidigung für die vom `cronUpdate.js`-Orchestrator dynamisch aus Club-Configs und hergeleiteten Bundesländern zusammengesetzten Verzeichnisnamen (verhindert z.B. `../` oder uneinheitliche Groß-/Kleinschreibung).
+| Validiert Pfadsegmente (Bundesland-/Club-Slugs) gegen `/^[a-z0-9-]+$/` — nur Kleinbuchstaben, Ziffern und Bindestrich. Wirft bei jedem anderen Wert (inkl. nicht-Strings) und für den reservierten Slug `index`. Zentrale Path-Traversal-Verteidigung für die vom `cronUpdate.js`-Orchestrator dynamisch aus Club-Configs und hergeleiteten Bundesländern zusammengesetzten Verzeichnisnamen (verhindert z.B. `../` oder uneinheitliche Groß-/Kleinschreibung).
 
 | *Sicherheitsmechanismen*
 a|
@@ -252,8 +266,15 @@ a|
 * `buildSpotlightBlock(teams, cupColor)` — "Nächste Spiele"-Block auf der Startseite mit Tabs Alle/Heim/Auswärts, chronologisch sortiert über alle Teams; vergangene Spiele mit Sieg/Niederlage-Icon
 * `isWin(match)` — Hilfsfunktion: gibt `true` (Sieg), `false` (Niederlage) oder `null` (kein Ergebnis / Unentschieden) zurück; berücksichtigt `match.isHome` für korrekte Punktezuordnung
 * `resultIcon(match)` — gibt SVG-Icon-String für Sieg (Pokal) oder Niederlage (✕) zurück, oder leeren String wenn kein Ergebnis/Unentschieden
-* `buildStandingsTable(comp)` — zwei Tabs: offizielle Tabelle + Games-Behind-Ranking
+* `buildStandingsTable(comp)` — zwei Tabs: offizielle Tabelle + Games-Behind-Ranking; hat eine Tabellenzeile `row.href`, wird der Teamname als Link gerendert (Portal-Land-Seiten verlinken eingebundene Clubs), sonst als reiner Text
 * `buildBracket(comp, ownTeamName)` — Turnierbaum mit Highlight des eigenen Teams und TBD-Platzhaltern für zukünftige Runden
+* `buildPortalNav(rootPrefix, regions, activeSlug)` — Portal-Navigation (`<nav class="site-nav">`) mit Startseite und allen Regionen; `rootPrefix` ist `'./'` (Bund-/Legal-Seiten) oder `'../'` (Land-Seiten)
+* `buildPortalStyles()` — portal-spezifische CSS-Ergänzungen zu `buildSharedStyles`
+* `buildPortalMigrationBanner()` — generischer Migrationshinweis (CSS-Klasse `.migration-banner`) für die Bund-Seite; unabhängig von `buildMigrationBanner`
+* `buildBundPage({ regions, showMigrationBanner }, legal)` — *exportiert*; Bund-Startseite mit einem Block je Region (Vereinsliste, Anzahl Vereine/Ligen)
+* `buildLandPage(region, regions, legal)` — *exportiert*; Land-Seite mit Vereinsliste und Liga-Tabellen, gruppiert nach `region.groups`
+* `buildPortalLegalPages(legal, regions)` — *exportiert*; liefert `{ impressum, datenschutz, barrierefreiheit }` (HTML-Strings) des Portal-Betreibers mit Portal-Navigation
+* `PORTAL_THEME` — *exportiert*; neutrales Portal-Theme (Default-Palette der Club-Seiten)
 * `buildTeamPage(team, allTeams, theme)` — vollständige Team-Seite
 * `buildIndexPage(teams, theme)` — Startseite
 * `teamLabel(teamName, ageGroup, gender)` — einheitliche Teambezeichnung mit Geschlechtssymbol
@@ -284,11 +305,72 @@ a|
 | `express`
 |===
 
+=== Modul: aggregatePages.js (neu — Bund-/Land-Seiten)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *Verantwortlichkeit*
+| Erzeugt nach der Club-Schleife die Portal-Seiten aus den Laufzeit-Ergebnissen (<<adr-017-aggregation-aus-laufzeit-ergebnissen,ADR-017>>).
+
+| *Schnittstelle*
+| `aggregatePages(results, { generatedRootDir, portalLegal, wamCache, wamCacheStale })` mit `results = [{ club, bundesland, meta }]`; `wamCache` und `wamCacheStale` sind optional (Default `null`/`false`). Schreibt `generated/index.html` (Bund), `generated/<region>/index.html` (Land, inkl. `bundesweit`) sowie `generated/{impressum,datenschutz,barrierefreiheit}.html` (Portal-Betreiber). Rückgabe: `{ regionCount, clubCount, skippedClubs }`.
+
+| *Logik*
+a|
+* Gruppierung nach Bundesland; Regionen alphabetisch nach Anzeigename, `bundesweit` zuletzt.
+* Deduplizierung der Ligen über `ligaId` (eine Tabelle pro Liga, nur Wettbewerbe mit `isLiga` und Tabelle); `isOwn` wird aus den eingebundenen Team-IDs neu bestimmt.
+* Verlinkung eingebundener Teams auf ihre Club-Seite (relative Links).
+* Gruppierung nach Ebene/Bezirk/Kreis nur mit frischem WAM-Cache; ohne Cache, bei veraltetem Cache und für `bundesweit` eine flache, alphabetische Liste, unbekannte Ligen unter "Weitere Ligen" (<<adr-019-graceful-degradation-wam-cache,ADR-019>>).
+* Migrationsbanner auf der Bund-Seite, wenn mindestens ein Club `legacyRootOutput: true` hat.
+* Clubs ohne Team-Daten (`meta` leer) werden übersprungen und per `console.warn` gemeldet.
+* Slugs der Regionen werden per `sanitizeSlug()` geprüft.
+
+| *Abhängigkeiten*
+| `./generateHTML` (`buildBundPage`, `buildLandPage`, `buildPortalLegalPages`), `./verbandMapping` (`bundeslandName`, `BUNDESWEIT`), `./wamCache` (`buildLigaIndex`), `./storage` (`sanitizeSlug`), `fs`, `path`
+|===
+
+=== Modul: wamClient.js und wamCache.js (neu — WAM-Liga-Suche)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *wamClient.js*
+| `fetchLeaguesForVerband(verbandId, { gebietIds, delayMs })` → `Promise<{ ligen, complete }>`. Sequenzielle Pagination über `POST /rest/wam/liga/list?startAtIndex=<n>` (Body `{ token: 0, verbandIds: [verbandId] }`, optional `gebietIds`); pro Liga werden `ligaId`, `liganame`, `skEbeneId`, `skEbeneName`, `bezirknr`, `bezirkName`, `kreisnr` und `kreisname` übernommen. Bei Fehlern (auch unerwartete Antwortstruktur, leere Seite trotz `hasMoreData`, Seitenlimit) `complete=false` mit den bis dahin geholten Ligen. Exportiert außerdem `WAM_PAGE_DELAY_MS` (Abstand zwischen Seiten).
+
+| *wamCache.js*
+| `loadWamCache(filePath, now)` → `{ cache, stale }` (TTL `WAM_CACHE_TTL_MS` = 150 Tage; fehlende oder unlesbare Datei → `{ cache: null, stale: false }`), `buildLigaIndex(cache)` → `Map<ligaId, liga>`, `refreshWamCache({ verbandIds, existingCache, fetchLeagues, now })` → `{ cache, incompleteVerbandIds }` (bei Teilabruf bleibt der alte Stand des Verbands erhalten, siehe <<adr-019-graceful-degradation-wam-cache,ADR-019>>). Exportiert außerdem `DEFAULT_CACHE_PATH`. Datei: `data/wam-ligen-cache.json` (überschreibbar über `BBB_WAM_CACHE`), aktualisiert durch `scripts/refresh-wam-cache.js` (`npm run wam:refresh`) bzw. den Workflow `wam-refresh.yml` (<<adr-018-wam-cache-versioniert,ADR-018>>).
+
+| *Abhängigkeiten*
+| `wamClient.js`: `axios`. `wamCache.js`: `./wamClient`, `fs`, `path`. Das Skript `scripts/refresh-wam-cache.js` nutzt zusätzlich `../src/clubs` und `../src/verbandMapping` (`bundeslandToVerbandId`).
+|===
+
+=== Modul: portalConfig.js (neu — Betreiberangaben)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *Verantwortlichkeit*
+| Lädt und validiert die Betreiberangaben des Portals (Impressum der Bund-/Land-Seiten).
+
+| *Schnittstelle*
+| `loadPortalConfig(filePath)` → Objekt mit der Struktur von `legal` der Club-Configs. Standardpfad: `portal.json` im Repo-Root, überschreibbar über `BBB_PORTAL_CONFIG`; Vorlage: `portal.example.json`. Exportiert außerdem `REQUIRED_FIELDS` (`operator`, `address`, `email`).
+
+| *Fehlerbehandlung*
+| Fehlende Datei, ungültiges JSON oder leere Pflichtfelder führen zu einem Fehler. `updateAll()` meldet ihn als `(portal)` und schreibt dann keine Portal-Seiten (<<adr-022-fehlerisolation-pro-club,ADR-022>>).
+
+| *Abhängigkeiten*
+| `fs`, `path` (Node.js Stdlib)
+|===
+
 === Abhängigkeitsmatrix
 
-[cols="2,1,1,1,1,1,1,1,1", options="header"]
+[cols="2,1,1,1,1,1,1,1,1,1,1,1,1", options="header"]
 |===
-| Modul | cronUpdate | clubs | verbandMapping | apiClient | icsGenerator | storage | generateHTML | server
+| Modul | cronUpdate | clubs | verbandMapping | apiClient | icsGenerator | storage | generateHTML | aggregatePages | wamClient | wamCache | portalConfig | server
 
 | *cronUpdate.js*
 | —
@@ -298,9 +380,17 @@ a|
 | nutzt
 | nutzt
 | nutzt
+| nutzt
+| —
+| nutzt
+| nutzt
 | —
 
 | *clubs.js*
+| —
+| —
+| —
+| —
 | —
 | —
 | —
@@ -319,8 +409,16 @@ a|
 | —
 | —
 | —
+| —
+| —
+| —
+| —
 
 | *apiClient.js*
+| —
+| —
+| —
+| —
 | —
 | —
 | —
@@ -339,8 +437,16 @@ a|
 | —
 | —
 | —
+| —
+| —
+| —
+| —
 
 | *storage.js*
+| —
+| —
+| —
+| —
 | —
 | —
 | —
@@ -359,8 +465,72 @@ a|
 | liest FS direkt
 | —
 | —
+| —
+| —
+| —
+| —
+
+| *aggregatePages.js*
+| —
+| —
+| nutzt
+| —
+| —
+| nutzt
+| nutzt
+| —
+| —
+| nutzt
+| —
+| —
+
+| *wamClient.js*
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+
+| *wamCache.js*
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| nutzt
+| —
+| —
+| —
+
+| *portalConfig.js*
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
 
 | *server.js*
+| —
+| —
+| —
+| —
 | —
 | —
 | —

@@ -419,7 +419,7 @@ a|
 | Aspekt | Inhalt
 
 | *Status*
-| Akzeptiert
+| Teilweise ersetzt durch <<adr-020-wegfall-legacy-html,ADR-020>> (HTML-Anteil; die ICS-Duplikate gelten unverändert)
 
 | *Datum*
 | 2026-09-22
@@ -526,11 +526,196 @@ a|
 a|
 * Die eigentliche Eigenschaft — keine Datenlecks zwischen Clubs — ließe sich bereits mit zwei Clubs nachweisen (siehe der bestehende Zwei-Club-Regressionstest). Die höhere Schwelle ist bewusst deutlich über diesem Minimum gewählt, damit ein Test nicht nur "gerade so" die Mindestanforderung einer zweiten Instanz erfüllt, sondern echte Vielfalt erzwingt.
 * 9 Clubs über mindestens 6 Bundesländer stellen sicher, dass ein Test gleichzeitig mehrere Klassen von Kollisionsrisiken abdeckt, die bei nur zwei Clubs unsichtbar bleiben können: echte Bundesland-Gruppierung (mehrere Clubs im selben Bundesland, um Verwechslung innerhalb einer Gruppe auszuschließen), alphabetisch benachbarte Bundesland-Slugs (die sich bei fehlerhafter String-Verarbeitung eher gegenseitig überschreiben würden) und Verarbeitungsreihenfolge-Effekte, die bei nur zwei Elementen zufällig unauffällig bleiben können.
-* Der verpflichtende bundesweite Club deckt den einzigen Sonderfall ab, der nicht über die "Mehrheits-Bundesland"-Logik läuft (siehe <<adr-014-automatische-statt-manuelle-bundesland-zuordnung-pro-club,ADR-014>>), sondern direkt auf `bundesweit` fällt — ein Bug, der nur diesen Pfad betrifft, würde von einer reinen Bundesland-zu-Bundesland-Stichprobe nicht gefunden.
+* Der verpflichtende bundesweite Club deckt den einzigen Sonderfall ab, der nicht über die "Mehrheits-Bundesland"-Logik läuft (siehe <<adr-014-automatische-bundesland-ableitung,ADR-014>>), sondern direkt auf `bundesweit` fällt — ein Bug, der nur diesen Pfad betrifft, würde von einer reinen Bundesland-zu-Bundesland-Stichprobe nicht gefunden.
 * Die konkrete Zahl 9 ist damit kein Zufallswert, sondern die kleinste Zahl, mit der sich 6+ Bundesländer UND mindestens eine Bundesland-Gruppe mit mehr als einem Club UND ein bundesweiter Sonderfall gleichzeitig in einem einzigen Testlauf realistisch abbilden lassen.
 
 | *Konsequenzen*
 a|
 * Positive: Multi-Club-Orchestrierungsbugs, die nur bei echter Vielfalt auftreten (wie der Cache-Contamination-Bug), werden künftig vor dem Merge gefunden statt erst im realen Cron-Lauf.
 * Negative: Neue Multi-Club-Integrationstests sind aufwändiger zu schreiben und langsamer in der Ausführung als ein einfacher Zwei-Club-Test (siehe `tests/e2e/cron-update-integration.test.js` für das etablierte Muster mit einer einzigen Clubs-Tabelle als Quelle der Wahrheit für Mock-Setup und erwartete Pfade).
+|===
+
+[[adr-017-aggregation-aus-laufzeit-ergebnissen]]
+=== ADR-017: Bund-/Land-Aggregation aus den Laufzeit-Ergebnissen statt aus `metadata.json`-Dateien
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-29
+
+| *Kontext*
+| Für die Bund-/Land-Seiten müssen die Daten aller Clubs zusammengeführt werden. Zwei Wege standen zur Wahl: (a) die pro Club geschriebenen `metadata.json`-Dateien unter `generated/` nach der Club-Schleife wieder einlesen, (b) die von `updateClub()` ohnehin zurückgegebenen Ergebnisse (`{ club, bundesland, meta }`) direkt weiterreichen.
+
+| *Entscheidung*
+| `aggregatePages(results, …)` (`src/aggregatePages.js`) erhält die Ergebnisliste von `updateAll()` im Speicher. Clubs mit leeren Team-Daten (`meta.length === 0`, z.B. API-Ausfall) werden auf den Portal-Seiten nicht aufgelistet.
+
+| *Begründung*
+a|
+* Kein Wieder-Einlesen von Dateien: keine veralteten Ordner entfernter Clubs (`generated/<land>/<club>/` bliebe sonst bei lokalen Läufen liegen und würde weiter gelistet), kein Widerspruch zwischen Datei-Quelle und Config-Quelle (Banner-Bedingung), keine Sonderbehandlung des Legacy-Roots.
+* Die Alternative (Datei-basiert) bleibt für ein späteres Matrix-Batching (Plan C) offen: ein Merge-Job kann die Ergebnisliste aus `metadata.json`-Dateien rekonstruieren und dieselbe Funktion aufrufen. Das ist bewusst NICHT Teil von Plan B (YAGNI).
+* Ohne den Leer-Filter würde ein API-Ausfall einen Club unter `bundesweit` ohne Teams auf der Bund-Seite erscheinen lassen.
+
+| *Konsequenzen*
+a|
+* Positive: einfachere Datenquelle, deterministisch pro Lauf.
+* Negative: `aggregatePages` ist an den Prozesslauf gekoppelt; ein separater Aggregationslauf ohne Club-Verarbeitung ist erst mit einem Loader möglich.
+|===
+
+[[adr-018-wam-cache-versioniert]]
+=== ADR-018: Quartalsweiser, versionierter WAM-Cache statt Live-Abruf pro Cron-Lauf
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-29
+
+| *Kontext*
+| `POST /rest/wam/liga/list?startAtIndex=<n>` (Body `{"token":0,"verbandIds":[<id>]}`) liefert paginiert (10/Seite, Antwort unter `data.ligen`, Fortsetzung über `hasMoreData`) alle Ligen eines Verbands inkl. Ebene (`skEbeneId` 0/1/2) und Bezirk/Kreis. Der Endpunkt ist in der bekannten OpenAPI-Spec nicht dokumentiert. Bayern: 40 Seiten, ~391 Ligen (inkl. 9 Ligen mit `verbandId` 32). Verifiziert am 2026-09-29: alle 8 `ligaData.ligaId`-Werte aus `club/id/4468/actualmatches` kommen in der WAM-Liste vor — die `ligaId` ist der Join-Schlüssel zwischen Match-Daten und WAM.
+
+| *Entscheidung*
+| Die WAM-Daten werden alle 3 Monate per Workflow (`wam-refresh.yml`, `scripts/refresh-wam-cache.js`) für die Verbände der eingebundenen Bundesländer abgerufen und als `data/wam-ligen-cache.json` im Repo versioniert. Der 6-Stunden-Cron liest nur den Cache. TTL: 150 Tage (`WAM_CACHE_TTL_MS`, `src/wamCache.js`). Zugriff über `src/wamClient.js` (sequenzielle Pagination, `startAtIndex` als Query-Parameter).
+
+| *Begründung*
+a|
+* 40+ Requests pro Verband bei jedem 6-Stunden-Lauf wären unverhältnismäßig für Daten, die sich pro Saison ändern; der Cache hält die API-Last niedrig (Rate-Limit ~1 req/s).
+* Versionierung im Repo macht Änderungen nachvollziehbar und den Deploy unabhängig von WAM-Verfügbarkeit.
+* TTL 150 Tage statt exakt einem Quartal, damit der Cache kurz vor jedem Refresh nicht als veraltet gilt.
+* Der Endpunkt ist undokumentiert und kann sich ändern — der Cache entkoppelt das Portal davon.
+
+| *Konsequenzen*
+a|
+* Positive: geringe Last, deterministische Builds, Struktur für die spätere "alle Ligen bundesweit"-Vision liegt bereit.
+* Negative: Liga-Metadaten sind bis zu ~3 Monate alt; Schedule-Workflows laufen nur auf dem Default-Branch (auf `v2` nur per `workflow_dispatch` testbar); Pushes mit `GITHUB_TOKEN` lösen kein Deployment aus, der nächste 6-Stunden-Lauf übernimmt den Cache.
+|===
+
+[[adr-019-graceful-degradation-wam-cache]]
+=== ADR-019: Graceful Degradation bei fehlendem/veraltetem WAM-Cache und Erhalt des alten Stands bei Teilabrufen
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-29
+
+| *Kontext*
+| Der WAM-Cache ist eine Anreicherung (Gruppierung der Land-Seiten nach Ebene/Bezirk/Kreis), keine Voraussetzung für die Seiten. Zudem kann ein Abruf mitten in der Pagination fehlschlagen.
+
+| *Entscheidung*
+| (1) Fehlt der Cache, ist er unlesbar oder älter als 150 Tage, erzeugt `aggregatePages` die Land-Seiten trotzdem — flach, alphabetisch, ohne Ebenen-Gruppierung — und loggt `console.warn`; der Lauf bricht nie ab. (2) `fetchLeaguesForVerband` liefert `{ ligen, complete }`. Schlägt eine Seite fehl, ist `complete=false`; `refreshWamCache` übernimmt dann für diesen Verband den ALTEN Cache-Stand (oder lässt ihn weg, falls keiner existiert), vermerkt ihn in `partialVerbandIds` und der Refresh-Job endet mit Fehlerstatus (kein Commit). Für `bundesweit` gibt es keine Anreicherung.
+
+| *Begründung*
+a|
+* Portal-Seiten dürfen nicht von der Verfügbarkeit eines undokumentierten Endpunkts abhängen.
+* Ein Teilabruf mit frischem `generatedAt` würde Lücken tarnen und einen guten Cache durch einen schlechteren ersetzen.
+
+| *Konsequenzen*
+a|
+* Positive: Robustheit; Fehler bleiben in CI sichtbar.
+* Negative: Ohne Cache sind die Land-Seiten weniger strukturiert; unbekannte Ligen erscheinen unter "Weitere Ligen".
+|===
+
+[[adr-020-wegfall-legacy-html]]
+=== ADR-020: Wegfall der Alt-Pfad-HTML — Rückwärtskompatibilität nur für ICS
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert (ersetzt den HTML-Teil von <<adr-013-alt-pfad-duplikat-ausgabe,ADR-013>>)
+
+| *Datum*
+| 2026-09-29
+
+| *Kontext*
+| ADR-013 ließ Clubs mit `legacyRootOutput: true` (Fibalon) zusätzlich HTML unter dem flachen Alt-Pfad schreiben. Plan B braucht `generated/index.html` für die Bund-Seite. Schützenswert waren immer die Kalender-Abonnenten (ICS-URLs), nicht die HTML-Seite.
+
+| *Entscheidung*
+| `legacyRootOutput` erzeugt nur noch die Alt-Pfad-ICS (`generated/{teamId}_{kind}.ics`, mit Migrations-VEVENT und echten Spielen). Kein `generated/index.html`, keine `generated/teams/*.html`, kein Root-`metadata.json` mehr. `generated/index.html` ist ausschließlich die Bund-Seite; der Migrationshinweis erscheint als generischer Banner darauf (genau dann, wenn mindestens ein Club das Flag hat).
+
+| *Begründung*
+a|
+* Kein Konflikt zweier Schreiber am selben Pfad; die ICS-Garantie bleibt vollständig erhalten.
+* `generated/` ist gitignored und wird pro Deploy frisch gebaut — alte HTML-Dateien verschwinden ohne Migrationsschritt.
+* Der Banner ist generisch, damit er unabhängig von der Anzahl betroffener Clubs korrekt bleibt; die handlungsrelevante neue URL steht im ICS-Migrations-VEVENT.
+
+| *Konsequenzen*
+a|
+* Positive: eindeutige Zuständigkeit für `generated/index.html`.
+* Negative: alte HTML-URLs (z.B. `/teams/<id>.html`) liefern nach dem Deploy 404; bewusst akzeptiert.
+|===
+
+[[adr-021-bundesweit-eigener-block]]
+=== ADR-021: `bundesweit` als eigener Block mit eigener Seite; reservierter Slug `index`
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-29
+
+| *Kontext*
+| Clubs, deren Teams nur in bundesweiten Wettbewerben spielen, haben kein Bundesland (`bundesweit`, siehe ADR-014). Die Navigation Bund → Land braucht dafür ein Ziel.
+
+| *Entscheidung*
+| `bundesweit` wird wie ein Bundesland behandelt (eigene Seite `generated/bundesweit/index.html` mit `buildLandPage`), auf der Bund-Seite als Block "Bundesweite Wettbewerbe" nach allen Bundesländern. Keine WAM-Anreicherung. Zusätzlich ist der Slug `index` reserviert (`sanitizeSlug`, `RESERVED_SLUGS`).
+
+| *Begründung*
+a|
+* Einheitliche Navigation ohne Sonderfälle im Nutzerfluss.
+* `index` ist vorsorglich reserviert (mehrdeutige URLs `/land/index` vs. `/land/index.html` bei manchen Servern). Es gibt KEINEN Dateisystem-Konflikt: Ordner `index/` und Datei `index.html` haben verschiedene Namen.
+
+| *Konsequenzen*
+a|
+* Positive: keine Sonderlogik in der Navigation; der bundesweite Fall ist getestet (ADR-016).
+* Negative: `bundesweit` ist ein Pseudo-Bundesland in Slug-Listen und Nav.
+|===
+
+[[adr-022-fehlerisolation-pro-club]]
+=== ADR-022: Fehlerisolation pro Club und tolerantes Deployment
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-29
+
+| *Kontext*
+| `updateAll()` brach bei einem Fehler in einem Club (`sanitizeSlug`, `updateClub`) die gesamte Schleife ab — alle folgenden Clubs und die Aggregation fielen aus.
+
+| *Entscheidung*
+| `updateAll()` fängt Fehler pro Club, loggt sie und gibt `{ results, failures }` zurück. Der CLI-Einstieg setzt `process.exitCode = 1`, wenn `failures` nicht leer ist (auch bei einem Fehler in der Portal-Aggregation, z.B. fehlender `portal.json`). `deploy.yml` führt `npm run update` mit `continue-on-error` aus, prüft, dass mindestens eine ICS-Datei existiert, deployt und markiert den Job am Ende rot. Eine Portal-Seite ohne Impressum wird nie veröffentlicht: fehlt `portal.json` oder sind Pflichtfelder leer, entstehen keine Bund-/Land-Seiten.
+
+| *Begründung*
+a|
+* Ein defekter Club darf die Kalender aller anderen nicht blockieren; sichtbar bleibt der Fehler über den roten Job.
+* Der ICS-Guard verhindert, dass ein Totalausfall die funktionierende Seite durch eine leere ersetzt.
+* Der Exitcode wird im CLI-Einstieg statt in `updateAll()` gesetzt, damit `node:test`-Läufe nicht beeinflusst werden.
+
+| *Konsequenzen*
+a|
+* Positive: Teilausfälle sind toleriert und trotzdem sichtbar.
+* Negative: Ein Deploy mit Teilfehlern veröffentlicht einen unvollständigen Stand (bewusste Abwägung gegen Totalausfall).
 |===
