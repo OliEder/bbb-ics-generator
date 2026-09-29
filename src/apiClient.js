@@ -92,6 +92,7 @@ async function fetchLeagueTable(ligaId, ownTeamId) {
     return rows.map(row => ({
       rank:     row.rang || 0,
       teamName: row.team?.teamname || '',
+      teamId:   row.team?.teamPermanentId != null ? String(row.team.teamPermanentId) : null,
       played:   row.anzspiele || 0,
       won:      row.s  || 0,
       lost:     row.n || 0,
