@@ -53,7 +53,17 @@ jobs:
             exit 1
           fi
 
+      # Saison-Archiv (generated/archive/<clubId>/<season>.json, ADR-014/ADR-026) zurück auf
+      # main committen. Reihenfolge/Bedingungen:
+      # - läuft NACH dem Guard: bei Totalausfall (Guard rot) wird weder committet noch deployt;
+      # - läuft auch bei Teilfehlern: "generate" hat continue-on-error, sein Fehlschlag lässt
+      #   success() true — die Archive der erfolgreichen Clubs werden also gesichert;
+      # - continue-on-error: ein Push-Fehler (z.B. main hat sich während des Laufs bewegt)
+      #   verhindert das Deployment nicht, markiert den Job aber am Ende rot (letzter Schritt).
       - name: Commit season archive
+        id: archive_commit
+        if: success()
+        continue-on-error: true
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "chore: update season archive [skip ci]"
@@ -80,8 +90,13 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v5
 
-      - name: Fail job if generation reported errors
-        if: steps.generate.outcome == 'failure'
+      - name: Fail job if generation or archive commit reported errors
+        if: steps.generate.outcome == 'failure' || steps.archive_commit.outcome == 'failure'
         run: |
-          echo "::error::npm run update meldete Fehler (siehe Log). Die übrigen Clubs wurden deployt."
+          if [ "${{ steps.generate.outcome }}" = "failure" ]; then
+            echo "::error::npm run update meldete Fehler (siehe Log). Die übrigen Clubs wurden deployt."
+          fi
+          if [ "${{ steps.archive_commit.outcome }}" = "failure" ]; then
+            echo "::error::Saison-Archiv konnte nicht committet werden (siehe Schritt 'Commit season archive')."
+          fi
           exit 1

@@ -66,9 +66,9 @@ Der Workflow benötigt drei spezifische Permissions:
 
 . *Verify generated output* (Guard): Bricht den Job mit `::error::` ab, wenn unter `generated/` keine einzige `*.ics`-Datei existiert. So ersetzt ein Totalausfall nicht die funktionierende Seite durch eine leere.
 
-. *Commit season archive* (`stefanzweifel/git-auto-commit-action@v5`): Committet ausschließlich `generated/archive/**` zurück auf den `main`-Branch, mit Commit-Message `chore: update season archive [skip ci]` (das `[skip ci]`-Suffix verhindert, dass dieser Commit den Deploy-Workflow erneut auslöst — sonst würde jeder Lauf einen weiteren Lauf triggern). Autor ist `github-actions[bot]`. Hintergrund: `generated/` ist ansonsten vollständig `.gitignore`t und reines, flüchtiges Build-Output — auf GitHub-Actions-Runnern (ephemer) geht es nach jedem Lauf verloren. Das Saison-Archiv (`src/seasonArchive.js`) muss davon abweichend dauerhaft erhalten bleiben, da die Basketball-Bund-API Match- und Tabellendaten einer abgelaufenen Saison irgendwann endgültig nicht mehr zurückliefert — ohne diesen Commit-Schritt gäbe es keine Möglichkeit, diese Daten zwischen den 6-stündigen Läufen zu bewahren. Details zur Architekturentscheidung siehe ADR-014 in `09-decisions.adoc`. Voraussetzung ist die Permission `contents: write` (siehe oben).
+. *Commit season archive* (`id: archive_commit`, `if: success()`, `continue-on-error: true`, `stefanzweifel/git-auto-commit-action@v5`): Committet ausschließlich `generated/archive/**` — seit <<adr-026-saison-archiv-pro-club,ADR-026>> pro Club `generated/archive/<clubId>/{seasonId}.json`; das Muster `generated/archive/**` und die `.gitignore`-Ausnahme `!/generated/archive/**` erfassen die Unterordner — zurück auf den `main`-Branch, mit Commit-Message `chore: update season archive [skip ci]` (das `[skip ci]`-Suffix verhindert, dass dieser Commit den Deploy-Workflow erneut auslöst — sonst würde jeder Lauf einen weiteren Lauf triggern). Autor ist `github-actions[bot]`. Hintergrund: `generated/` ist ansonsten vollständig `.gitignore`t und reines, flüchtiges Build-Output — auf GitHub-Actions-Runnern (ephemer) geht es nach jedem Lauf verloren. Das Saison-Archiv (`src/seasonArchive.js`) muss davon abweichend dauerhaft erhalten bleiben, da die Basketball-Bund-API Match- und Tabellendaten einer abgelaufenen Saison irgendwann endgültig nicht mehr zurückliefert — ohne diesen Commit-Schritt gäbe es keine Möglichkeit, diese Daten zwischen den 6-stündigen Läufen zu bewahren. Details zur Architekturentscheidung siehe <<adr-014-saison-archivierung,ADR-014>> und <<adr-026-saison-archiv-pro-club,ADR-026>> in `09-decisions.adoc`. Voraussetzung ist die Permission `contents: write` (siehe oben).
 
-. *List generated files (debug)* (`ls -la generated/`, `find generated/ -name "*.ics" -ls`): Diagnostik-Schritt, listet alle erzeugten Dateien im Actions-Log.
+. *List generated files (debug)* (`find generated/ -maxdepth 3 -type d`, `find generated/ -name "*.ics" -ls`): Diagnostik-Schritt, listet alle erzeugten Dateien im Actions-Log.
 
 . *Setup Pages* (`actions/configure-pages@v5`): Konfiguriert GitHub Pages für den aktuellen Repository-Kontext.
 
@@ -76,7 +76,36 @@ Der Workflow benötigt drei spezifische Permissions:
 
 . *Deploy to GitHub Pages* (`actions/deploy-pages@v5`): Deployed das Artefakt auf GitHub Pages. Gibt die öffentliche URL als Output `page_url` zurück.
 
-. *Fail job if generation reported errors* (`if: steps.generate.outcome == 'failure'`): Markiert den Job nach dem Deployment als fehlgeschlagen (rot), obwohl die übrigen Clubs bereits deployt wurden. Der Fehler bleibt so sichtbar.
+. *Fail job if generation or archive commit reported errors* (`if: steps.generate.outcome == 'failure' || steps.archive_commit.outcome == 'failure'`): Markiert den Job nach dem Deployment als fehlgeschlagen (rot), obwohl die übrigen Clubs bereits deployt wurden. Der Fehler bleibt so sichtbar.
+
+==== Zusammenspiel Fehlertoleranz und Archiv-Commit
+
+Reihenfolge: *Generate* (`continue-on-error`) → *Verify generated output* (Guard) → *Commit season archive* → Debug-Listing → Pages-Setup/Upload/Deploy → *Fail job …*.
+
+[cols="3,2,2,2", options="header"]
+|===
+| Situation | Archiv-Commit | Deploy | Job-Status
+
+| Alle Clubs erfolgreich
+| ja
+| ja
+| grün
+
+| Teilfehler (einzelne Clubs, Portal-Aggregation oder Archiv-Fehler eines Clubs; `npm run update` endet mit Exitcode 1, mindestens eine ICS vorhanden)
+| ja — `continue-on-error` am Generate-Schritt lässt `success()` wahr; die Archive der erfolgreichen Clubs werden gesichert
+| ja
+| rot (letzter Schritt)
+
+| Totalausfall (keine einzige ICS-Datei)
+| nein — der Guard schlägt fehl, alle Folgeschritte werden übersprungen
+| nein
+| rot
+
+| Push des Archiv-Commits scheitert (z.B. `main` hat sich während des Laufs bewegt)
+| fehlgeschlagen (`continue-on-error`)
+| ja — das Deployment hängt nicht am Archiv-Commit
+| rot (letzter Schritt)
+|===
 
 *Bewusste Konsequenz (ADR-025):* Der Guard prüft ausschließlich auf ICS-Dateien, nicht auf `generated/index.html` — Kalender-Abos haben Vorrang. Fehlt `portal.json`, werden keine Bund-/Land-Seiten erzeugt; es wird dennoch (mit den ICS und den Club-Seiten) deployt und der Job anschließend rot markiert.
 
@@ -171,15 +200,20 @@ Nach jedem Accessibility-Job-Lauf (auch bei Fehlern, `if: always()`) wird `playw
 
 ....
 generated/
-├── {teamId}_all.ics       # Alle Spiele eines Teams
-├── {teamId}_home.ics      # Nur Heimspiele
-├── {teamId}_away.ics      # Nur Auswärtsspiele
-├── ... (3 Dateien pro Team)
-├── metadata.json          # Update-Metadaten für HTML-Generator
-├── teams-cache.json       # Team-Cache (effektiv nur lokal relevant)
-├── archive/                # Archivierte Vorjahres-Saisons (persistiert via Git-Commit, siehe oben)
-│   └── {seasonId}.json     # Ein File pro Saison, alle Teams enthalten
-└── index.html              # Übersichtsseite mit Subscription-Links
+├── index.html                  # Bund-Startseite (aggregatePages)
+├── impressum.html, datenschutz.html, barrierefreiheit.html   # Portal-Rechtsseiten
+├── <bundesland>/               # z.B. bayern/, bundesweit/
+│   ├── index.html              # Land-Seite
+│   └── <club-slug>/
+│       ├── index.html          # Club-Startseite
+│       ├── metadata.json       # Team-Metadaten (inkl. notCurrentlyListed-Teams)
+│       ├── teams/{teamId}.html # Team-Seiten (mit Archiv-Tab, falls Archivdaten vorhanden)
+│       └── {teamId}_{type}.ics # 3 Dateien pro Team (all/home/away)
+├── {teamId}_{type}.ics         # Alt-Pfad-ICS nur für Clubs mit legacyRootOutput: true
+├── teams-cache-<clubId>.json   # Team-Cache pro Club (effektiv nur lokal relevant)
+└── archive/                    # Saison-Archiv (persistiert via Git-Commit, siehe oben)
+    └── <clubId>/
+        └── {seasonId}.json     # Eine Datei pro Club und Saison, alle Teams dieses Clubs
 ....
 
 === Nutzer-Subscription

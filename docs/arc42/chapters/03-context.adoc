@@ -82,6 +82,10 @@ flowchart TD
 | GitHub Actions API / HTTP Upload
 | Artefakt-Upload via `actions/upload-pages-artifact@v3`; Deployment via `actions/deploy-pages@v5`; Concurrency-Gruppe `pages` verhindert parallele Deployments
 
+| GitHub Actions → GitHub-Repository (`main`)
+| Git push (`stefanzweifel/git-auto-commit-action@v5`, `GITHUB_TOKEN`, `contents: write`)
+| Committet nach jedem Lauf ausschließlich `generated/archive/**` (Saison-Archiv pro Club, `generated/archive/<clubId>/{seasonId}.json`) mit `[skip ci]` zurück auf `main`; auch bei Teilfehlern, nicht bei Totalausfall (siehe Kapitel 7, <<adr-014-saison-archivierung,ADR-014>>, <<adr-026-saison-archiv-pro-club,ADR-026>>)
+
 | GitHub Pages → Kalender-Clients
 | HTTPS (TLS 1.2+) / text/calendar
 | Statische Datei-Auslieferung; kein Content-Negotiation; `Content-Type: text/calendar` für `.ics`-Dateien
@@ -98,6 +102,8 @@ flowchart TD
 === Multi-Club-Datenfluss
 
 Seit dem Multi-Club-Umbau beginnt der Datenfluss nicht mehr bei einer einzigen Root-`config.json`, sondern potenziell bei vielen Konfigurationsquellen: `src/clubs.js` liest rekursiv jede `clubs/<bundesland-slug>/<club-slug>/config.json` ein und liefert pro gefundenem Club eine `clubId` sowie optionale Theme-, Cup-Farb- und Legal-Einstellungen. `cronUpdate.js` verarbeitet danach jeden Club unabhängig: Für jedes Team eines Clubs wird über die Basketball-Bund-API die `verbandId` seiner aktuellen Liga ermittelt und per `src/verbandMapping.js` auf ein Bundesland abgebildet; das Bundesland des gesamten Clubs ergibt sich als Mehrheitsvotum über alle seine Teams (`deriveClubBundesland`). Dieses Bundesland wird bei jedem Update-Lauf neu aus den ohnehin abgerufenen Liga-Daten berechnet — es ist keine manuell gepflegte Konfiguration, und der Ordnername im Quellbaum (`clubs/<bundesland-slug>/...`) ist davon unabhängig und dient nur der menschlichen Organisation im Repository. Die generierten ICS- und HTML-Dateien landen entsprechend unter `generated/<bundesland-slug>/<club-slug>/`. Ein Club, der bereits vor dem Umbau unter dem alten, flachen Pfad (`generated/{teamId}_{type}.ics`) lief und dessen Kalender-Links bereits von Nutzern abonniert sind, kann in seiner `config.json` mit `legacyRootOutput: true` markiert werden; für solche Clubs wird zusätzlich zur neuen, verschachtelten Struktur ein vollständiges Duplikat der ICS-Ausgabe am alten, flachen Pfad erzeugt (inklusive einem Migrationshinweis-Termin im Kalender), damit bestehende Abonnements nicht brechen. Alt-Pfad-HTML entfällt (<<adr-023-wegfall-legacy-html,ADR-023>>); stattdessen zeigt die Bund-Seite einen generischen Migrationsbanner.
+
+Abgelaufene Saisons archiviert `src/seasonArchive.js` pro Club unter `generated/archive/<clubId>/{seasonId}.json` — bewusst nach der stabilen `clubId` und nicht nach dem pro Lauf abgeleiteten Bundesland, damit das Archiv einen Bundesland-Wechsel (z.B. API-Ausfall → `bundesweit`) übersteht und sich Clubs nicht vermischen (<<adr-026-saison-archiv-pro-club,ADR-026>>). Die Team-Seiten unter `generated/<bundesland-slug>/<club-slug>/teams/` lesen ihren Archiv-Tab aus diesem Club-Archiv.
 
 === Portal-Aggregation und WAM-Refresh
 

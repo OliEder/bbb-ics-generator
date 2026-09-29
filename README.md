@@ -27,7 +27,7 @@ Automatisch generiertes Vereinsportal für die Fibalon Baskets Neumarkt. Ruft al
 - **Tabelle** — offizielle Tabelle + Games-Behind-Variante (NBA-Logik)
 - **Turnierklammer** — für Pokalwettbewerbe mit Vorschau zukünftiger Runden
 - **Spielplan** — alle/Heim/Auswärts-Tabs mit ICS-Kalender-Links
-- **Archiv** — abgelaufene Saisons werden automatisch archiviert und bleiben als eigener Tab mit Endtabelle und Ergebnissen einsehbar. Ist ein Team gerade nicht in den aktuellen Daten des Vereins gelistet (z.B. zwischen zwei Saisons), bleibt seine Teamseite mit einem kurzen Hinweis erhalten, statt zu verschwinden.
+- **Archiv** — abgelaufene Saisons werden automatisch archiviert und bleiben als eigener Tab mit Endtabelle und Ergebnissen einsehbar. Das Archiv ist **pro Verein getrennt** (`generated/archive/<clubId>/<saison>.json`, nach der stabilen `clubId` statt nach Bundesland, damit es einen Bundesland-Wechsel des Vereins übersteht) und wird von `deploy.yml` nach jedem Lauf nach `main` committet, weil die API alte Saisons irgendwann nicht mehr liefert. Ist ein Team gerade nicht in den aktuellen Daten des Vereins gelistet (z.B. zwischen zwei Saisons), bleibt seine Teamseite mit einem kurzen Hinweis erhalten, statt zu verschwinden (Grundlage ist die `metadata.json` des vorherigen Laufs im Vereinsverzeichnis).
 
 ### Kalender-Abonnement
 Jedes Team bietet drei ICS-Feeds:
@@ -80,6 +80,7 @@ bbb-ics-generator/
 │   ├── apiClient.js       # Basketball-Bund API-Client (inkl. mapWithConcurrency-Helfer)
 │   ├── icsGenerator.js    # ICS-Datei-Generierung (RFC 5545)
 │   ├── storage.js         # Datei-I/O, Teams-Cache, Slug-Validierung (Path-Traversal-Schutz)
+│   ├── seasonArchive.js   # Saison-Archiv pro Verein (generated/archive/<clubId>/)
 │   └── generateHTML.js    # Statischer HTML-Generator (pro Club aufgerufen)
 ├── scripts/
 │   └── refresh-wam-cache.js   # CLI: aktualisiert data/wam-ligen-cache.json (npm run wam:refresh)
@@ -93,6 +94,9 @@ bbb-ics-generator/
 ├── generated/              # Ausgabeverzeichnis (von GitHub Actions befüllt)
 │   ├── index.html                # Bund-Startseite
 │   ├── {impressum,datenschutz,barrierefreiheit}.html   # Portal-Rechtsseiten
+│   ├── archive/                # Saison-Archiv, versioniert (einzige Ausnahme in .gitignore)
+│   │   └── {clubId}/
+│   │       └── {seasonId}.json   # Archivierte Saison eines Vereins (alle seine Teams)
 │   ├── bayern/
 │   │   ├── index.html          # Land-Seite (Ligatabellen der eingebundenen Vereine)
 │   │   └── fibalon/
@@ -206,7 +210,7 @@ GitHub Actions aktualisiert die Seite:
 - **Cron `0 */6 * * *`** — alle 6 Stunden
 - **Manuell** — über das GitHub Actions UI
 
-Schlägt die Verarbeitung einzelner Vereine fehl, deployt `deploy.yml` trotzdem die übrigen (sofern mindestens eine ICS-Datei erzeugt wurde) und markiert den Job am Ende als fehlgeschlagen. Der WAM-Liga-Cache wird separat durch `wam-refresh.yml` quartalsweise aktualisiert.
+Schlägt die Verarbeitung einzelner Vereine fehl, deployt `deploy.yml` trotzdem die übrigen (sofern mindestens eine ICS-Datei erzeugt wurde) und markiert den Job am Ende als fehlgeschlagen. Das Saison-Archiv (`generated/archive/**`) wird auch bei solchen Teilfehlern committet, bei einem Totalausfall (keine ICS-Datei) dagegen nicht. Der WAM-Liga-Cache wird separat durch `wam-refresh.yml` quartalsweise aktualisiert.
 
 ---
 
@@ -246,4 +250,4 @@ Die `@network`-Smoke-Tests (`tests/ui/api.spec.js`) laufen nicht im PR-Lauf, son
 | axios | ^1.7.9 | HTTP-Client für API-Anfragen |
 | ics | ^3.8.1 | RFC 5545 ICS-Generierung |
 | express | ^4.21.2 | Lokaler Entwicklungsserver |
-| node-cron | ^3.0.3 | Scheduling |
+| node-cron | ^4.6.0 | Scheduling |
