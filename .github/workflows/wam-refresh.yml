@@ -1,0 +1,42 @@
+name: Refresh WAM Liga Cache
+
+on:
+  schedule:
+    - cron: '0 3 1 */3 *'  # quartalsweise, 03:00 UTC am 1. Januar/April/Juli/Oktober
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Endet mit Fehler, wenn ein Verband nur unvollständig abgerufen wurde — dann kein Commit.
+      - name: Refresh WAM cache
+        run: npm run wam:refresh
+
+      - name: Commit updated cache
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/wam-ligen-cache.json
+          if git diff --cached --quiet; then
+            echo "Keine Änderungen am WAM-Cache"
+          else
+            git commit -m "chore(data): refresh WAM liga cache [skip ci]"
+            git push
+          fi

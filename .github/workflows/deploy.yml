@@ -37,8 +37,21 @@ jobs:
       - name: Install dependencies
         run: npm install
         
+      # Fehler einzelner Clubs (Exitcode 1) sollen das Deployment der übrigen Clubs nicht
+      # verhindern (ADR-022): Schritt darf fehlschlagen, der Job wird am Ende rot markiert.
       - name: Generate ICS files and HTML
+        id: generate
+        continue-on-error: true
         run: npm run update
+
+      # Guard: Bei Totalausfall (keine ICS erzeugt) NICHT deployen, sonst würde die
+      # funktionierende Seite durch eine leere ersetzt.
+      - name: Verify generated output
+        run: |
+          if ! find generated -name '*.ics' -print -quit | grep -q .; then
+            echo "::error::Keine ICS-Dateien erzeugt — Deployment abgebrochen"
+            exit 1
+          fi
 
       - name: List generated files (debug)
         run: |
@@ -58,3 +71,9 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+      - name: Fail job if generation reported errors
+        if: steps.generate.outcome == 'failure'
+        run: |
+          echo "::error::npm run update meldete Fehler (siehe Log). Die übrigen Clubs wurden deployt."
+          exit 1
