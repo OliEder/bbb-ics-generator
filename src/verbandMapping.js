@@ -32,6 +32,40 @@ const VERBAND_TO_BUNDESLAND = {
 
 const BUNDESWEIT = 'bundesweit';
 
+const BUNDESLAND_NAMES = {
+  'baden-wuerttemberg': 'Baden-Württemberg',
+  bayern: 'Bayern',
+  berlin: 'Berlin',
+  bremen: 'Bremen',
+  hamburg: 'Hamburg',
+  hessen: 'Hessen',
+  niedersachsen: 'Niedersachsen',
+  'rheinland-pfalz': 'Rheinland-Pfalz',
+  saarland: 'Saarland',
+  'schleswig-holstein': 'Schleswig-Holstein',
+  'nordrhein-westfalen': 'Nordrhein-Westfalen',
+  'mecklenburg-vorpommern': 'Mecklenburg-Vorpommern',
+  'sachsen-anhalt': 'Sachsen-Anhalt',
+  brandenburg: 'Brandenburg',
+  sachsen: 'Sachsen',
+  thueringen: 'Thüringen',
+  [BUNDESWEIT]: 'Bundesweite Wettbewerbe',
+};
+
+function bundeslandName(slug) {
+  return BUNDESLAND_NAMES[slug] || slug;
+}
+
+// Umkehrung von verbandIdToBundesland — für den WAM-Refresh, der aus den Club-Ordnern
+// (clubs/<bundesland>/…) die abzufragenden verbandIds ableitet. null für 'bundesweit'
+// (kein einzelner Verband) und unbekannte Slugs.
+function bundeslandToVerbandId(slug) {
+  for (const [id, mappedSlug] of Object.entries(VERBAND_TO_BUNDESLAND)) {
+    if (mappedSlug === slug) return Number(id);
+  }
+  return null;
+}
+
 function verbandIdToBundesland(verbandId) {
   if (verbandId === null || verbandId === undefined) return BUNDESWEIT;
   return VERBAND_TO_BUNDESLAND[Number(verbandId)] || BUNDESWEIT;
@@ -66,4 +100,4 @@ function deriveClubBundesland(teamVerbandIds) {
   return winner;
 }
 
-module.exports = { verbandIdToBundesland, deriveClubBundesland, BUNDESWEIT };
+module.exports = { verbandIdToBundesland, deriveClubBundesland, bundeslandName, bundeslandToVerbandId, BUNDESLAND_NAMES, BUNDESWEIT };

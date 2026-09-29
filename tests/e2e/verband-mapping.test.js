@@ -2,7 +2,10 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { verbandIdToBundesland, deriveClubBundesland } = require('../../src/verbandMapping.js');
+const {
+  verbandIdToBundesland, deriveClubBundesland,
+  bundeslandName, bundeslandToVerbandId, BUNDESLAND_NAMES, BUNDESWEIT,
+} = require('../../src/verbandMapping.js');
 
 test('verbandIdToBundesland: bekannte Landesverband-ID liefert Bundesland-Slug', () => {
   assert.equal(verbandIdToBundesland(2), 'bayern');
@@ -57,4 +60,29 @@ test('verbandIdToBundesland: NaN liefert bundesweit', () => {
 
 test('verbandIdToBundesland: negative Zahl liefert bundesweit', () => {
   assert.equal(verbandIdToBundesland(-1), 'bundesweit');
+});
+
+test('BUNDESLAND_NAMES: jeder Bundesland-Slug der Tabelle hat einen Anzeigenamen', () => {
+  for (let id = 1; id <= 16; id++) {
+    const slug = verbandIdToBundesland(id);
+    assert.notEqual(slug, BUNDESWEIT, `verbandId ${id} muss auf ein Bundesland abbilden`);
+    assert.ok(BUNDESLAND_NAMES[slug], `Anzeigename für ${slug} fehlt`);
+  }
+  assert.equal(BUNDESLAND_NAMES[BUNDESWEIT], 'Bundesweite Wettbewerbe');
+});
+
+test('bundeslandName: Umlaute/Bindestriche, Fallback auf Slug', () => {
+  assert.equal(bundeslandName('thueringen'), 'Thüringen');
+  assert.equal(bundeslandName('baden-wuerttemberg'), 'Baden-Württemberg');
+  assert.equal(bundeslandName('unbekannt'), 'unbekannt');
+});
+
+test('bundeslandToVerbandId: Umkehrung von verbandIdToBundesland, null für bundesweit/unbekannt', () => {
+  assert.equal(bundeslandToVerbandId('bayern'), 2);
+  assert.equal(bundeslandToVerbandId('thueringen'), 16);
+  assert.equal(bundeslandToVerbandId(BUNDESWEIT), null);
+  assert.equal(bundeslandToVerbandId('unbekannt'), null);
+  for (let id = 1; id <= 16; id++) {
+    assert.equal(bundeslandToVerbandId(verbandIdToBundesland(id)), id);
+  }
 });
