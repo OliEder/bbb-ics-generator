@@ -31,6 +31,9 @@ test('Bund-Seite listet alle 8 Bundesländer und den bundesweiten Block (zuletzt
     assert.ok(bund.includes('href="bundesweit/verein-3009/index.html"'));
     assert.ok(bund.includes('<h1 class="team-page-title">BBB Vereinsportal</h1>'), 'generated/index.html ist die Bund-Seite, nicht mehr eine Club-Seite');
 
+    const order = ['Baden-Württemberg', 'Bayern', 'Berlin', 'Hessen', 'Niedersachsen', 'Nordrhein-Westfalen', 'Saarland', 'Sachsen'].map(n => bund.indexOf(`>${n}</a></h2>`));
+    assert.deepEqual(order, [...order].sort((x, y) => x - y), 'Regionen alphabetisch nach Anzeigename');
+
     for (const slug of ['baden-wuerttemberg', 'bayern', 'berlin', 'hessen', 'niedersachsen', 'nordrhein-westfalen', 'saarland', 'sachsen', 'bundesweit']) {
       assert.ok(existsSync(run.paths.land(slug)), `Land-Seite ${slug} fehlt`);
     }
@@ -164,6 +167,7 @@ test('WAM-Anreicherung: frischer Cache gruppiert Ligen nach Ebene/Bezirk/Kreis',
     generatedAt: NOW_ISO(),
     ligenByVerbandId: {
       2: [wamEntry(7002, { skEbeneId: 1, bezirkName: 'Oberbayern' })],
+      100: [wamEntry(7009, { skEbeneId: 0, skEbeneName: 'Verband' })],
       1: [wamEntry(73001, { skEbeneId: 2, bezirknr: 3, bezirkName: 'Stuttgart', kreisnr: 5, kreisname: 'Esslingen' })],
     },
   };
@@ -173,6 +177,7 @@ test('WAM-Anreicherung: frischer Cache gruppiert Ligen nach Ebene/Bezirk/Kreis',
     assert.ok(read(run.paths.land('bayern')).includes('<h2 class="portal-group-heading">Bezirk Oberbayern</h2>'));
     assert.ok(read(run.paths.land('baden-wuerttemberg')).includes('<h2 class="portal-group-heading">Stuttgart · Esslingen</h2>'));
     assert.ok(!read(run.paths.land('bundesweit')).includes('class="portal-group-heading"'), 'bundesweit wird nie angereichert');
+    assert.ok(!read(run.paths.land('bundesweit')).includes('Verbandsebene'), 'bundesweite Liga 7009 wird trotz Cache-Eintrag nicht gruppiert');
   } finally { run.cleanup(); }
 });
 
