@@ -1352,3 +1352,104 @@ test('genHTML: ohne options.migrationNotice erscheint kein Banner', () => {
     rmSync(dir, { recursive: true });
   }
 });
+
+// ---- Portal-Seiten (Plan B): Bund-/Land-Seite, Portal-Legal, Tabellen-Links ----
+
+const PORTAL_REGIONS = [
+  { slug: 'bayern', name: 'Bayern', ligaCount: 1, clubs: [{ name: 'Verein & Co', href: 'bayern/verein-1/index.html' }] },
+  { slug: 'bundesweit', name: 'Bundesweite Wettbewerbe', ligaCount: 0, clubs: [{ name: 'Bundesliga-Club', href: 'bundesweit/verein-9/index.html' }] },
+];
+const PORTAL_LEGAL = { operator: 'Betreiber <b>X</b>', address: 'Str. 1', email: 'a@b.de', phone: '', responsible: '' };
+
+test('buildStandingsTable: Zeile mit href rendert escapten Link, Zeile ohne href bleibt reiner Text', () => {
+  const { buildStandingsTable } = requireGenHTML(tmpdir())._testExports;
+  const html = buildStandingsTable({
+    ligaId: '1', liganame: 'Bezirksliga',
+    table: [
+      { rank: 1, teamName: 'Alpha & Co', teamId: '1', played: 1, won: 1, lost: 0, points: 2, korbdiff: 5, isOwn: true, href: 'verein-1/index.html?a=1&b=2' },
+      { rank: 2, teamName: 'Beta', teamId: '2', played: 1, won: 0, lost: 1, points: 0, korbdiff: -5, isOwn: false, href: null },
+    ],
+  });
+  assert.ok(html.includes('<a href="verein-1/index.html?a=1&amp;b=2">Alpha &amp; Co</a>'));
+  assert.ok(html.includes('<td>Beta</td>'));
+  assert.ok(!html.includes('<a href="null"'));
+});
+
+test('buildBundPage: Regionen mit Links/Anzahlen, escapt Namen, Portal-Footer mit ./', () => {
+  const { buildBundPage } = requireGenHTML(tmpdir());
+  const html = buildBundPage({ regions: PORTAL_REGIONS, showMigrationBanner: false }, PORTAL_LEGAL);
+  assert.ok(html.includes('<h1 class="team-page-title">BBB Vereinsportal</h1>'));
+  assert.ok(html.includes('<h2><a href="bayern/index.html">Bayern</a></h2>'));
+  assert.ok(html.includes('<h2><a href="bundesweit/index.html">Bundesweite Wettbewerbe</a></h2>'));
+  assert.ok(html.includes('<a href="bayern/verein-1/index.html">Verein &amp; Co</a>'));
+  assert.ok(html.includes('1 Verein · 1 Liga'), 'Singular-Formen');
+  assert.ok(html.includes('1 Verein · 0 Ligen'), 'Plural bei 0');
+  assert.ok(html.includes('href="./impressum.html"'));
+  assert.ok(html.includes('href="./datenschutz.html"'));
+  assert.ok(!html.includes('<b>X</b>'), 'Nutzerdaten dürfen nicht unescaped erscheinen');
+  assert.ok(!html.includes('<div class="migration-banner"'));
+});
+
+test('buildBundPage: Migrationsbanner nur mit showMigrationBanner, generisch ohne Link', () => {
+  const { buildBundPage } = requireGenHTML(tmpdir());
+  const html = buildBundPage({ regions: PORTAL_REGIONS, showMigrationBanner: true }, PORTAL_LEGAL);
+  const match = html.match(/<div class="migration-banner"[\s\S]*?<\/div>/);
+  assert.ok(match, 'Banner-Markup erwartet');
+  assert.ok(match[0].includes('Einige Kalender-Abos sind umgezogen'));
+  assert.ok(!match[0].includes('href'), 'Banner darf keinen clubspezifischen Link enthalten');
+});
+
+test('buildBundPage: ohne Regionen erscheint ein Hinweistext statt einer leeren Liste', () => {
+  const { buildBundPage } = requireGenHTML(tmpdir());
+  const html = buildBundPage({ regions: [], showMigrationBanner: false }, PORTAL_LEGAL);
+  assert.ok(html.includes('Noch keine Vereine eingebunden'));
+  assert.ok(!html.includes('<ul class="portal-regions">'));
+});
+
+test('buildLandPage: Tabellen mit Club-Links, Gruppen-Überschriften, escapt, Footer ../', () => {
+  const { buildLandPage } = requireGenHTML(tmpdir());
+  const region = {
+    slug: 'bayern', name: 'Bayern <script>',
+    clubs: [{ name: 'Verein & Co', href: 'verein-1/index.html' }],
+    groups: [{
+      heading: 'Bezirk Oberbayern',
+      ligen: [{
+        ligaId: '1', liganame: 'Bezirksliga <b>',
+        table: [
+          { rank: 1, teamName: 'Eigen', teamId: '1', played: 1, won: 1, lost: 0, points: 2, korbdiff: 5, isOwn: true, href: 'verein-1/index.html' },
+          { rank: 2, teamName: 'Fremd<script>', teamId: '2', played: 1, won: 0, lost: 1, points: 0, korbdiff: -5, isOwn: false, href: null },
+        ],
+      }],
+    }],
+  };
+  const html = buildLandPage(region, PORTAL_REGIONS, PORTAL_LEGAL);
+  assert.ok(html.includes('<h1 class="team-page-title">Bayern &lt;script&gt;</h1>'));
+  assert.ok(html.includes('<h2 class="portal-group-heading">Bezirk Oberbayern</h2>'));
+  assert.ok(html.includes('<h3>Bezirksliga &lt;b&gt;</h3>'), 'Liga-Überschrift ist h3 unter einer Gruppen-Überschrift');
+  assert.ok(html.includes('<a href="verein-1/index.html">Eigen</a>'));
+  assert.ok(html.includes('Fremd&lt;script&gt;'));
+  assert.ok(!html.includes('Fremd<script>'));
+  assert.ok(html.includes('href="../impressum.html"'));
+  assert.ok(html.includes('href="../index.html"'), 'Nav-Logo führt zur Bund-Seite');
+});
+
+test('buildLandPage: ohne Gruppen-Überschrift ist die Liga-Überschrift h2; ohne Ligen erscheint ein Hinweis', () => {
+  const { buildLandPage } = requireGenHTML(tmpdir());
+  const flat = buildLandPage({
+    slug: 'bayern', name: 'Bayern', clubs: [],
+    groups: [{ heading: null, ligen: [{ ligaId: '1', liganame: 'Liga A', table: [] }] }],
+  }, PORTAL_REGIONS, PORTAL_LEGAL);
+  assert.ok(flat.includes('<h2>Liga A</h2>'));
+  const empty = buildLandPage({ slug: 'bayern', name: 'Bayern', clubs: [], groups: [] }, PORTAL_REGIONS, PORTAL_LEGAL);
+  assert.ok(empty.includes('noch keine Ligatabellen'));
+});
+
+test('buildPortalLegalPages: Impressum/Datenschutz/Barrierefreiheit mit Portal-Navigation statt Club-Navigation', () => {
+  const { buildPortalLegalPages } = requireGenHTML(tmpdir());
+  const pages = buildPortalLegalPages(PORTAL_LEGAL, PORTAL_REGIONS);
+  assert.deepEqual(Object.keys(pages).sort(), ['barrierefreiheit', 'datenschutz', 'impressum']);
+  assert.ok(pages.impressum.includes('Betreiber &lt;b&gt;X&lt;/b&gt;'));
+  assert.ok(pages.impressum.includes('BBB Vereinsportal'));
+  assert.ok(!pages.impressum.includes('Fibalon Baskets Neumarkt'), 'kein Club-Branding im Portal-Impressum');
+  assert.ok(pages.datenschutz.includes('<a href="mailto:a@b.de">a@b.de</a>'));
+});
