@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { resolveCompetition, isCupForMatch } = require('./competitionKind');
 
 function groupBySeasonId(matches) {
   const grouped = {};
@@ -14,11 +15,7 @@ function groupBySeasonId(matches) {
   return grouped;
 }
 
-function isLiga(liganame) {
-  return String(liganame || '').toLowerCase().includes('liga');
-}
-
-function mapMatches(seasonMatches, teamId, details) {
+function mapMatches(seasonMatches, teamId, details, ligaKindMap) {
   return seasonMatches
     .slice()
     .sort((a, b) => {
@@ -46,6 +43,7 @@ function mapMatches(seasonMatches, teamId, details) {
         isHome,
         result:       m.result || null,
         competition:  m.ligaData?.liganame || '',
+        isCup:        isCupForMatch(m, ligaKindMap),
         isNext:       false,
         venueName:    '',
         venueAddress: '',
@@ -55,30 +53,20 @@ function mapMatches(seasonMatches, teamId, details) {
 }
 
 async function buildArchiveTeamEntry(teamMeta, seasonMatches, details, apiFns) {
-  const { fetchLeagueTable, fetchTournamentRounds } = apiFns;
-  const matches = mapMatches(seasonMatches, teamMeta.id, details);
-
   const compMap = new Map();
   for (const m of seasonMatches) {
     const ligaId = String(m.ligaData?.ligaId || '');
     if (!ligaId || compMap.has(ligaId)) continue;
-    compMap.set(ligaId, {
-      ligaId,
-      liganame: m.ligaData?.liganame || '',
-      isLiga:   isLiga(m.ligaData?.liganame),
-    });
+    compMap.set(ligaId, { ligaId, liganame: m.ligaData?.liganame || '' });
   }
 
+  // Gleiche Auflösung wie im aktuellen Lauf (competitionKind.js, ADR-028). Fehlt
+  // fetchLeagueTableWithMeta in apiFns, werden Namen ohne "liga" als Pokal behandelt.
   const competitions = await Promise.all(
-    Array.from(compMap.values()).map(async comp => {
-      if (comp.isLiga) {
-        const table = await fetchLeagueTable(comp.ligaId, teamMeta.id);
-        return { ...comp, table: table || null, bracket: null };
-      }
-      const bracket = await fetchTournamentRounds(comp.ligaId);
-      return { ...comp, table: null, bracket: bracket || null };
-    })
+    Array.from(compMap.values()).map(comp => resolveCompetition(comp, teamMeta.id, apiFns))
   );
+  const ligaKindMap = new Map(competitions.map(c => [c.ligaId, c.isLiga]));
+  const matches = mapMatches(seasonMatches, teamMeta.id, details, ligaKindMap);
 
   return {
     teamName: teamMeta.name,

@@ -43,4 +43,20 @@ async function resolveCompetition(comp, ownTeamId, apiFns) {
   return { ...comp, isLiga: false, table: null, bracket: bracket || null };
 }
 
-module.exports = { kindFromName, isLeagueByName, resolveCompetition };
+// Anzeige-Schicht: gespeicherte Klassifikation hat Vorrang, Namensregel nur als Fallback
+// für alte metadata.json/Archive ohne isLiga/isCup.
+function compIsLiga(comp) {
+  return typeof comp?.isLiga === 'boolean' ? comp.isLiga : isLeagueByName(comp?.liganame);
+}
+function matchIsCup(match) {
+  return typeof match?.isCup === 'boolean' ? match.isCup : !isLeagueByName(match?.competition);
+}
+
+// Pro Spiel: aufgelöste Klassifikation der Liga (Map ligaId→isLiga) → isCup; ohne Eintrag Namensregel.
+function isCupForMatch(m, ligaKindMap) {
+  const id = String(m.ligaData?.ligaId || '');
+  if (ligaKindMap && ligaKindMap.has(id)) return !ligaKindMap.get(id);
+  return !isLeagueByName(m.ligaData?.liganame);
+}
+
+module.exports = { kindFromName, isLeagueByName, resolveCompetition, compIsLiga, matchIsCup, isCupForMatch };

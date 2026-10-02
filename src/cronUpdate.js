@@ -1,8 +1,9 @@
-const { fetchTeamMatches, fetchMatchInfo, fetchClubTeams, fetchLeagueTable, fetchTournamentRounds, mapWithConcurrency } = require('./apiClient');
+const { fetchTeamMatches, fetchMatchInfo, fetchClubTeams, fetchLeagueTable, fetchLeagueTableWithMeta, fetchTournamentRounds, mapWithConcurrency } = require('./apiClient');
 const { generateICS } = require('./icsGenerator');
 const { saveICS, saveTeamsCache, loadTeamsCache, sanitizeSlug } = require('./storage');
 const { genHTML } = require('./generateHTML');
 const { groupBySeasonId, updateArchiveForTeam, clubArchiveDir } = require('./seasonArchive');
+const { resolveCompetition, isCupForMatch } = require('./competitionKind');
 const { loadClubs } = require('./clubs');
 const { deriveClubBundesland } = require('./verbandMapping');
 const { loadPortalConfig } = require('./portalConfig');
@@ -16,10 +17,6 @@ const PORTAL_BASE_URL = process.env.BBB_PORTAL_BASE_URL || 'https://olieder.gith
 const MATCH_INFO_CONCURRENCY = Number(process.env.BBB_MATCH_INFO_CONCURRENCY) > 0
   ? Number(process.env.BBB_MATCH_INFO_CONCURRENCY)
   : 4;
-
-function isLiga(liganame) {
-  return String(liganame || '').toLowerCase().includes('liga');
-}
 
 // Die API liefert Spiele mehrerer Saisons gemischt zurück (z.B. laufende Vorbereitung
 // der Folgesaison). Statt eines hartcodierten Jahres wird die aktuelle Saison pro Team
@@ -55,7 +52,8 @@ async function getTeams(clubId) {
   return [];
 }
 
-function mapMatches(seasonMatches, teamId, details) {
+// ligaKindMap (optional): Map ligaId→isLiga aus resolveCompetition; ohne Map gilt die Namensregel.
+function mapMatches(seasonMatches, teamId, details, ligaKindMap) {
   let nextMarked = false;
   return seasonMatches.map(m => {
     const isHome = Number(m.homeTeam?.teamPermanentId) === Number(teamId);
@@ -94,6 +92,7 @@ function mapMatches(seasonMatches, teamId, details) {
       isHome,
       result,
       competition:  m.ligaData?.liganame || '',
+      isCup:        isCupForMatch(m, ligaKindMap),
       isNext,
       venueName,
       venueAddress,
@@ -179,32 +178,23 @@ async function fetchTeamData(team) {
       return da < db ? -1 : da > db ? 1 : 0;
     });
 
-  const mappedMatches = mapMatches(seasonMatches, team.id, details);
-
   // Collect unique competitions from this season's matches
   const compMap = new Map();
   for (const m of seasonMatches) {
     const ligaId = String(m.ligaData?.ligaId || '');
     if (!ligaId || compMap.has(ligaId)) continue;
-    compMap.set(ligaId, {
-      ligaId,
-      liganame: m.ligaData?.liganame || '',
-      isLiga:   isLiga(m.ligaData?.liganame),
-    });
+    compMap.set(ligaId, { ligaId, liganame: m.ligaData?.liganame || '' });
   }
 
-  // Fetch table or bracket for each competition in parallel
+  // Liga vs. Pokal/Turnier je Wettbewerb auflösen (Tabelle bzw. Bracket holen), ADR-028
   const competitions = await Promise.all(
-    Array.from(compMap.values()).map(async comp => {
-      if (comp.isLiga) {
-        const table = await fetchLeagueTable(comp.ligaId, team.id);
-        return { ...comp, table: table || null, bracket: null };
-      } else {
-        const bracket = await fetchTournamentRounds(comp.ligaId);
-        return { ...comp, table: null, bracket: bracket || null };
-      }
-    })
+    Array.from(compMap.values()).map(comp =>
+      resolveCompetition(comp, team.id, { fetchLeagueTable, fetchLeagueTableWithMeta, fetchTournamentRounds }))
   );
+
+  // Erst danach mappen: isCup je Spiel folgt der aufgelösten Klassifikation
+  const ligaKindMap = new Map(competitions.map(c => [c.ligaId, c.isLiga]));
+  const mappedMatches = mapMatches(seasonMatches, team.id, details, ligaKindMap);
 
   const verbandId = firstVerbandId(matches);
 
@@ -318,7 +308,7 @@ async function updateClub(club, generatedRootDir) {
           groupedBySeason,
           seasonId,
           details,
-          { fetchLeagueTable, fetchTournamentRounds }
+          { fetchLeagueTable, fetchLeagueTableWithMeta, fetchTournamentRounds }
         );
       } catch (archiveErr) {
         console.error(`[ERROR] Archiv-Update für Team ${t.id} (Club ${clubId}) fehlgeschlagen:`, archiveErr.stack || archiveErr);

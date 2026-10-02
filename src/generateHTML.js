@@ -2,6 +2,7 @@
 
 const fs   = require('fs');
 const path = require('path');
+const { compIsLiga, matchIsCup } = require('./competitionKind');
 
 const DEFAULT_BASE_URL = 'https://olieder.github.io/bbb-ics-generator/';
 
@@ -120,12 +121,8 @@ function sanitizeCssColor(value) {
   return '#004174';
 }
 
-function isLiga(competition) {
-  return String(competition || '').toLowerCase().includes('liga');
-}
-
 function buildScheduleRow(match, cupColor) {
-  const cup = !isLiga(match.competition);
+  const cup = matchIsCup(match);
   const badgeClass = cup ? 'badge badge--cup' : (match.isHome ? 'badge badge--home' : 'badge badge--away');
   const badgeLabel = match.isHome ? 'H' : 'A';
 
@@ -234,8 +231,8 @@ function buildArchiveSeasonBlock(archiveEntry, cupColor) {
 
   const competitions = Array.isArray(archiveEntry.competitions) ? archiveEntry.competitions : [];
   const compBlocks = competitions.map(comp => {
-    const headingClass = isLiga(comp.liganame) ? 'comp-heading' : 'comp-heading comp-heading--cup';
-    const body = isLiga(comp.liganame)
+    const headingClass = compIsLiga(comp) ? 'comp-heading' : 'comp-heading comp-heading--cup';
+    const body = compIsLiga(comp)
       ? buildStandingsTable(comp)
       : buildBracket(comp, archiveEntry.teamName);
     return `<section class="comp-section">
@@ -369,9 +366,9 @@ function buildTeaserCard(team) {
   }
 
   const renderMatch = m => {
-    const badgeClass = isLiga(m.competition)
-      ? (m.isHome ? 'badge badge--home' : 'badge badge--away')
-      : 'badge badge--cup';
+    const badgeClass = matchIsCup(m)
+      ? 'badge badge--cup'
+      : (m.isHome ? 'badge badge--home' : 'badge badge--away');
     const badgeLabel = m.isHome ? 'H' : 'A';
     const prefix = m.isHome ? 'vs.' : '@';
     const oppName = escapeHtml(m.opponent || '');
@@ -865,9 +862,9 @@ function buildNextGameTeaser(team) {
 </section>`;
   }
 
-  const badgeClass = isLiga(nextMatch.competition)
-    ? (nextMatch.isHome ? 'badge badge--home' : 'badge badge--away')
-    : 'badge badge--cup';
+  const badgeClass = matchIsCup(nextMatch)
+    ? 'badge badge--cup'
+    : (nextMatch.isHome ? 'badge badge--home' : 'badge badge--away');
   const badgeLabel = nextMatch.isHome ? 'Heim' : 'Auswärts';
 
   // Full date with weekday for the prominent teaser
@@ -978,7 +975,7 @@ function buildSpotlightBlock(teams, cupColor) {
     let lastDate = null;
     const rows = [];
     for (const { m, team } of entries) {
-      const cup = !isLiga(m.competition);
+      const cup = matchIsCup(m);
       const badgeClass = cup ? 'badge badge--cup' : (m.isHome ? 'badge badge--home' : 'badge badge--away');
       const badgeLabel = m.isHome ? 'H' : 'A';
 
@@ -1067,8 +1064,8 @@ function buildTeamPage(team, allTeams, theme, legal = {}, renderOptions = {}) {
 
   const competitions = Array.isArray(team.competitions) ? team.competitions : [];
   const compBlocks = competitions.map(comp => {
-    const headingClass = isLiga(comp.liganame) ? 'comp-heading' : 'comp-heading comp-heading--cup';
-    const body = isLiga(comp.liganame)
+    const headingClass = compIsLiga(comp) ? 'comp-heading' : 'comp-heading comp-heading--cup';
+    const body = compIsLiga(comp)
       ? buildStandingsTable(comp)
       : buildBracket(comp, team.teamName);
     return `<section class="comp-section">

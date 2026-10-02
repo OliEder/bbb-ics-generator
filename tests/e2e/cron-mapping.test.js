@@ -485,3 +485,22 @@ test('updateAll: übernimmt teamAkjId und teamNumber in metadata.json', async (t
     run.cleanup();
   }
 });
+
+test('mapMatches: ohne Map bleibt isCup aus dem Namen abgeleitet (Fallback)', () => {
+  const ms = [
+    makeMatch({ matchId: 1, liganame: 'Bezirksliga' }),
+    makeMatch({ matchId: 2, liganame: 'Bezirkspokal Herren', date: '2026-05-02' }),
+    makeMatch({ matchId: 3, liganame: 'Bezirksklasse Damen', date: '2026-05-03' }),
+  ];
+  const mapped = mapMatches(ms, 100, {});
+  assert.deepEqual(mapped.map(m => m.isCup), [false, true, true]);
+});
+
+test('mapMatches: Map ligaId→isLiga hat Vorrang vor dem Namen', () => {
+  const m1 = makeMatch({ matchId: 1, liganame: 'Bezirksklasse Damen' });
+  m1.ligaData.ligaId = 54891;
+  const m2 = makeMatch({ matchId: 2, liganame: 'Bezirkspokal Damen', date: '2026-05-02' });
+  m2.ligaData.ligaId = 7;
+  const mapped = mapMatches([m1, m2], 100, {}, new Map([['54891', true], ['7', false]]));
+  assert.deepEqual(mapped.map(m => m.isCup), [false, true]);
+});

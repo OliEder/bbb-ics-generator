@@ -113,7 +113,21 @@ function tableFor(ligaId, ownTeamId) {
 //  emptyMatchClubIds: fetchTeamMatches liefert für die Teams dieser Clubs keine Spiele
 //    (API-Ausfall auf Team-Ebene; der Teams-Cache greift hier nicht → Club fällt auf 'bundesweit')
 //  verbandOverrides: { [clubId]: verbandId } — abweichender Landesverband aller Spiele eines Clubs
-function installApiMocks(apiClient, { failClubIds = [], emptyClubIds = [], pastSeason = false, emptyMatchClubIds = [], verbandOverrides = {} } = {}) {
+//  competitionOverrides: { [clubId]: { liganame, crossTableExists } } — abweichender Wettbewerbsname
+//    (z.B. "OPF Bezirksklasse Damen" ohne "liga") und das crossTableExists-Flag, das
+//    fetchLeagueTableWithMeta für diese Liga liefert (ADR-028). Bei crossTableExists=false liefert
+//    fetchTournamentRounds zusätzlich ein Bracket. Ohne Override bleibt alles wie bisher.
+function installApiMocks(apiClient, { failClubIds = [], emptyClubIds = [], pastSeason = false, emptyMatchClubIds = [], verbandOverrides = {}, competitionOverrides = {} } = {}) {
+  const crossTableByLiga = new Map();
+  for (const [clubId, o] of Object.entries(competitionOverrides)) {
+    const club = CLUBS.find(c => c.clubId === clubId);
+    if (club) crossTableByLiga.set(ligaFor(club).ligaId, o.crossTableExists);
+  }
+  const applyOverride = (club, m) => {
+    const o = competitionOverrides[club.clubId];
+    if (o?.liganame) m.ligaData.liganame = o.liganame;
+    return m;
+  };
   apiClient.fetchClubTeams = async clubId => {
     if (failClubIds.includes(String(clubId))) throw new Error(`Simulierter API-Ausfall für Club ${clubId}`);
     if (emptyClubIds.includes(String(clubId))) return [];
@@ -124,13 +138,20 @@ function installApiMocks(apiClient, { failClubIds = [], emptyClubIds = [], pastS
     const club = CLUBS.find(c => teamIdFor(c.clubId) === String(teamId));
     if (!club || emptyMatchClubIds.includes(club.clubId)) return { matches: [], gender: 'männlich' };
     const verbandId = verbandOverrides[club.clubId] ?? club.verbandId;
-    const matches = [matchFor(club, verbandId)];
-    if (pastSeason) matches.push(pastMatchFor(club, verbandId));
+    const matches = [applyOverride(club, matchFor(club, verbandId))];
+    if (pastSeason) matches.push(applyOverride(club, pastMatchFor(club, verbandId)));
     return { matches, gender: 'männlich' };
   };
   apiClient.fetchMatchInfo = async () => null;
   apiClient.fetchLeagueTable = async (ligaId, ownTeamId) => tableFor(String(ligaId), String(ownTeamId));
-  apiClient.fetchTournamentRounds = async () => null;
+  apiClient.fetchLeagueTableWithMeta = async (ligaId, ownTeamId) => ({
+    rows: tableFor(String(ligaId), String(ownTeamId)),
+    tableExists: true,
+    crossTableExists: crossTableByLiga.has(String(ligaId)) ? crossTableByLiga.get(String(ligaId)) : true,
+  });
+  apiClient.fetchTournamentRounds = async ligaId => (crossTableByLiga.get(String(ligaId)) === false
+    ? [{ roundName: 'Finale', matches: [{ home: 'Pokal A', guest: 'Pokal B', result: null, homeWon: null, homeBye: false, guestBye: false }] }]
+    : null);
 }
 
 function freshRequire(modulePath) {
@@ -145,7 +166,7 @@ const ENV_KEYS = ['BBB_ICS_DIR', 'BBB_CLUBS_DIR', 'BBB_PORTAL_CONFIG', 'BBB_WAM_
 //  configOverrides: { [clubId]: extraConfig }  (z.B. { '3001': { legacyRootOutput: true } })
 //  portal: Objekt für portal.json, oder null → Datei fehlt
 //  wamCache: Objekt für den WAM-Cache, oder null → Datei fehlt
-//  mockOptions: weitere Optionen für installApiMocks (pastSeason, emptyMatchClubIds, verbandOverrides)
+//  mockOptions: weitere Optionen für installApiMocks (pastSeason, emptyMatchClubIds, verbandOverrides, competitionOverrides)
 // rerun(apiOptions) lädt cronUpdate.js mit neuen API-Mocks frisch, behält aber Verzeichnisse
 // und Configs bei — für Tests über mehrere aufeinanderfolgende Läufe (z.B. Rolling-Update).
 function createRun({ configOverrides = {}, failClubIds = [], emptyClubIds = [], portal = DEFAULT_PORTAL, wamCache = null, ...mockOptions } = {}) {
