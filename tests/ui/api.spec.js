@@ -91,6 +91,18 @@ test.describe('BBB API Smoke Tests @network', () => {
     }
   });
 
+  test('competition/table: ligaData.tableExists/crossTableExists als Booleans (Vertrag der Wettbewerbsart-Erkennung, ADR-028)', async ({ request }) => {
+    const liga = matches.map(m => m.ligaData).find(l => l?.ligaId);
+    test.skip(!liga, 'Keine Spiele im Zeitfenster (Saisonpause?)');
+    const res = await request.get(`${BASE}/competition/table/id/${liga.ligaId}`);
+    expect(res.status()).toBe(200);
+    const ligaData = (await res.json())?.data?.ligaData;
+    expect(ligaData, 'data.ligaData fehlt').toBeTruthy();
+    // competitionKind.resolveCompetition stützt sich für Namen ohne "liga" auf crossTableExists === true.
+    expect(typeof ligaData.crossTableExists, 'ligaData.crossTableExists muss ein Boolean sein').toBe('boolean');
+    expect(typeof ligaData.tableExists, 'ligaData.tableExists muss ein Boolean sein').toBe('boolean');
+  });
+
   test('competition/spielplan (+ matchday): Pokal-/Turnierstruktur für fetchTournamentRounds', async ({ request }) => {
     const cup = matches.map(m => m.ligaData).find(l => l && !isLiga(l.liganame));
     test.skip(!cup, 'Kein Pokal/Turnier in den Spielen des Clubs');

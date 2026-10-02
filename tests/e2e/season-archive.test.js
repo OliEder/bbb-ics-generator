@@ -351,3 +351,27 @@ test('updateArchiveForTeam: wirft bei ungültiger clubId, bevor irgendetwas gesc
     assert.equal(existsSync(join(dir, 'archive')), false);
   });
 });
+
+test('buildArchiveTeamEntry: Bezirksklasse mit crossTableExists=true → isLiga, Tabelle statt Bracket', async () => {
+  const seasonMatches = [makeMatch({ matchId: 1, liganame: 'OPF Bezirksklasse Damen 2025/26', ligaId: '54891', result: '80:70' })];
+  const teamMeta = { id: '100', name: 'Eigenes Team', ageGroup: 'Damen', gender: 'weiblich' };
+  let metaCalls = 0;
+  const entry = await buildArchiveTeamEntry(teamMeta, seasonMatches, {}, {
+    fetchLeagueTable: async () => { throw new Error('kein zweiter Tabellenabruf'); },
+    fetchLeagueTableWithMeta: async () => { metaCalls++; return { rows: [{ rank: 1 }], tableExists: true, crossTableExists: true }; },
+    fetchTournamentRounds: async () => { throw new Error('kein Bracket-Abruf'); },
+  });
+  assert.equal(metaCalls, 1);
+  assert.equal(entry.competitions[0].isLiga, true);
+  assert.deepEqual(entry.competitions[0].table, [{ rank: 1 }]);
+  assert.equal(entry.competitions[0].bracket, null);
+  assert.equal(entry.matches[0].isCup, false);
+});
+
+test('buildArchiveTeamEntry: Pokal-Spiele erhalten isCup:true', async () => {
+  const seasonMatches = [makeMatch({ matchId: 1, liganame: 'Bezirkspokal Herren', ligaId: '9', result: '80:70' })];
+  const entry = await buildArchiveTeamEntry({ id: '100', name: 'E', ageGroup: '', gender: '' }, seasonMatches, {}, {
+    fetchLeagueTable: async () => null, fetchTournamentRounds: async () => null,
+  });
+  assert.equal(entry.matches[0].isCup, true);
+});

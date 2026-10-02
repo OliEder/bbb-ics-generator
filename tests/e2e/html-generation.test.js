@@ -1865,3 +1865,65 @@ test('buildPortalLegalPages strikt: liefert weiterhin impressum + datenschutz + 
   const pages = buildPortalLegalPages({ operator: 'X', address: 'Y', email: 'a@b.de' }, []);
   assert.deepEqual(Object.keys(pages).sort(), ['barrierefreiheit', 'datenschutz', 'impressum']);
 });
+
+// --- Wettbewerbsart: gespeicherte Klassifikation (comp.isLiga / m.isCup) statt Namensprüfung (ADR-028) ---
+{
+  const { _testExports } = require('../../src/generateHTML.js');
+  const { buildTeamPage, buildArchiveSeasonBlock } = _testExports;
+  const theme = { primary: '#004174', accent: '#009ef3', cupColor: '#7c3aed' };
+  const tableRows = [
+    { rank: 1, teamName: 'Fibalon Damen', teamId: '1', played: 5, won: 4, lost: 1, points: 8, koerbe: 300, gegenKoerbe: 250, korbdiff: 50, isOwn: true },
+    { rank: 2, teamName: 'Gegner Damen', teamId: '2', played: 5, won: 1, lost: 4, points: 2, koerbe: 250, gegenKoerbe: 300, korbdiff: -50, isOwn: false },
+  ];
+  const bracket = [{ roundName: 'Finale', matches: [{ home: 'A', guest: 'B', result: null, homeWon: null, homeBye: false, guestBye: false }] }];
+  const mkTeam = (competitions, matches = []) => ({
+    teamId: 't9', teamName: 'Fibalon Damen', ageGroup: '', gender: '',
+    lastUpdate: new Date().toISOString(), matchCount: matches.length, homeMatchCount: 0, awayMatchCount: 0,
+    matches, competitions,
+  });
+
+  test('Wettbewerb "Bezirksklasse" mit isLiga:true rendert Tabelle, kein Bracket', () => {
+    const html = buildTeamPage(mkTeam([{ ligaId: '54891', liganame: 'OPF Bezirksklasse Damen 2026/27', isLiga: true, table: tableRows, bracket: null }]), [], theme);
+    assert.ok(html.includes('standings-table'));
+    assert.ok(!html.includes('class="bracket-round"'));
+    assert.ok(html.includes('<h2 class="comp-heading">OPF Bezirksklasse Damen 2026/27</h2>'));
+    assert.ok(!html.includes('comp-heading--cup"'));
+  });
+
+  test('Wettbewerb mit isLiga:false rendert Bracket, auch wenn der Name "liga" enthält', () => {
+    const html = buildTeamPage(mkTeam([{ ligaId: '1', liganame: 'Ligapokal Herren', isLiga: false, table: null, bracket }]), [], theme);
+    assert.ok(html.includes('class="bracket-round"'));
+    assert.ok(html.includes('comp-heading comp-heading--cup'));
+  });
+
+  test('Fallback ohne isLiga-Feld (alte Daten): Namensregel wie bisher', () => {
+    const liga = buildTeamPage(mkTeam([{ ligaId: '1', liganame: 'Bezirksliga Nord', table: tableRows, bracket: null }]), [], theme);
+    assert.ok(liga.includes('standings-table'));
+    const cup = buildTeamPage(mkTeam([{ ligaId: '2', liganame: 'Bezirkspokal Herren', table: null, bracket }]), [], theme);
+    assert.ok(cup.includes('class="bracket-round"'));
+    assert.ok(cup.includes('comp-heading--cup'));
+  });
+
+  test('Archiv-Block nutzt comp.isLiga für Tabelle vs. Bracket', () => {
+    const html = buildArchiveSeasonBlock({ season: 2025, status: 'final', teamName: 'X', competitions: [{ ligaId: '1', liganame: 'Kreisklasse Damen', isLiga: true, table: tableRows, bracket: null }] }, '#7c3aed');
+    assert.ok(html.includes('standings-table'));
+    assert.ok(!html.includes('class="bracket-round"'));
+  });
+
+  test('Spielzeile mit isCup:false trotz Namen ohne "liga" zeigt kein Pokal-Badge', () => {
+    const m = { date: '2026-10-10', opponent: 'G', result: null, isHome: true, isNext: false, competition: 'OPF Bezirksklasse Damen 2026/27', isCup: false };
+    const html = buildTeamPage(mkTeam([], [m]), [], theme);
+    assert.ok(html.includes('<span class="badge badge--home">H</span><div class="schedule-row-content">'));
+    assert.ok(!html.includes('<span class="badge badge--cup">H</span><div class="schedule-row-content">'));
+  });
+
+  test('Spielzeile mit isCup:true zeigt Pokal-Badge; ohne isCup greift die Namensregel', () => {
+    const base = { date: '2026-10-10', opponent: 'G', result: null, isHome: true, isNext: false };
+    const cup = buildTeamPage(mkTeam([], [{ ...base, competition: 'Bezirksklasse X', isCup: true }]), [], theme);
+    assert.ok(cup.includes('<span class="badge badge--cup">H</span><div class="schedule-row-content">'));
+    const fallbackCup = buildTeamPage(mkTeam([], [{ ...base, competition: 'Bezirksklasse X' }]), [], theme);
+    assert.ok(fallbackCup.includes('<span class="badge badge--cup">H</span><div class="schedule-row-content">'));
+    const fallbackLiga = buildTeamPage(mkTeam([], [{ ...base, competition: 'Bezirksliga X' }]), [], theme);
+    assert.ok(!fallbackLiga.includes('<span class="badge badge--cup">H</span><div class="schedule-row-content">'));
+  });
+}
