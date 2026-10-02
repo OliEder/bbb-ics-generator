@@ -25,7 +25,7 @@ Automatisch generiertes Vereinsportal für die Fibalon Baskets Neumarkt. Ruft al
 ### Team-Seiten
 - **Next-Game Teaser** — nächstes Spiel mit Datum, Uhrzeit, Gegner, Heim/Auswärts, Hallenname, Adresse, Leaflet-Karte und Navigationslinks zu Google Maps + Apple Maps
 - **Tabelle** — offizielle Tabelle + Games-Behind-Variante (NBA-Logik)
-- **Turnierklammer** — für Pokalwettbewerbe mit Vorschau zukünftiger Runden
+- **Turnierklammer** — für Pokalwettbewerbe mit Vorschau zukünftiger Runden; Ligen (auch "Bezirksklasse"/"Kreisklasse" ohne "liga" im Namen) werden als Tabelle dargestellt, die Wettbewerbsart wird per Namensregel und `crossTableExists` der API erkannt (ADR-028)
 - **Spielplan** — alle/Heim/Auswärts-Tabs mit ICS-Kalender-Links
 - **Archiv** — abgelaufene Saisons werden automatisch archiviert und bleiben als eigener Tab mit Endtabelle und Ergebnissen einsehbar. Das Archiv ist **pro Verein getrennt** (`generated/archive/<clubId>/<saison>.json`, nach der stabilen `clubId` statt nach Bundesland, damit es einen Bundesland-Wechsel des Vereins übersteht) und wird von `deploy.yml` nach jedem Lauf nach `main` committet, weil die API alte Saisons irgendwann nicht mehr liefert. Ist ein Team gerade nicht in den aktuellen Daten des Vereins gelistet (z.B. zwischen zwei Saisons), bleibt seine Teamseite mit einem kurzen Hinweis erhalten, statt zu verschwinden (Grundlage ist die `metadata.json` des vorherigen Laufs im Vereinsverzeichnis).
 

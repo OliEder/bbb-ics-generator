@@ -46,12 +46,13 @@ a|
 * `writeClubIcs(meta, rawTeamData, clubOutputDir)` — ruft `writeIcsVariants` für alle Teams eines Clubs ohne Migrationshinweis auf (neuer, verschachtelter Pfad)
 * `writeLegacyOutput(rawTeamData, baseUrl)` — schreibt für Clubs mit `legacyRootOutput: true` ausschließlich die Alt-Pfad-ICS (`generated/{teamId}_{kind}.ics`, echte Spieldaten plus Migrationshinweis-VEVENT in jeder Variante); kein Alt-Pfad-HTML und kein Root-`metadata.json` mehr (siehe <<adr-023-wegfall-legacy-html,ADR-023>>)
 * `firstVerbandId(matches)` — liefert die `verbandId` des ersten (ungefilterten) Rohspiels eines Teams, das eine besitzt; Basis für die Bundesland-Mehrheitsentscheidung
-* `isLiga(liganame)` — Namensheuristik: enthält der Wettbewerbsname "liga", gilt er als Liga (Tabelle), sonst als Cup/Pokal (Turnierbaum)
+* Wettbewerbsart: `fetchTeamData` löst Wettbewerbe über `competitionKind.resolveCompetition` auf (Liga → Tabelle, Pokal → Turnierbaum; <<adr-028-wettbewerbsart-erkennung,ADR-028>>) und ruft danach `mapMatches(seasonMatches, teamId, details, ligaKindMap)` auf, das je Spiel `isCup` setzt (ohne Map: Namensregel)
 
 | *Schnittstellen (ausgehend)*
 | `clubs.js`: `loadClubs(clubsRootDir)` +
 `verbandMapping.js`: `deriveClubBundesland(teamVerbandIds)` +
-`apiClient.js`: `fetchTeamMatches(teamId)`, `fetchMatchInfo(matchId)`, `fetchClubTeams(clubId)`, `fetchLeagueTable(ligaId, ownTeamId)`, `fetchTournamentRounds(ligaId)`, `mapWithConcurrency(items, limit, mapper)` +
+`apiClient.js`: `fetchTeamMatches(teamId)`, `fetchMatchInfo(matchId)`, `fetchClubTeams(clubId)`, `fetchLeagueTable(ligaId, ownTeamId)`, `fetchLeagueTableWithMeta(ligaId, ownTeamId)`, `fetchTournamentRounds(ligaId)`, `mapWithConcurrency(items, limit, mapper)` +
+`competitionKind.js`: `resolveCompetition(comp, ownTeamId, apiFns)`, `isCupForMatch(match, ligaKindMap)` +
 `icsGenerator.js`: `generateICS(matches, details, teamId, type, teamName, migrationNotice)` +
 `storage.js`: `saveICS(teamId, type, data, outputDir)`, `saveTeamsCache(teams, clubId)`, `loadTeamsCache(clubId)`, `sanitizeSlug(slug)` +
 `seasonArchive.js`: `groupBySeasonId(matches)`, `updateArchiveForTeam(clubId, teamMeta, groupedBySeason, currentSeasonId, details, apiFns)`, `clubArchiveDir(clubId)` +
@@ -126,6 +127,27 @@ a|
 | Keine (reine Funktionen, keine I/O)
 |===
 
+=== Modul: competitionKind.js (neu — Wettbewerbsart-Erkennung)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *Verantwortlichkeit*
+| Einzige Implementierung der Klassifikation Liga vs. Pokal/Turnier (<<adr-028-wettbewerbsart-erkennung,ADR-028>>): Namensregel, Auflösung eines Wettbewerbs inkl. Tabelle bzw. Turnierbaum und Fallback-Helfer für die Anzeige-Schicht.
+
+| *Exportierte Funktionen*
+a|
+* `kindFromName(liganame)` → `'cup'` (pokal/cup/turnier/qualifikation) \| `'league'` (enthält "liga") \| `'unknown'`
+* `isLeagueByName(liganame)` → Boolean (nur `'league'`)
+* `resolveCompetition(comp, ownTeamId, apiFns)` → `Promise<{ ...comp, isLiga, table, bracket }>`; bei `'unknown'` genau ein `fetchLeagueTableWithMeta`-Abruf, `crossTableExists === true` → Liga (Zeilen wiederverwendet), sonst/bei Fehler Pokal
+* `compIsLiga(comp)` / `matchIsCup(match)` — Anzeige-Schicht: gespeichertes `comp.isLiga` bzw. `m.isCup`, Namensregel nur als Fallback für alte Daten
+* `isCupForMatch(rawMatch, ligaKindMap)` — von `mapMatches` genutzt (Map `ligaId` → `isLiga`)
+
+| *Abhängigkeiten*
+| Keine (reine Funktionen; `apiFns` werden injiziert)
+|===
+
 === Modul: apiClient.js (API-Facade)
 
 [cols="2,5", options="header"]
@@ -141,6 +163,7 @@ a|
 * `fetchMatchInfo(matchId)` → `MatchInfo \| null` (null bei Fehler)
 * `fetchClubTeams(clubId)` → `Array<Team> \| null` (null bei Fehler, leer wenn keine Matches)
 * `fetchLeagueTable(ligaId, ownTeamId)` → `Array<TableRow> \| null` (null bei Fehler); jede `TableRow` enthält zusätzlich `teamId` (`teamPermanentId` als String oder `null`), mit dem `aggregatePages.js` Tabellenzeilen eingebundener Teams auf die Club-Seite verlinkt
+* `fetchLeagueTableWithMeta(ligaId, ownTeamId)` → `{ rows, tableExists, crossTableExists } \| null` (null bei Fehler); die Flags stammen aus `data.ligaData` der Table-Antwort (in Match-Daten sind sie `null`); `fetchLeagueTable` ist ein dünner Wrapper darauf und liefert nur `rows`
 * `fetchTournamentRounds(ligaId)` → `Array<Round> \| null` (null bei Fehler oder keinen Runden)
 * `mapWithConcurrency(items, limit, mapper)` → `Promise<Array>` (geänderte/neue Funktion, siehe unten)
 
@@ -257,7 +280,7 @@ a|
 | *Exportierte Funktionen*
 a|
 * `groupBySeasonId(matches)` → `{ [seasonId]: Array<Match> }` — gruppiert die rohen API-Matches eines Teams anhand von `ligaData.seasonId`; Matches ohne numerische `seasonId` werden übersprungen.
-* `buildArchiveTeamEntry(teamMeta, seasonMatches, details, apiFns)` → `Promise<ArchiveTeamEntry>` — baut den Archiv-Eintrag eines Teams für eine Saison: aufsteigend sortierte, angereicherte `matches[]` (Gegner, Heim/Auswärts, Ergebnis, Liganame) sowie `competitions[]` mit Tabelle (`fetchLeagueTable`) oder Turnierbaum (`fetchTournamentRounds`) je nach Liga-Heuristik (`isLiga`, gleiche Namens-Heuristik wie ADR-009).
+* `buildArchiveTeamEntry(teamMeta, seasonMatches, details, apiFns)` → `Promise<ArchiveTeamEntry>` — baut den Archiv-Eintrag eines Teams für eine Saison: aufsteigend sortierte, angereicherte `matches[]` (Gegner, Heim/Auswärts, Ergebnis, Liganame) sowie `competitions[]` mit Tabelle (`fetchLeagueTable`) oder Turnierbaum (`fetchTournamentRounds`) je nach Klassifikation über `competitionKind.resolveCompetition` (gleiche Regel wie im aktuellen Lauf, <<adr-028-wettbewerbsart-erkennung,ADR-028>>; fehlt `apiFns.fetchLeagueTableWithMeta`, gelten Namen ohne "liga" als Pokal); `matches[]` tragen `isCup`.
 * `clubArchiveDir(clubId)` → `string` — Archiv-Verzeichnis eines Clubs, `generated/archive/<clubId>/` (Basis überschreibbar via `BBB_ICS_DIR`); legt nichts an.
 * `saveArchive(clubId, season, data)` → `string` (Dateipfad) — schreibt `generated/archive/<clubId>/{seasonId}.json` und legt das Club-Verzeichnis bei Bedarf an.
 * `loadArchive(clubId, season)` → `object \| null` — liest `generated/archive/<clubId>/{seasonId}.json`, `null` wenn nicht vorhanden (ohne Verzeichnis anzulegen).

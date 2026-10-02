@@ -264,7 +264,7 @@ a|
 | Die Übersichtsseite soll pro Team den Spielplan der aktuellen Saison anzeigen — vergangene Spiele mit Ergebnis, kommende ohne — direkt in den Tab-Panels, oberhalb der Kalender-Abo-Buttons.
 
 | *Entscheidung*
-| `cronUpdate.js` filtert die rohen API-Matches auf die aktuelle Saison, sortiert sie aufsteigend und speichert sie als `matches[]`-Array in `metadata.json`. `generateHTML.js` rendert dieses Array als HTML-Tabelle im jeweiligen Tab-Panel (Alle/Heim/Auswärts). Liga-Erkennung per Namens-Heuristik: enthält `liganame` das Wort "Liga" → Liga-Typ, sonst Cup/Pokal. Cup-Farbe ist konfigurierbar via `config.theme.cupColor` (Default `#7c3aed`).
+| `cronUpdate.js` filtert die rohen API-Matches auf die aktuelle Saison, sortiert sie aufsteigend und speichert sie als `matches[]`-Array in `metadata.json`. `generateHTML.js` rendert dieses Array als HTML-Tabelle im jeweiligen Tab-Panel (Alle/Heim/Auswärts). Liga-Erkennung per Namens-Heuristik: enthält `liganame` das Wort "Liga" → Liga-Typ, sonst Cup/Pokal (ersetzt durch die zentrale Klassifikation aus <<adr-028-wettbewerbsart-erkennung,ADR-028>>). Cup-Farbe ist konfigurierbar via `config.theme.cupColor` (Default `#7c3aed`).
 +
 *Update 2026-09-08:* Die anfängliche Implementierung nutzte eine harte Konstante `CURRENT_SEASON` auf Modul-Ebene. Das führte zu einem Produktionsbug: Beim Saisonwechsel 2026/27 lieferte die API ausschließlich Matches mit `seasonId: 2026`, während `CURRENT_SEASON` noch auf `2025` stand — `matches[]` und `competitions[]` liefen für alle Teams leer, obwohl die (ungefiltert erzeugten) ICS-Kalender die neuen Spiele korrekt enthielten. Die Konstante wurde durch `currentSeasonId(matches)` ersetzt, das pro Team die höchste vorkommende `seasonId` aus den geladenen Matches ermittelt (die API liefert Matches mehrerer Saisons gemischt zurück, z.B. während der Übergangsphase).
 
@@ -872,4 +872,46 @@ a|
 * Ein Wechsel zurück auf den strengen Modus ist jederzeit möglich: `address`/`email` eintragen und `private` entfernen.
 * Club-Seiten behalten ihre eigenen Impressen (Club-`legal`); sie sind von dieser Betriebsart nicht betroffen.
 * Abgesichert durch Tests in `tests/e2e/portal-config.test.js`, `html-generation.test.js`, `portal-aggregation-integration.test.js` (10-Club-Fixture) und `tests/accessibility/portal.spec.js`.
+|===
+
+[[adr-028-wettbewerbsart-erkennung]]
+=== ADR-028: Wettbewerbsart-Erkennung (Liga vs. Pokal/Turnier)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-10-02
+
+| *Kontext*
+a|
+* Bug: Bei den Damen von Fibalon wurde ein Turnier-Bracket gerendert, obwohl "OPF Bezirksklasse Damen 2026/27" (ligaId 54891) eine normale Liga mit Tabelle ist.
+* Ursache: Die Klassifikation stützte sich überall auf `liganame.toLowerCase().includes('liga')` (`cronUpdate.js`, `seasonArchive.js`, `generateHTML.js`). Namen wie "Bezirksklasse …" oder "Kreisklasse …" enthalten "liga" nicht, wurden als Turnier behandelt, und `fetchTournamentRounds` baute aus den inline-Matches mit `matchDay` 1–10 "Runden".
+* Betroffen sind in Bayern ca. 90 Wettbewerbe (Bezirksklasse 55, Kreisklasse 36).
+
+| *Entscheidung*
+a|
+* Die Klassifikation liegt zentral in `src/competitionKind.js` (keine Kopien mehr). Regeln:
+. Name enthält (case-insensitiv) `pokal`, `cup`, `turnier` oder `qualifikation` → Pokal (auch bei "Ligapokal").
+. Sonst enthält der Name `liga` → Liga (kein Zusatzrequest).
+. Sonst (`unknown`, z.B. Bezirksklasse/Kreisklasse): ein Abruf der Table-Antwort mit Metadaten (`apiClient.fetchLeagueTableWithMeta`); `ligaData.crossTableExists === true` → Liga (die geholten Zeilen werden wiederverwendet), sonst Pokal. Schlägt der Abruf fehl → Pokal (bisheriges Verhalten).
+* `resolveCompetition(comp, ownTeamId, apiFns)` wird von `fetchTeamData` (`cronUpdate.js`) und `buildArchiveTeamEntry` (`seasonArchive.js`) genutzt und liefert `{ ...comp, isLiga, table, bracket }`.
+* Die Anzeige-Schicht klassifiziert nicht mehr nach Namen, wenn die Daten es wissen: `generateHTML.js` nutzt `comp.isLiga` (gespeichert in `metadata.json`/Archiv) und je Spiel `m.isCup` (von `mapMatches` aus der aufgelösten Klassifikation der Liga abgeleitet). Nur wenn diese Felder fehlen (alte `metadata.json`/Archive), greift die Namensregel als Fallback.
+
+| *Begründung*
+a|
+* Es gibt kein einzelnes zuverlässiges Flag. `crossTableExists`/`tableExists` stehen nur in der Table-Antwort (in Match-Daten sind sie `null`) und sind für Pokale nicht verlässlich: "OPF Bezirkspokal Herren 26-27" hat `crossTableExists=false` aber `tableExists=true` (22 Zeilen), "OPF Bezirkspokal Damen 26-27" dagegen `crossTableExists=true`, `tableExists=false`; "Bayernpokal 2027 Herren" und "Qualifikationsspiel bayerische Meisterschaft" haben beide `false`.
+* Bezirksoberliga/Kreisliga/Bezirksliga/Landesliga/Regionalliga/Bayernliga und Bezirksklasse/Kreisklasse haben `crossTableExists=true`.
+* Daher: Pokale sind am Namen erkennbar, Klassen am Flag.
+
+| *Konsequenzen*
+a|
+* Ein Zusatzrequest fällt nur bei `unknown`-Namen an; die Tabellenzeilen werden wiederverwendet (kein zweiter Tabellenabruf).
+* Alte `metadata.json` und Archive ohne `isLiga`/`isCup` nutzen den Namens-Fallback und werden beim nächsten Lauf korrigiert; bereits archivierte Vorsaisons werden bis zur nächsten Aktualisierung (provisional) nicht rückwirkend umklassifiziert.
+* Die Namensregel (Schritt 1+2) bleibt eine Heuristik; ein neuer Pokalname ohne die Schlüsselwörter wird über `crossTableExists` entschieden und kann dort falsch liegen.
+* Abgesichert durch `tests/e2e/competition-kind.test.js`, `api-client-league-table.test.js`, `html-generation.test.js`, `competition-kind-integration.test.js` (10-Club-Fixture) und den `@network`-Vertragstest in `tests/ui/api.spec.js`.
 |===

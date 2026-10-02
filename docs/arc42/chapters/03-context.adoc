@@ -29,7 +29,7 @@ flowchart TD
 
 | *Basketball-Bund REST-API — Tabelle*
 | BBB Vereinsportal ← API (HTTP GET)
-| Endpunkt: `/rest/competition/table/id/{ligaId}`. Liefert die Ligatabelle mit Rang, Teamname, Siege, Niederlagen, Punkte, Körbe, Korbdifferenz.
+| Endpunkt: `/rest/competition/table/id/{ligaId}`. Liefert die Ligatabelle mit Rang, Teamname, Siege, Niederlagen, Punkte, Körbe, Korbdifferenz sowie `data.ligaData.tableExists`/`crossTableExists` (Booleans; Grundlage der Wettbewerbsart-Erkennung für Namen ohne "liga", siehe <<adr-028-wettbewerbsart-erkennung,ADR-028>>).
 
 | *Basketball-Bund REST-API — Spielplan/Turnierplan*
 | BBB Vereinsportal ← API (HTTP GET)
