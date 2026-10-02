@@ -348,9 +348,18 @@ async function updateClub(club, generatedRootDir) {
   // Diese Einträge gehen nur in metadata.json/HTML des Clubs, nicht in das für ICS und
   // die Portal-Aggregation zurückgegebene meta (keine Rohdaten, veraltete Tabellen).
   const previousMetaPath = path.join(clubOutputDir, 'metadata.json');
-  const previousMeta = fs.existsSync(previousMetaPath)
-    ? JSON.parse(fs.readFileSync(previousMetaPath, 'utf8'))
-    : [];
+  // Eine abgeschnittene oder fehlerhafte vorherige metadata.json (lokal möglich) darf den Club
+  // nicht scheitern lassen: dann werden keine nicht mehr gelisteten Teams übernommen.
+  let previousMeta = [];
+  if (fs.existsSync(previousMetaPath)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(previousMetaPath, 'utf8'));
+      if (Array.isArray(parsed)) previousMeta = parsed;
+      else console.warn(`[WARN] ${previousMetaPath} ist kein Array — vorherige Teams werden nicht übernommen`);
+    } catch (err) {
+      console.warn(`[WARN] ${previousMetaPath} nicht lesbar — vorherige Teams werden nicht übernommen: ${err.message}`);
+    }
+  }
   const activeTeamIds = new Set(teams.map(t => String(t.id)));
   const missingTeams = previousMeta
     .filter(m => !activeTeamIds.has(String(m.teamId)))

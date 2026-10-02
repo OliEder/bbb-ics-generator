@@ -40,7 +40,7 @@ a|
 | Aspekt | Inhalt
 
 | *Status*
-| Ersetzt durch <<adr-017-automatische-bundesland-ableitung,ADR-017>> (Multi-Club-Umbau, 2026-09)
+| Ersetzt durch <<adr-018-verzeichnis-pro-club,ADR-018>> (Verzeichnis pro Club; die zugehörige Bundesland-Ableitung steht in <<adr-017-automatische-bundesland-ableitung,ADR-017>>), Multi-Club-Umbau, 2026-09
 
 | *Datum*
 | 2024

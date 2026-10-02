@@ -80,3 +80,28 @@ test('CLI: Exitcode 0 ohne Fehler', () => {
   const res = runCli('');
   assert.equal(res.status, 0, res.stderr.slice(-500));
 });
+
+const { mkdirSync, writeFileSync } = require('node:fs');
+
+test('updateAll: beschädigte oder nicht-Array metadata.json im Club-Verzeichnis lässt den Club nicht scheitern', async () => {
+  for (const garbage of ['{ abgeschnitten', '{"kein":"array"}']) {
+    const run = createRun();
+    const realWarn = console.warn;
+    const warnings = [];
+    console.warn = (...args) => warnings.push(args.join(' '));
+    try {
+      const clubDir = join(run.dir, 'bayern', 'verein-3002');
+      mkdirSync(clubDir, { recursive: true });
+      writeFileSync(join(clubDir, 'metadata.json'), garbage);
+      const { results, failures } = await run.cronModule.updateAll();
+      assert.deepEqual(failures, [], `kein Club darf an "${garbage}" scheitern`);
+      assert.equal(results.length, 10);
+      const meta = JSON.parse(readFileSync(join(clubDir, 'metadata.json'), 'utf8'));
+      assert.ok(Array.isArray(meta) && meta.length === 1, 'metadata.json wird neu und gültig geschrieben');
+      assert.ok(warnings.some(w => w.includes('metadata.json')), 'Warnung wird geloggt');
+    } finally {
+      console.warn = realWarn;
+      run.cleanup();
+    }
+  }
+});

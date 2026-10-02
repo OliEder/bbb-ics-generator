@@ -36,7 +36,7 @@ graph LR
 | Einstiegspunkt des Update-Prozesses. Orchestriert den kompletten Daten-Refresh für **alle** konfigurierten Clubs: Club-Configs laden, pro Club Teams ermitteln, Spielpläne abrufen, Bundesland herleiten, ICS + HTML generieren, für Bestandsclubs zusätzlich die Alt-Pfad-ICS schreiben und nach der Club-Schleife die Bund-/Land-Seiten aggregieren (`aggregatePages()`, siehe <<adr-020-aggregation-aus-laufzeit-ergebnissen,ADR-020>>).
 
 | *Schnittstellen (eingehend)*
-| Keine. Wird direkt via `node src/cronUpdate.js` gestartet (durch GitHub Actions oder manuell). `module.exports = { getTeams, updateAll, updateClub, mapMatches, computeSpotlight }` — diese fünf Funktionen sind die öffentliche, testbare Oberfläche des Moduls. Der CLI-Einstieg (`require.main === module`) ruft `updateAll()` auf und setzt `process.exitCode = 1`, wenn `failures` nicht leer ist (bewusst nicht in `updateAll()` selbst, damit `node:test`-Läufe nicht beeinflusst werden, siehe <<adr-025-fehlerisolation-pro-club,ADR-025>>).
+| Keine. Wird direkt via `node src/cronUpdate.js` gestartet (durch GitHub Actions oder manuell). `module.exports = { getTeams, updateAll, updateClub, mapMatches, computeSpotlight, currentSeasonId }` — diese sechs Funktionen sind die öffentliche, testbare Oberfläche des Moduls. Der CLI-Einstieg (`require.main === module`) ruft `updateAll()` auf und setzt `process.exitCode = 1`, wenn `failures` nicht leer ist (bewusst nicht in `updateAll()` selbst, damit `node:test`-Läufe nicht beeinflusst werden, siehe <<adr-025-fehlerisolation-pro-club,ADR-025>>).
 
 | *Interne (nicht exportierte) Funktionen*
 a|
