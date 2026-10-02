@@ -89,12 +89,16 @@ async function fetchClubTeams(clubId) {
   }
 }
 
-async function fetchLeagueTable(ligaId, ownTeamId) {
+// Holt die Tabelle samt den Metadaten-Flags aus data.ligaData (tableExists/crossTableExists).
+// Die Flags stehen NUR in dieser Antwort (in den Match-Daten sind sie null) — Grundlage der
+// Wettbewerbsart-Erkennung für Namen ohne "liga" (siehe competitionKind.js, ADR-028).
+// Gibt null bei einem Abruffehler zurück.
+async function fetchLeagueTableWithMeta(ligaId, ownTeamId) {
   const url = `${BASE_URL}/competition/table/id/${ligaId}`;
   try {
     const res = await axios.get(url);
-    const rows = res.data?.data?.tabelle?.entries || [];
-    return rows.map(row => ({
+    const data = res.data?.data;
+    const rows = (data?.tabelle?.entries || []).map(row => ({
       rank:     row.rang || 0,
       teamName: row.team?.teamname || '',
       teamId:   row.team?.teamPermanentId != null ? String(row.team.teamPermanentId) : null,
@@ -107,10 +111,21 @@ async function fetchLeagueTable(ligaId, ownTeamId) {
       korbdiff: row.korbdiff || 0,
       isOwn:    String(row.team?.teamPermanentId) === String(ownTeamId),
     }));
+    return {
+      rows,
+      tableExists:      data?.ligaData?.tableExists === true,
+      crossTableExists: data?.ligaData?.crossTableExists === true,
+    };
   } catch (err) {
     console.error('API error fetchLeagueTable', ligaId, err.response ? err.response.status : err.message);
     return null;
   }
+}
+
+// Dünner Wrapper: nur die Tabellenzeilen (Array) bzw. null bei Fehler.
+async function fetchLeagueTable(ligaId, ownTeamId) {
+  const res = await fetchLeagueTableWithMeta(ligaId, ownTeamId);
+  return res ? res.rows : null;
 }
 
 async function fetchTournamentRounds(ligaId) {
@@ -219,4 +234,4 @@ async function fetchTournamentRounds(ligaId) {
   }
 }
 
-module.exports = { fetchTeamMatches, fetchMatchInfo, fetchClubTeams, fetchLeagueTable, fetchTournamentRounds, mapWithConcurrency };
+module.exports = { fetchTeamMatches, fetchMatchInfo, fetchClubTeams, fetchLeagueTable, fetchLeagueTableWithMeta, fetchTournamentRounds, mapWithConcurrency };
