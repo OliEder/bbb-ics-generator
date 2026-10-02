@@ -1808,3 +1808,60 @@ test('loadTeamArchives: liest Archivdateien, ignoriert kaputte Dateien, sortiert
     rmSync(dir, { recursive: true });
   }
 });
+
+// ---- Privater Portalbetrieb (ADR-027) ----
+
+test('buildFooter privat: ohne contactUrl kein Impressum- und kein Kontakt-Link', () => {
+  const { buildFooter } = require('../../src/generateHTML.js')._testExports;
+  const html = buildFooter({ private: true, operator: 'Privat' }, './');
+  assert.ok(!html.includes('impressum.html'));
+  assert.ok(!html.includes('Kontakt'));
+  assert.ok(html.includes('href="./datenschutz.html"') && html.includes('href="./barrierefreiheit.html"'));
+});
+
+test('buildFooter privat: contactUrl als Kontakt-Link (target/rel, escaped), kein Impressum', () => {
+  const { buildFooter } = require('../../src/generateHTML.js')._testExports;
+  const html = buildFooter({ private: true, operator: 'Privat', contactUrl: 'https://x.test/k?a=1&b="2"' }, '../');
+  assert.ok(html.includes('<a href="https://x.test/k?a=1&amp;b=&quot;2&quot;" target="_blank" rel="noopener">Kontakt</a>'), html);
+  assert.ok(!html.includes('impressum.html'));
+  assert.ok(html.includes('href="../datenschutz.html"'));
+});
+
+test('buildFooter: Club-Legal ohne private bleibt unverändert (Impressum-Link, kein Kontakt)', () => {
+  const { buildFooter } = require('../../src/generateHTML.js')._testExports;
+  const html = buildFooter({ operator: 'Verein', address: 'A', email: 'a@b.de' }, './');
+  assert.ok(html.includes('<a href="./impressum.html">Impressum</a>'));
+  assert.ok(!html.includes('Kontakt'));
+});
+
+test('buildPortalLegalPages privat: nur datenschutz + barrierefreiheit, mit Operator und Kontaktlink', () => {
+  const { buildPortalLegalPages } = require('../../src/generateHTML.js');
+  const legal = { private: true, operator: 'Privat <b>& Co', contactUrl: 'https://x.test/k?a=1&b=2' };
+  const pages = buildPortalLegalPages(legal, []);
+  assert.deepEqual(Object.keys(pages).sort(), ['barrierefreiheit', 'datenschutz']);
+  for (const html of Object.values(pages)) {
+    assert.ok(html.includes('Privat &lt;b&gt;&amp; Co') || pages.barrierefreiheit === html);
+    assert.ok(html.includes('href="https://x.test/k?a=1&amp;b=2"'));
+    assert.ok(!/Impressum/.test(html), 'kein Verweis auf Impressum');
+    assert.ok(!html.includes('mailto:'));
+  }
+  assert.ok(pages.datenschutz.includes('Privat &lt;b&gt;&amp; Co'));
+  assert.ok(!pages.datenschutz.includes('<b>& Co'));
+});
+
+test('buildPortalLegalPages privat ohne contactUrl: Fallbacksatz, kein Impressum-Verweis', () => {
+  const { buildPortalLegalPages } = require('../../src/generateHTML.js');
+  const pages = buildPortalLegalPages({ private: true, operator: 'Privat' }, []);
+  for (const html of Object.values(pages)) {
+    assert.ok(html.includes('Bitte wenden Sie sich an den Seitenbetreiber.'));
+    assert.ok(!/Impressum/.test(html));
+    assert.ok(!html.includes('mailto:'));
+  }
+  assert.ok(pages.datenschutz.includes('Privat'));
+});
+
+test('buildPortalLegalPages strikt: liefert weiterhin impressum + datenschutz + barrierefreiheit', () => {
+  const { buildPortalLegalPages } = require('../../src/generateHTML.js');
+  const pages = buildPortalLegalPages({ operator: 'X', address: 'Y', email: 'a@b.de' }, []);
+  assert.deepEqual(Object.keys(pages).sort(), ['barrierefreiheit', 'datenschutz', 'impressum']);
+});

@@ -7,6 +7,8 @@ const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 
 /** @type {ReturnType<typeof createRun>} */
 let run;
+/** @type {ReturnType<typeof createRun>} */
+let privateRun;
 test.beforeAll(async () => {
   run = createRun({
     configOverrides: { '3001': { legacyRootOutput: true } }, // Banner sichtbar
@@ -16,14 +18,20 @@ test.beforeAll(async () => {
     },
   });
   await run.cronModule.updateAll();
+  // Privater Portalbetrieb (ADR-027): eigener Lauf; zweites createRun nach dem ersten Lauf,
+  // Cleanup in umgekehrter Reihenfolge (stellt die Umgebung korrekt wieder her).
+  privateRun = createRun({ portal: { private: true, operator: 'Privat Test', contactUrl: 'https://example.test/kontakt' } });
+  await privateRun.cronModule.updateAll();
 });
-test.afterAll(() => run.cleanup());
+test.afterAll(() => { privateRun.cleanup(); run.cleanup(); });
 
 const PAGES = [
   ['Bund-Seite (mit Banner)', () => run.paths.bund],
   ['Land-Seite Bayern (mit Ebenen-Gruppierung)', () => run.paths.land('bayern')],
   ['Land-Seite bundesweit', () => run.paths.land('bundesweit')],
   ['Portal-Impressum', () => run.paths.legal('impressum')],
+  ['Bund-Seite (privater Betrieb)', () => privateRun.paths.bund],
+  ['Portal-Datenschutz (privater Betrieb)', () => privateRun.paths.legal('datenschutz')],
 ];
 
 for (const [name, getPath] of PAGES) {
@@ -61,6 +69,7 @@ async function contrastOf(page, selector) {
 
 const CONTRAST_CHECKS = [
   ['Bund-Seite', () => run.paths.bund, ['.migration-banner', '.portal-region h2 a', '.portal-list a', '.portal-meta', '.site-footer', '.site-footer a']],
+  ['Bund-Seite (privater Betrieb, Kontakt-Link)', () => privateRun.paths.bund, ['.site-footer', '.site-footer a[rel="noopener"][href^="https://example.test"]']],
   ['Land-Seite Bayern', () => run.paths.land('bayern'), ['.portal-list a', '.portal-group-heading', '.standings-table a', '.standings-table td', '.site-footer a']],
 ];
 

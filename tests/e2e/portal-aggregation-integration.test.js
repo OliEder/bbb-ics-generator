@@ -228,3 +228,35 @@ test('groupLigen: Ebenen-Reihenfolge Verband → Bezirk → Kreis → Weitere; a
 
   assert.equal(groupLigen(ligen, null)[0].heading, null, 'ohne Index flach');
 });
+
+test('privater Portalbetrieb: kein Impressum, Kontakt-Link im Footer, Club-Seiten unverändert (ADR-027)', async () => {
+  const clubLegal = { operator: 'Club e.V.', address: 'Clubstr. 1', email: 'club@example.test' };
+  const run = createRun({
+    portal: { private: true, operator: 'Privat Test', contactUrl: 'https://example.test/kontakt' },
+    configOverrides: { '3002': { legal: clubLegal } },
+  });
+  try {
+    const { failures } = await run.cronModule.updateAll();
+    assert.deepEqual(failures, []);
+    assert.ok(!existsSync(run.paths.legal('impressum')), 'impressum.html darf nicht entstehen');
+    assert.ok(existsSync(run.paths.legal('datenschutz')) && existsSync(run.paths.legal('barrierefreiheit')));
+    assert.ok(read(run.paths.legal('datenschutz')).includes('Privat Test'));
+
+    const contact = 'href="https://example.test/kontakt" target="_blank" rel="noopener">Kontakt</a>';
+    for (const file of [run.paths.bund, run.paths.land('bayern'), run.paths.legal('datenschutz')]) {
+      const html = read(file);
+      assert.ok(html.includes(contact), `${file}: Kontakt-Link fehlt`);
+      assert.ok(!html.includes('impressum.html'), `${file}: darf nicht auf impressum.html verlinken`);
+    }
+    assert.ok(read(run.paths.bund).includes('<h1 class="team-page-title">BBB Vereinsportal</h1>'));
+    assert.ok(read(run.paths.land('bayern')).includes('href="verein-3002/index.html"'));
+
+    const club = read(run.paths.club('bayern', '3002'));
+    assert.ok(club.includes('<a href="./impressum.html">Impressum</a>'), 'Club-Footer behält Impressum-Link');
+    assert.ok(!club.includes('Kontakt</a>'));
+    const clubWithout = read(run.paths.club('bayern', '3010'));
+    assert.ok(!clubWithout.includes('impressum.html') && !clubWithout.includes('Kontakt</a>'));
+  } finally {
+    run.cleanup();
+  }
+});

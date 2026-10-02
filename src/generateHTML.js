@@ -1156,11 +1156,15 @@ function buildTeamPage(team, allTeams, theme, legal = {}, renderOptions = {}) {
 }
 
 function buildFooter(legal, relativePath) {
-  const hasImpressum = legal && Object.values(legal).some(v => v && String(v).trim());
+  const isPrivate = legal && legal.private === true;
+  const hasImpressum = !isPrivate && legal && Object.values(legal).some(v => v && String(v).trim());
   const safeRel = escapeHtml(relativePath);
-  const impressumLink = hasImpressum
-    ? ` &middot; <a href="${safeRel}impressum.html">Impressum</a>`
-    : '';
+  let impressumLink = '';
+  if (hasImpressum) {
+    impressumLink = ` &middot; <a href="${safeRel}impressum.html">Impressum</a>`;
+  } else if (isPrivate && legal.contactUrl) {
+    impressumLink = ` &middot; <a href="${escapeHtml(legal.contactUrl)}" target="_blank" rel="noopener">Kontakt</a>`;
+  }
   return `<footer role="contentinfo" class="site-footer">
   <span>Quelle: <a href="https://www.basketball-bund.net" target="_blank" rel="noopener">basketball-bund.net</a></span>${impressumLink}
   &middot; <a href="${safeRel}datenschutz.html">Datenschutz</a>
@@ -1256,15 +1260,27 @@ Für die Richtigkeit der Daten wird keine Gewähr übernommen.</p>`;
   return buildLegalSkeleton('Impressum', content, allTeams, theme, legal, nav, extraStyles);
 }
 
+// Kontakt-/Auskunftssatz im privaten Portalbetrieb (ADR-027): Kontaktlink oder Fallback, nie mailto/Impressum.
+function privateContactSentence(legal, lead) {
+  return legal.contactUrl
+    ? `${lead} <a href="${escapeHtml(legal.contactUrl)}" target="_blank" rel="noopener">über den Kontaktlink</a>.`
+    : 'Bitte wenden Sie sich an den Seitenbetreiber.';
+}
+
 function buildDatenschutz(legal, allTeams, theme, nav, extraStyles) {
+  const isPrivate = legal.private === true;
   const op    = escapeHtml(legal.operator || '');
-  const email = escapeHtml(legal.email    || '');
+  const email = isPrivate ? '' : escapeHtml(legal.email || '');
+  const contact = isPrivate
+    ? privateContactSentence(legal, 'Anfragen richten Sie bitte an den Seitenbetreiber')
+    : (email ? `Anfragen richten Sie bitte per E-Mail an: <a href="mailto:${email}">${email}</a>` : 'Bitte wenden Sie sich an den Seitenbetreiber (siehe Impressum).');
+  const privateNote = isPrivate ? '\n<p>Privates, nicht kommerzielles Projekt.</p>' : '';
   const year  = new Date().getFullYear();
   const content = `
 <h1>Datenschutzerklärung</h1>
 <p>Stand: ${year}</p>
 <h2>Verantwortlicher</h2>
-<p>${op || 'Siehe Impressum'}</p>
+<p>${op || (isPrivate ? 'Seitenbetreiber' : 'Siehe Impressum')}</p>${privateNote}
 <h2>Datenerhebung</h2>
 <p>Diese Website erhebt selbst keine personenbezogenen Daten, setzt keine Cookies und verwendet kein Tracking.</p>
 <h2>Technische Drittanbieter</h2>
@@ -1275,12 +1291,16 @@ function buildDatenschutz(legal, allTeams, theme, nav, extraStyles) {
   <li><strong>nominatim.openstreetmap.org</strong> — Geocodierung von Spielfeldern (clientseitig, nur bei Aufruf einer Teamseite)</li>
 </ul>
 <h2>Auskunft und Löschung</h2>
-<p>${email ? `Anfragen richten Sie bitte per E-Mail an: <a href="mailto:${email}">${email}</a>` : 'Bitte wenden Sie sich an den Seitenbetreiber (siehe Impressum).'}</p>`;
+<p>${contact}</p>`;
   return buildLegalSkeleton('Datenschutzerklärung', content, allTeams, theme, legal, nav, extraStyles);
 }
 
 function buildBarrierefreiheit(legal, allTeams, theme, nav, extraStyles) {
-  const email = escapeHtml(legal.email || '');
+  const isPrivate = legal.private === true;
+  const email = isPrivate ? '' : escapeHtml(legal.email || '');
+  const contact = isPrivate
+    ? privateContactSentence(legal, 'Bei Problemen mit der Barrierefreiheit wenden Sie sich bitte an den Seitenbetreiber')
+    : (email ? `Bei Problemen mit der Barrierefreiheit wenden Sie sich bitte an: <a href="mailto:${email}">${email}</a>` : 'Bitte wenden Sie sich an den Seitenbetreiber (siehe Impressum).');
   const year  = new Date().getFullYear();
   const content = `
 <h1>Barrierefreiheitserklärung</h1>
@@ -1294,7 +1314,7 @@ function buildBarrierefreiheit(legal, allTeams, theme, nav, extraStyles) {
   <li>Die Darstellung bei stark vergrößertem Text (über 200&thinsp;%) wurde nicht vollständig getestet.</li>
 </ul>
 <h2>Feedback und Kontakt</h2>
-<p>${email ? `Bei Problemen mit der Barrierefreiheit wenden Sie sich bitte an: <a href="mailto:${email}">${email}</a>` : 'Bitte wenden Sie sich an den Seitenbetreiber (siehe Impressum).'}</p>
+<p>${contact}</p>
 <h2>Durchsetzungsverfahren</h2>
 <p>Wenn Sie nach Kontaktaufnahme keine zufriedenstellende Antwort erhalten haben, können Sie die
 <a href="https://www.schlichtungsstelle-bgg.de/" target="_blank" rel="noopener">Schlichtungsstelle nach dem Behindertengleichstellungsgesetz (BGG)</a> einschalten.</p>`;
@@ -1455,11 +1475,12 @@ function buildLandPage(region, regions, legal) {
 function buildPortalLegalPages(legal, regions) {
   const nav = buildPortalNav('./', regions, null);
   const styles = buildPortalStyles();
-  return {
-    impressum: buildImpressum(legal, [], PORTAL_THEME, nav, styles),
-    datenschutz: buildDatenschutz(legal, [], PORTAL_THEME, nav, styles),
-    barrierefreiheit: buildBarrierefreiheit(legal, [], PORTAL_THEME, nav, styles),
-  };
+  const pages = {};
+  // Privater Betrieb (ADR-027): bewusst kein Impressum.
+  if (!legal.private) pages.impressum = buildImpressum(legal, [], PORTAL_THEME, nav, styles);
+  pages.datenschutz = buildDatenschutz(legal, [], PORTAL_THEME, nav, styles);
+  pages.barrierefreiheit = buildBarrierefreiheit(legal, [], PORTAL_THEME, nav, styles);
+  return pages;
 }
 
 
