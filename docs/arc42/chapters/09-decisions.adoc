@@ -781,7 +781,7 @@ a|
 | `updateAll()` brach bei einem Fehler in einem Club (`sanitizeSlug`, `updateClub`) die gesamte Schleife ab — alle folgenden Clubs und die Aggregation fielen aus.
 
 | *Entscheidung*
-| `updateAll()` fängt Fehler pro Club, loggt sie und gibt `{ results, failures }` zurück. Der CLI-Einstieg setzt `process.exitCode = 1`, wenn `failures` nicht leer ist (auch bei einem Fehler in der Portal-Aggregation, z.B. fehlender `portal.json`). `deploy.yml` führt `npm run update` mit `continue-on-error` aus, prüft, dass mindestens eine ICS-Datei existiert, deployt und markiert den Job am Ende rot. Eine Portal-Seite ohne Impressum wird nie veröffentlicht: fehlt `portal.json` oder sind Pflichtfelder leer, entstehen keine Bund-/Land-Seiten.
+| `updateAll()` fängt Fehler pro Club, loggt sie und gibt `{ results, failures }` zurück. Der CLI-Einstieg setzt `process.exitCode = 1`, wenn `failures` nicht leer ist (auch bei einem Fehler in der Portal-Aggregation, z.B. fehlender `portal.json`). `deploy.yml` führt `npm run update` mit `continue-on-error` aus, prüft, dass mindestens eine ICS-Datei existiert, deployt und markiert den Job am Ende rot. Eine Portal-Seite ohne Impressum wird nie veröffentlicht: fehlt `portal.json` oder sind Pflichtfelder leer, entstehen keine Bund-/Land-Seiten (zum privaten Betrieb ohne Impressum siehe <<adr-027-privater-portalbetrieb,ADR-027>>).
 
 | *Begründung*
 a|
@@ -834,4 +834,42 @@ a|
 a|
 * Positive: Kein Vermischen von Clubs; das Archiv überlebt Bundesland-Wechsel; der bundesweite Club und Clubs verschiedener Bundesländer haben je ein eigenes Archiv. Abgesichert durch `tests/e2e/season-archive-multiclub.test.js` (10-Club-Fixture gemäß <<adr-019-testbreite-multi-club,ADR-019>>, inkl. Rolling-Update über mehrere Läufe, ausgefallenem Club, Bundesland-Wechsel und defekter Archivdatei).
 * Negative: Die Persistenz nicht gemeldeter Teams (`notCurrentlyListed`, <<adr-014-saison-archivierung,ADR-014>>) liest die `metadata.json` des vorherigen Laufs aus dem Club-Ausgabeverzeichnis `generated/<bundesland>/<club-slug>/` — sie ist damit (anders als das Archiv) nicht bundeslandstabil, und in CI existiert die vorherige `metadata.json` ohnehin nicht (`generated/` ist außer dem Archiv nicht versioniert). Die Archivdateien werden nicht bei Club-Entfernung aufgeräumt (bewusst: kein automatisches Löschen historischer Daten).
+|===
+
+[[adr-027-privater-portalbetrieb]]
+=== ADR-027: Privater Portalbetrieb ohne Impressum (Opt-in `private: true`)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-10-02
+
+| *Kontext*
+a|
+* Der Portal-Betreiber ist eine Privatperson, betreibt das Portal nicht geschäftsmäßig und möchte keine Privatadresse in einem Impressum veröffentlichen.
+* Bisher verlangte `portal.json` zwingend `operator`, `address` und `email` (<<adr-025-fehlerisolation-pro-club,ADR-025>>); ohne diese Angaben entstanden keine Portal-Seiten.
+
+| *Entscheidung*
+a|
+* Opt-in per `"private": true` in `portal.json` (nur der Boolean `true` aktiviert den Modus; Strings, Zahlen u.ä. lassen die bisherige strenge Prüfung greifen).
+* Im privaten Modus ist nur `operator` (Name) Pflicht, optional `contactUrl` (muss mit `https://` beginnen, Schutz vor `javascript:`-/`data:`-Links). `address`, `email`, `phone` und `responsible` werden ignoriert und nie ausgegeben.
+* Es wird kein `impressum.html` erzeugt; der Footer der Portal-Seiten zeigt statt des Impressum-Links (falls `contactUrl` gesetzt) einen Link „Kontakt". Datenschutz- und Barrierefreiheitsseite nennen den Namen als Verantwortlichen und verweisen auf den Kontaktlink bzw. „Bitte wenden Sie sich an den Seitenbetreiber."
+* Dies ist eine ausdrückliche Entscheidung des Betreibers. Es handelt sich nicht um eine rechtliche Feststellung und nicht um Rechtsberatung.
+
+| *Begründung*
+a|
+* Betreiber ist Privatperson und betreibt das Portal nicht geschäftsmäßig; die Privatadresse soll nicht veröffentlicht werden.
+* Ein Opt-in mit strikter Boolean-Prüfung verhindert, dass der Modus versehentlich (z.B. durch `"true"`) aktiviert wird; der strenge Modus bleibt der Default.
+
+| *Konsequenzen*
+a|
+* Verantwortung und Risiko der Entscheidung liegen beim Betreiber.
+* Ein Wechsel zurück auf den strengen Modus ist jederzeit möglich: `address`/`email` eintragen und `private` entfernen.
+* Club-Seiten behalten ihre eigenen Impressen (Club-`legal`); sie sind von dieser Betriebsart nicht betroffen.
+* Abgesichert durch Tests in `tests/e2e/portal-config.test.js`, `html-generation.test.js`, `portal-aggregation-integration.test.js` (10-Club-Fixture) und `tests/accessibility/portal.spec.js`.
 |===

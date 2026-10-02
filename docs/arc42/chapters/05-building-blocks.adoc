@@ -408,10 +408,10 @@ a|
 | Lädt und validiert die Betreiberangaben des Portals (Impressum der Bund-/Land-Seiten).
 
 | *Schnittstelle*
-| `loadPortalConfig(filePath)` → Objekt mit der Struktur von `legal` der Club-Configs. Standardpfad: `portal.json` im Repo-Root, überschreibbar über `BBB_PORTAL_CONFIG`; Vorlage: `portal.example.json`. Exportiert außerdem `REQUIRED_FIELDS` (`operator`, `address`, `email`).
+| `loadPortalConfig(filePath)` → Objekt mit der Struktur von `legal` der Club-Configs. Standardpfad: `portal.json` im Repo-Root, überschreibbar über `BBB_PORTAL_CONFIG`; Vorlage: `portal.example.json`. Exportiert außerdem `REQUIRED_FIELDS` (`operator`, `address`, `email`). Mit `"private": true` (nur der Boolean) gilt der private Modus (<<adr-027-privater-portalbetrieb,ADR-027>>): Pflicht ist nur `operator`, optional `contactUrl` (nur `https://`); Rückgabe `{ private: true, operator, contactUrl? }`, `address`/`email`/`phone`/`responsible` werden verworfen. `buildPortalLegalPages()` liefert dann kein Impressum, `buildFooter()` zeigt statt des Impressum-Links einen Kontakt-Link.
 
 | *Fehlerbehandlung*
-| Fehlende Datei, ungültiges JSON oder leere Pflichtfelder führen zu einem Fehler. `updateAll()` meldet ihn als `(portal)` und schreibt dann keine Portal-Seiten (<<adr-025-fehlerisolation-pro-club,ADR-025>>).
+| Fehlende Datei, ungültiges JSON, leere Pflichtfelder (im privaten Modus: leerer `operator` oder `contactUrl` ohne `https://`) führen zu einem Fehler. `updateAll()` meldet ihn als `(portal)` und schreibt dann keine Portal-Seiten (<<adr-025-fehlerisolation-pro-club,ADR-025>>).
 
 | *Abhängigkeiten*
 | `fs`, `path` (Node.js Stdlib)

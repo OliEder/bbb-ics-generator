@@ -1,7 +1,5 @@
 {
+  "private": true,
   "operator": "Oliver-Marcus Eder",
-  "address": "",
-  "email": "",
-  "phone": "",
-  "responsible": ""
+  "contactUrl": "https://github.com/OliEder/bbb-ics-generator/issues"
 }

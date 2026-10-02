@@ -87,6 +87,7 @@ bbb-ics-generator/
 ├── data/
 │   └── wam-ligen-cache.json   # Versionierter WAM-Liga-Cache (quartalsweise aktualisiert)
 ├── portal.example.json    # Vorlage für portal.json (Betreiberangaben des Portals)
+├── portal.private.example.json # Vorlage für den privaten Modus (ohne Impressum)
 ├── clubs/                 # Ein Verzeichnis pro Bundesland/Club
 │   └── bayern/
 │       └── fibalon/
@@ -160,14 +161,26 @@ Teams werden automatisch über die Basketball-Bund API ermittelt und für 30 Tag
 
 ### Portal-Betreiberangaben (portal.json)
 
-Die Bund-/Land-Seiten und die Portal-Rechtsseiten brauchen die Angaben des Portal-Betreibers. Die Datei `portal.json` im Repo-Root wird vom Betreiber selbst angelegt: `portal.example.json` nach `portal.json` kopieren und ausfüllen.
+Die Bund-/Land-Seiten und die Portal-Rechtsseiten brauchen die Angaben des Portal-Betreibers. Die Datei `portal.json` im Repo-Root wird vom Betreiber selbst angelegt. Es gibt zwei Betriebsarten:
+
+**Strenger Modus (Standard, mit Impressum):** `portal.example.json` nach `portal.json` kopieren und ausfüllen.
 
 - `operator`, `address`, `email` — Pflichtfelder
 - `phone`, `responsible` — optional
 
+```json
+{ "operator": "Vorname Nachname", "address": "Straße 1, 12345 Ort", "email": "kontakt@example.de" }
+```
+
+**Privater Modus (ohne Impressum, Opt-in):** `portal.private.example.json` als Vorlage. Nur der Boolean `"private": true` aktiviert den Modus. Pflicht ist nur `operator` (Name); optional `contactUrl` (muss mit `https://` beginnen). `address`, `email`, `phone`, `responsible` werden ignoriert und nicht veröffentlicht. Es entsteht kein `impressum.html`; der Footer zeigt (falls gesetzt) einen Kontakt-Link. Das ist eine Entscheidung des Betreibers, keine Rechtsberatung (siehe ADR-027). Wechsel zurück zum strengen Modus: `address`/`email` eintragen und `private` entfernen. Club-Seiten behalten ihre eigenen Impressen.
+
+```json
+{ "private": true, "operator": "Vorname Nachname", "contactUrl": "https://github.com/<user>/<repo>/issues" }
+```
+
 **Deploy-Voraussetzung:** `portal.json` (mit den Betreiberangaben) muss im Repo-Root liegen, bevor nach `main` gemergt wird; sonst deployt `deploy.yml` ohne Bund-/Land-Seiten und der Job wird rot.
 
-Ohne gültige `portal.json` (Datei fehlt, Pflichtfeld leer) werden keine Bund-/Land-Seiten erzeugt und der Update-Lauf endet mit Fehler; die Ausgabe der einzelnen Vereine und die ICS-Dateien bleiben davon unberührt. Über die Umgebungsvariable `BBB_PORTAL_CONFIG` kann ein anderer Pfad angegeben werden.
+Ohne gültige `portal.json` (Datei fehlt, Pflichtfeld leer, ungültige `contactUrl`) werden keine Bund-/Land-Seiten erzeugt und der Update-Lauf endet mit Fehler; die Ausgabe der einzelnen Vereine und die ICS-Dateien bleiben davon unberührt. Über die Umgebungsvariable `BBB_PORTAL_CONFIG` kann ein anderer Pfad angegeben werden.
 
 ### WAM-Liga-Cache
 
