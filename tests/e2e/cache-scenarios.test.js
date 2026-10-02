@@ -38,14 +38,14 @@ test('Cache-HIT: loadTeamsCache gibt frische Teams zurück → fetchClubTeams ni
   try {
     // Write a fresh cache
     const storage = requireStorage(dir);
-    storage.saveTeamsCache(mockTeams);
+    storage.saveTeamsCache(mockTeams, '4468');
 
     // Stub axios so any real network call fails loudly
     const axios = require('axios');
     const stub = t.mock.method(axios, 'get', () => Promise.reject(new Error('Should not be called')));
 
     const { getTeams } = requireCronUpdate(dir);
-    const result = await getTeams();
+    const result = await getTeams('4468');
     assert.deepEqual(result, mockTeams);
     assert.equal(stub.mock.calls.length, 0, 'fetchClubTeams (axios.get) wurde unerwartet aufgerufen');
   } finally {
@@ -61,7 +61,7 @@ test('Cache-MISS: stale Cache → fetchClubTeams wird aufgerufen, Cache neu gesc
     // Write a stale cache (31 days old)
     const old = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString();
     writeFileSync(
-      join(dir, 'teams-cache.json'),
+      join(dir, 'teams-cache-4468.json'),
       JSON.stringify({ cachedAt: old, teams: mockTeams }),
       'utf8'
     );
@@ -70,13 +70,13 @@ test('Cache-MISS: stale Cache → fetchClubTeams wird aufgerufen, Cache neu gesc
     t.mock.method(axios, 'get', () => Promise.resolve(clubTeamsResponse));
 
     const { getTeams } = requireCronUpdate(dir);
-    const result = await getTeams();
+    const result = await getTeams('4468');
     assert.ok(Array.isArray(result) && result.length > 0, 'Keine Teams zurückgegeben');
     assert.equal(result[0].id, String(clubTeamsResponse.data.data.matches[0].homeTeam.teamPermanentId));
 
     // Verify cache was written fresh
     const { loadTeamsCache } = requireStorage(dir);
-    const { stale } = loadTeamsCache();
+    const { stale } = loadTeamsCache('4468');
     assert.equal(stale, false, 'Cache sollte nach Update nicht stale sein');
   } finally {
     rmSync(dir, { recursive: true });
@@ -91,7 +91,7 @@ test('Fallback: fetchClubTeams wirft Error + stale Cache → stale Cache zurück
     // Write a stale cache
     const old = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString();
     writeFileSync(
-      join(dir, 'teams-cache.json'),
+      join(dir, 'teams-cache-4468.json'),
       JSON.stringify({ cachedAt: old, teams: mockTeams }),
       'utf8'
     );
@@ -100,7 +100,7 @@ test('Fallback: fetchClubTeams wirft Error + stale Cache → stale Cache zurück
     t.mock.method(axios, 'get', () => Promise.reject(new Error('Network error')));
 
     const { getTeams } = requireCronUpdate(dir);
-    const result = await getTeams();
+    const result = await getTeams('4468');
     // Should fall back to stale cached teams
     assert.deepEqual(result, mockTeams, 'Stale Cache wurde nicht als Fallback verwendet');
   } finally {

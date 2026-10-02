@@ -8,8 +8,7 @@ Das System kennt zwei Umgebungen: die lokale Entwicklungsumgebung und die Produk
 ----
 flowchart LR
     subgraph LOCAL["Lokale Entwicklung"]
-        DEV["Developer\nMaschine"] --> NS["node src/cronUpdate.js"]
-        DEV --> NH["node src/generateHTML.js"]
+        DEV["Developer\nMaschine"] --> NS["node src/cronUpdate.js\n(ruft genHTML() je Club intern auf)"]
         DEV --> NS2["node src/server.js\nPort 3000"]
     end
     subgraph GITHUB["Produktionsumgebung (GitHub)"]
@@ -19,7 +18,7 @@ flowchart LR
 
 === GitHub Actions Workflow
 
-Der einzige CI/CD-Workflow ist in `.github/workflows/deploy.yml` definiert.
+Der Deployment-Workflow ist in `.github/workflows/deploy.yml` definiert. Der Workflow `wam-refresh.yml` aktualisiert separat den WAM-Liga-Cache (siehe unten).
 
 ==== Trigger
 
@@ -63,19 +62,76 @@ Der Workflow benötigt drei spezifische Permissions:
 
 . *Install dependencies* (`npm install`): Installiert alle npm-Abhängigkeiten aus `package.json` (`axios`, `ics`, `express`, `node-cron`). Kein `--ci`-Flag, kein Lockfile-Enforcement.
 
-. *Generate ICS files* (`npm run update` → `node src/cronUpdate.js`): Hauptschritt. Ruft die Basketball-Bund-API ab, erzeugt alle ICS-Dateien und schreibt `metadata.json` in `generated/`.
+. *Generate ICS files and HTML* (`id: generate`, `continue-on-error: true`; `npm run update` → `node src/cronUpdate.js`): Hauptschritt. Iteriert über alle Clubs (`loadClubs()`), ruft je Club die Basketball-Bund-API ab, erzeugt alle ICS-Dateien, schreibt `metadata.json` und ruft `genHTML()` intern auf (pro Club unter `generated/<bundesland>/<club-slug>/`; für Clubs mit `legacyRootOutput: true` zusätzlich nur die Alt-Pfad-ICS direkt unter `generated/`, siehe <<adr-023-wegfall-legacy-html,ADR-023>>), aggregiert danach die Bund-/Land-Seiten (`aggregatePages()`). Ein separater `generate-html`-Schritt existiert seit der Multi-Club-Umstellung nicht mehr — er wäre redundant, da `cronUpdate.js` die HTML-Generierung bereits übernimmt. Endet der Prozess mit Exitcode 1 (Fehler bei einzelnen Clubs oder in der Portal-Aggregation), bricht der Schritt den Job dank `continue-on-error` nicht ab; das Ergebnis steht in `steps.generate.outcome` (<<adr-025-fehlerisolation-pro-club,ADR-025>>).
 
-. *Generate HTML* (`npm run generate-html` → `node src/generateHTML.js`): Erzeugt `generated/index.html` aus `metadata.json`.
+. *Verify generated output* (Guard): Bricht den Job mit `::error::` ab, wenn unter `generated/` keine einzige `*.ics`-Datei existiert. So ersetzt ein Totalausfall nicht die funktionierende Seite durch eine leere.
 
-. *Commit season archive* (`stefanzweifel/git-auto-commit-action@v5`): Committet ausschließlich `generated/archive/**` zurück auf den `main`-Branch, mit Commit-Message `chore: update season archive [skip ci]` (das `[skip ci]`-Suffix verhindert, dass dieser Commit den Deploy-Workflow erneut auslöst — sonst würde jeder Lauf einen weiteren Lauf triggern). Autor ist `github-actions[bot]`. Hintergrund: `generated/` ist ansonsten vollständig `.gitignore`t und reines, flüchtiges Build-Output — auf GitHub-Actions-Runnern (ephemer) geht es nach jedem Lauf verloren. Das Saison-Archiv (`src/seasonArchive.js`) muss davon abweichend dauerhaft erhalten bleiben, da die Basketball-Bund-API Match- und Tabellendaten einer abgelaufenen Saison irgendwann endgültig nicht mehr zurückliefert — ohne diesen Commit-Schritt gäbe es keine Möglichkeit, diese Daten zwischen den 6-stündigen Läufen zu bewahren. Details zur Architekturentscheidung siehe ADR-014 in `09-decisions.adoc`. Voraussetzung ist die Permission `contents: write` (siehe oben).
+. *Commit season archive* (`id: archive_commit`, `if: success()`, `continue-on-error: true`, `stefanzweifel/git-auto-commit-action@v5`): Committet ausschließlich `generated/archive/**` — seit <<adr-026-saison-archiv-pro-club,ADR-026>> pro Club `generated/archive/<clubId>/{seasonId}.json`; das Muster `generated/archive/**` und die `.gitignore`-Ausnahme `!/generated/archive/**` erfassen die Unterordner — zurück auf den `main`-Branch, mit Commit-Message `chore: update season archive [skip ci]` (das `[skip ci]`-Suffix verhindert, dass dieser Commit den Deploy-Workflow erneut auslöst — sonst würde jeder Lauf einen weiteren Lauf triggern). Autor ist `github-actions[bot]`. Hintergrund: `generated/` ist ansonsten vollständig `.gitignore`t und reines, flüchtiges Build-Output — auf GitHub-Actions-Runnern (ephemer) geht es nach jedem Lauf verloren. Das Saison-Archiv (`src/seasonArchive.js`) muss davon abweichend dauerhaft erhalten bleiben, da die Basketball-Bund-API Match- und Tabellendaten einer abgelaufenen Saison irgendwann endgültig nicht mehr zurückliefert — ohne diesen Commit-Schritt gäbe es keine Möglichkeit, diese Daten zwischen den 6-stündigen Läufen zu bewahren. Details zur Architekturentscheidung siehe <<adr-014-saison-archivierung,ADR-014>> und <<adr-026-saison-archiv-pro-club,ADR-026>> in `09-decisions.adoc`. Voraussetzung ist die Permission `contents: write` (siehe oben).
 
-. *List generated files (debug)* (`ls -la generated/`, `find generated/ -name "*.ics" -ls`): Diagnostik-Schritt, listet alle erzeugten Dateien im Actions-Log.
+. *List generated files (debug)* (`find generated/ -maxdepth 3 -type d`, `find generated/ -name "*.ics" -ls`): Diagnostik-Schritt, listet alle erzeugten Dateien im Actions-Log.
 
 . *Setup Pages* (`actions/configure-pages@v5`): Konfiguriert GitHub Pages für den aktuellen Repository-Kontext.
 
 . *Upload artifact* (`actions/upload-pages-artifact@v3`, `path: ./generated`): Packt das `generated/`-Verzeichnis als Pages-Artefakt.
 
 . *Deploy to GitHub Pages* (`actions/deploy-pages@v5`): Deployed das Artefakt auf GitHub Pages. Gibt die öffentliche URL als Output `page_url` zurück.
+
+. *Fail job if generation or archive commit reported errors* (`if: steps.generate.outcome == 'failure' || steps.archive_commit.outcome == 'failure'`): Markiert den Job nach dem Deployment als fehlgeschlagen (rot), obwohl die übrigen Clubs bereits deployt wurden. Der Fehler bleibt so sichtbar.
+
+==== Zusammenspiel Fehlertoleranz und Archiv-Commit
+
+Reihenfolge: *Generate* (`continue-on-error`) → *Verify generated output* (Guard) → *Commit season archive* → Debug-Listing → Pages-Setup/Upload/Deploy → *Fail job …*.
+
+[cols="3,2,2,2", options="header"]
+|===
+| Situation | Archiv-Commit | Deploy | Job-Status
+
+| Alle Clubs erfolgreich
+| ja
+| ja
+| grün
+
+| Teilfehler (einzelne Clubs, Portal-Aggregation oder Archiv-Fehler eines Clubs; `npm run update` endet mit Exitcode 1, mindestens eine ICS vorhanden)
+| ja — `continue-on-error` am Generate-Schritt lässt `success()` wahr; die Archive der erfolgreichen Clubs werden gesichert
+| ja
+| rot (letzter Schritt)
+
+| Totalausfall (keine einzige ICS-Datei)
+| nein — der Guard schlägt fehl, alle Folgeschritte werden übersprungen
+| nein
+| rot
+
+| Push des Archiv-Commits scheitert (z.B. `main` hat sich während des Laufs bewegt)
+| fehlgeschlagen (`continue-on-error`)
+| ja — das Deployment hängt nicht am Archiv-Commit
+| rot (letzter Schritt)
+|===
+
+*Bewusste Konsequenz (ADR-025):* Der Guard prüft ausschließlich auf ICS-Dateien, nicht auf `generated/index.html` — Kalender-Abos haben Vorrang. Fehlt `portal.json`, werden keine Bund-/Land-Seiten erzeugt; es wird dennoch (mit den ICS und den Club-Seiten) deployt und der Job anschließend rot markiert.
+
+==== Workflow wam-refresh.yml (WAM-Liga-Cache)
+
+Der Workflow `.github/workflows/wam-refresh.yml` aktualisiert quartalsweise den versionierten Cache `data/wam-ligen-cache.json` (<<adr-021-wam-cache-versioniert,ADR-021>>).
+
+[cols="2,4", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| Trigger
+| `schedule: cron: '0 3 1 */3 *'` (03:00 UTC am 1. Januar/April/Juli/Oktober) und manuell über `workflow_dispatch`. Schedule-Workflows laufen nur auf dem Default-Branch; auf anderen Branches ist nur `workflow_dispatch` nutzbar.
+
+| Berechtigung
+| `contents: write` (Commit des Caches ins Repository)
+
+| Schritte
+| `actions/checkout@v5`, `actions/setup-node@v5` (Node.js 24, npm-Cache), `npm ci`, `npm run wam:refresh`, dann Commit von `data/wam-ligen-cache.json` mit der Message `chore(data): refresh WAM liga cache [skip ci]` (nur bei Änderungen) und Push.
+
+| Fehlerfall
+| Wurde ein Verband nur unvollständig abgerufen, endet `npm run wam:refresh` mit Fehler; der Job bricht ab und es wird nichts committet (<<adr-022-graceful-degradation-wam-cache,ADR-022>>).
+
+| Deployment
+| Ein Push mit `GITHUB_TOKEN` löst keine Workflows aus; der neue Cache wird spätestens vom nächsten 6-Stunden-Lauf von `deploy.yml` übernommen.
+|===
 
 ==== Concurrency-Steuerung
 
@@ -129,8 +185,12 @@ Der Workflow hat zwei parallele Jobs:
 | Führt `node --test tests/e2e/*.test.js` aus — alle Unit- und E2E-Tests mit Node.js built-in test runner.
 
 | `accessibility`
-| Installiert Playwright + Chromium, führt `npx playwright test` aus (WCAG 2.1 AA Tests via axe-core). Lädt den Playwright HTML Report als Artifact hoch (30 Tage aufbewahrt, abrufbar unter Actions → Run → Artifacts).
+| Installiert Playwright + Chromium, führt `npx playwright test --grep-invert @network` aus (WCAG 2.1 AA Tests via axe-core, UI-Tests; ohne die Live-API-Smoke-Tests, damit PRs nicht von basketball-bund.net abhängen). Lädt den Playwright HTML Report als Artifact hoch (30 Tage aufbewahrt, abrufbar unter Actions → Run → Artifacts).
 |===
+
+==== Workflow api-smoke.yml (API-Vertragstests)
+
+Der Workflow `.github/workflows/api-smoke.yml` führt wöchentlich (montags 05:00 UTC) sowie manuell (`workflow_dispatch`) die `@network`-Tests aus `tests/ui/api.spec.js` aus (`npx playwright test --project=chromium-ui --grep @network`). Sie prüfen gegen die Live-API die Felder, die der Code aus allen sieben genutzten Endpunkten liest (`club/actualmatches`, `team/matches`, `match/matchInfo`, `competition/table`, `competition/spielplan` samt `matchday`, `wam/liga/list`), inklusive der von der OpenAPI-Spec abweichenden flachen WAM-Antwortform (<<adr-021-wam-cache-versioniert,ADR-021>>) und des `ligaId`-Joins zwischen Match-Daten und WAM. Fehlen in der Saison passende Daten (Saisonpause, kein Pokal), werden einzelne Tests übersprungen. Ein roter Lauf meldet eine geänderte Antwortform; er blockiert weder PRs noch den Deploy. Bei Fehlern wird der Playwright-Report als Artifact `api-smoke-report` hochgeladen.
 
 ==== Playwright Report Artifact
 
@@ -140,15 +200,20 @@ Nach jedem Accessibility-Job-Lauf (auch bei Fehlern, `if: always()`) wird `playw
 
 ....
 generated/
-├── {teamId}_all.ics       # Alle Spiele eines Teams
-├── {teamId}_home.ics      # Nur Heimspiele
-├── {teamId}_away.ics      # Nur Auswärtsspiele
-├── ... (3 Dateien pro Team)
-├── metadata.json          # Update-Metadaten für HTML-Generator
-├── teams-cache.json       # Team-Cache (effektiv nur lokal relevant)
-├── archive/                # Archivierte Vorjahres-Saisons (persistiert via Git-Commit, siehe oben)
-│   └── {seasonId}.json     # Ein File pro Saison, alle Teams enthalten
-└── index.html              # Übersichtsseite mit Subscription-Links
+├── index.html                  # Bund-Startseite (aggregatePages)
+├── impressum.html, datenschutz.html, barrierefreiheit.html   # Portal-Rechtsseiten
+├── <bundesland>/               # z.B. bayern/, bundesweit/
+│   ├── index.html              # Land-Seite
+│   └── <club-slug>/
+│       ├── index.html          # Club-Startseite
+│       ├── metadata.json       # Team-Metadaten (inkl. notCurrentlyListed-Teams)
+│       ├── teams/{teamId}.html # Team-Seiten (mit Archiv-Tab, falls Archivdaten vorhanden)
+│       └── {teamId}_{type}.ics # 3 Dateien pro Team (all/home/away)
+├── {teamId}_{type}.ics         # Alt-Pfad-ICS nur für Clubs mit legacyRootOutput: true
+├── teams-cache-<clubId>.json   # Team-Cache pro Club (effektiv nur lokal relevant)
+└── archive/                    # Saison-Archiv (persistiert via Git-Commit, siehe oben)
+    └── <clubId>/
+        └── {seasonId}.json     # Eine Datei pro Club und Saison, alle Teams dieses Clubs
 ....
 
 === Nutzer-Subscription

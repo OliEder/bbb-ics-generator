@@ -467,6 +467,33 @@ test('Auswärtsspiel hat badge--away im HTML', () => {
   }
 });
 
+test('genHTML: options.baseUrl überschreibt die Standard-BASE_URL in ICS-Links', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME, {}, { baseUrl: 'https://olieder.github.io/bbb-ics-generator/bayern/fibalon/' });
+    const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
+    assert.ok(html.includes('webcal://olieder.github.io/bbb-ics-generator/bayern/fibalon/167881_all.ics'));
+    assert.ok(!html.includes('webcal://olieder.github.io/bbb-ics-generator/167881_all.ics'));
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('genHTML: ohne options.baseUrl bleibt das bisherige Default-Verhalten erhalten', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
+    assert.ok(html.includes('webcal://olieder.github.io/bbb-ics-generator/167881_all.ics'));
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
 // --- sortTeams ---
 test('sortTeams: Herren first, then U-groups descending', () => {
   const modPath = require.resolve('../../src/generateHTML.js');
@@ -1384,6 +1411,199 @@ test('buildTabScript: enthält Clipboard-Handler für btn--copy', () => {
   });
 }
 
+test('genHTML: mit options.migrationNotice erscheint ein Banner auf index.html und Team-Seiten', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME, {}, {
+      migrationNotice: { newBasePath: '/bayern/fibalon/' },
+    });
+
+    const index = readFileSync(join(dir, 'index.html'), 'utf8');
+    assert.ok(index.includes('/bayern/fibalon/'), 'Banner-Link fehlt auf index.html');
+    assert.ok(/migration-banner/i.test(index), 'Banner-Markup fehlt auf index.html');
+
+    const teamPage = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
+    assert.ok(teamPage.includes('/bayern/fibalon/'), 'Banner-Link fehlt auf Team-Seite');
+    assert.ok(/migration-banner/i.test(teamPage), 'Banner-Markup fehlt auf Team-Seite');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('genHTML: ohne options.migrationNotice erscheint kein Banner', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const index = readFileSync(join(dir, 'index.html'), 'utf8');
+    // Note: the CSS stylesheet always defines a .migration-banner rule (static styling),
+    // so we assert on the absence of the rendered element, not the bare class name string.
+    assert.ok(!/class="migration-banner"/i.test(index));
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+// ---- Portal-Seiten (Plan B): Bund-/Land-Seite, Portal-Legal, Tabellen-Links ----
+
+const PORTAL_REGIONS = [
+  { slug: 'bayern', name: 'Bayern', ligaCount: 1, clubs: [{ name: 'Verein & Co', href: 'bayern/verein-1/index.html' }] },
+  { slug: 'bundesweit', name: 'Bundesweite Wettbewerbe', ligaCount: 0, clubs: [{ name: 'Bundesliga-Club', href: 'bundesweit/verein-9/index.html' }] },
+];
+const PORTAL_LEGAL = { operator: 'Betreiber <b>X</b>', address: 'Str. 1', email: 'a@b.de', phone: '', responsible: '' };
+
+test('buildStandingsTable: Zeile mit href rendert escapten Link, Zeile ohne href bleibt reiner Text', () => {
+  const { buildStandingsTable } = requireGenHTML(tmpdir())._testExports;
+  const html = buildStandingsTable({
+    ligaId: '1', liganame: 'Bezirksliga',
+    table: [
+      { rank: 1, teamName: 'Alpha & Co', teamId: '1', played: 1, won: 1, lost: 0, points: 2, korbdiff: 5, isOwn: true, href: 'verein-1/index.html?a=1&b=2' },
+      { rank: 2, teamName: 'Beta', teamId: '2', played: 1, won: 0, lost: 1, points: 0, korbdiff: -5, isOwn: false, href: null },
+    ],
+  });
+  assert.ok(html.includes('<a href="verein-1/index.html?a=1&amp;b=2">Alpha &amp; Co</a>'));
+  assert.ok(html.includes('<td>Beta</td>'));
+  assert.ok(!html.includes('<a href="null"'));
+});
+
+test('buildBundPage: Regionen mit Links/Anzahlen, escapt Namen, Portal-Footer mit ./', () => {
+  const { buildBundPage } = requireGenHTML(tmpdir());
+  const html = buildBundPage({ regions: PORTAL_REGIONS, showMigrationBanner: false }, PORTAL_LEGAL);
+  assert.ok(html.includes('<h1 class="team-page-title">BBB Vereinsportal</h1>'));
+  assert.ok(html.includes('<h2><a href="bayern/index.html">Bayern</a></h2>'));
+  assert.ok(html.includes('<h2><a href="bundesweit/index.html">Bundesweite Wettbewerbe</a></h2>'));
+  assert.ok(html.includes('<a href="bayern/verein-1/index.html">Verein &amp; Co</a>'));
+  assert.ok(html.includes('1 Verein · 1 Liga'), 'Singular-Formen');
+  assert.ok(html.includes('1 Verein · 0 Ligen'), 'Plural bei 0');
+  assert.ok(html.includes('href="./impressum.html"'));
+  assert.ok(html.includes('href="./datenschutz.html"'));
+  assert.ok(!html.includes('<div class="migration-banner"'));
+});
+
+test('buildBundPage: Migrationsbanner nur mit showMigrationBanner, generisch ohne Link', () => {
+  const { buildBundPage } = requireGenHTML(tmpdir());
+  const html = buildBundPage({ regions: PORTAL_REGIONS, showMigrationBanner: true }, PORTAL_LEGAL);
+  const match = html.match(/<div class="migration-banner"[\s\S]*?<\/div>/);
+  assert.ok(match, 'Banner-Markup erwartet');
+  assert.ok(match[0].includes('Einige Kalender-Abos sind umgezogen'));
+  assert.ok(!match[0].includes('href'), 'Banner darf keinen clubspezifischen Link enthalten');
+});
+
+test('buildBundPage: ohne Regionen erscheint ein Hinweistext statt einer leeren Liste', () => {
+  const { buildBundPage } = requireGenHTML(tmpdir());
+  const html = buildBundPage({ regions: [], showMigrationBanner: false }, PORTAL_LEGAL);
+  assert.ok(html.includes('Noch keine Vereine eingebunden'));
+  assert.ok(!html.includes('<ul class="portal-regions">'));
+});
+
+test('buildLandPage: Tabellen mit Club-Links, Gruppen-Überschriften, escapt, Footer ../', () => {
+  const { buildLandPage } = requireGenHTML(tmpdir());
+  const region = {
+    slug: 'bayern', name: 'Bayern <script>',
+    clubs: [{ name: 'Verein & Co', href: 'verein-1/index.html' }],
+    groups: [{
+      heading: 'Bezirk Oberbayern',
+      ligen: [{
+        ligaId: '1', liganame: 'Bezirksliga <b>',
+        table: [
+          { rank: 1, teamName: 'Eigen', teamId: '1', played: 1, won: 1, lost: 0, points: 2, korbdiff: 5, isOwn: true, href: 'verein-1/index.html' },
+          { rank: 2, teamName: 'Fremd<script>', teamId: '2', played: 1, won: 0, lost: 1, points: 0, korbdiff: -5, isOwn: false, href: null },
+        ],
+      }],
+    }],
+  };
+  const html = buildLandPage(region, PORTAL_REGIONS, PORTAL_LEGAL);
+  assert.ok(html.includes('<h1 class="team-page-title">Bayern &lt;script&gt;</h1>'));
+  assert.ok(html.includes('<h2 class="portal-group-heading">Bezirk Oberbayern</h2>'));
+  assert.ok(html.includes('<h3>Bezirksliga &lt;b&gt;</h3>'), 'Liga-Überschrift ist h3 unter einer Gruppen-Überschrift');
+  assert.ok(html.includes('<a href="verein-1/index.html">Eigen</a>'));
+  assert.ok(html.includes('Fremd&lt;script&gt;'));
+  assert.ok(!html.includes('Fremd<script>'));
+  assert.ok(html.includes('href="../impressum.html"'));
+  assert.ok(html.includes('href="../index.html"'), 'Nav-Logo führt zur Bund-Seite');
+});
+
+test('buildLandPage: ohne Gruppen-Überschrift ist die Liga-Überschrift h2; ohne Ligen erscheint ein Hinweis', () => {
+  const { buildLandPage } = requireGenHTML(tmpdir());
+  const flat = buildLandPage({
+    slug: 'bayern', name: 'Bayern', clubs: [],
+    groups: [{ heading: null, ligen: [{ ligaId: '1', liganame: 'Liga A', table: [] }] }],
+  }, PORTAL_REGIONS, PORTAL_LEGAL);
+  assert.ok(flat.includes('<h2>Liga A</h2>'));
+  const empty = buildLandPage({ slug: 'bayern', name: 'Bayern', clubs: [], groups: [] }, PORTAL_REGIONS, PORTAL_LEGAL);
+  assert.ok(empty.includes('noch keine Ligatabellen'));
+});
+
+test('buildPortalLegalPages: Impressum/Datenschutz/Barrierefreiheit mit Portal-Navigation statt Club-Navigation', () => {
+  const { buildPortalLegalPages } = requireGenHTML(tmpdir());
+  const pages = buildPortalLegalPages(PORTAL_LEGAL, PORTAL_REGIONS);
+  assert.deepEqual(Object.keys(pages).sort(), ['barrierefreiheit', 'datenschutz', 'impressum']);
+  assert.ok(pages.impressum.includes('Betreiber &lt;b&gt;X&lt;/b&gt;'));
+  assert.ok(pages.impressum.includes('BBB Vereinsportal'));
+  assert.ok(!pages.impressum.includes('Fibalon Baskets Neumarkt'), 'kein Club-Branding im Portal-Impressum');
+  assert.ok(pages.datenschutz.includes('<a href="mailto:a@b.de">a@b.de</a>'));
+});
+
+test('buildPortalLegalPages: Portal-Impressum enthält Portal-Styles, Club-Impressum nicht', () => {
+  const mod = requireGenHTML(tmpdir());
+  const pages = mod.buildPortalLegalPages(PORTAL_LEGAL, PORTAL_REGIONS);
+  const rule = '.site-footer a { color: var(--color-text)';
+  for (const key of ['impressum', 'datenschutz', 'barrierefreiheit']) {
+    assert.ok(pages[key].includes(rule), `${key}: Portal-Regel erwartet`);
+  }
+  const club = mod._testExports.buildImpressum(PORTAL_LEGAL, [], mod.PORTAL_THEME);
+  assert.ok(!club.includes(rule), 'Club-Impressum darf Portal-Styles nicht enthalten');
+});
+
+test('buildBundPage: Sonderzeichen in Region, Club-Name und href werden escaped', () => {
+  const { buildBundPage } = requireGenHTML(tmpdir());
+  const regions = [{ slug: 'by', name: 'Bayern <script>', ligaCount: 0, clubs: [{ name: 'A & B', href: 'x"y/index.html' }] }];
+  const html = buildBundPage({ regions, showMigrationBanner: false }, PORTAL_LEGAL);
+  assert.ok(html.includes('Bayern &lt;script&gt;'));
+  assert.ok(html.includes('A &amp; B'));
+  assert.ok(html.includes('href="x&quot;y/index.html"'));
+  assert.ok(!html.includes('Bayern <script>'));
+  assert.ok(!html.includes('A & B'));
+  assert.ok(!html.includes('x"y'));
+});
+
+test('buildBundPage: Region ohne Clubs rendert kein leeres <ul class="portal-list">', () => {
+  const { buildBundPage } = requireGenHTML(tmpdir());
+  const html = buildBundPage({ regions: [{ slug: 'by', name: 'Bayern', ligaCount: 0, clubs: [] }], showMigrationBanner: false }, PORTAL_LEGAL);
+  assert.ok(!html.includes('<ul class="portal-list">'));
+});
+
+test('buildLandPage: Sonderzeichen in Gruppe, Club-href, Nav-Name und Tabellen-href werden escaped', () => {
+  const { buildLandPage } = requireGenHTML(tmpdir());
+  const region = {
+    slug: 'bayern', name: 'Bayern',
+    clubs: [{ name: 'Club', href: 'c"d/index.html' }],
+    groups: [{ heading: 'Bezirk <i>', ligen: [{ ligaId: '1', liganame: 'Liga', table: [
+      { rank: 1, teamName: 'T', teamId: '1', played: 1, won: 1, lost: 0, points: 2, korbdiff: 1, isOwn: true, href: 't"u/index.html' },
+    ] }] }],
+  };
+  const nav = [{ slug: 'bayern', name: 'Bay<ern' }];
+  const html = buildLandPage(region, nav, PORTAL_LEGAL);
+  assert.ok(html.includes('Bezirk &lt;i&gt;'));
+  assert.ok(html.includes('href="c&quot;d/index.html"'));
+  assert.ok(html.includes('Bay&lt;ern'));
+  assert.ok(html.includes('href="t&quot;u/index.html"'));
+  assert.ok(!html.includes('Bezirk <i>'));
+  assert.ok(!html.includes('c"d'));
+  assert.ok(!html.includes('Bay<ern'));
+  assert.ok(!html.includes('t"u'));
+});
+
+test('buildLandPage: ohne Clubs kein leeres <ul class="portal-list">, Vereine-Überschrift bleibt', () => {
+  const { buildLandPage } = requireGenHTML(tmpdir());
+  const html = buildLandPage({ slug: 'bayern', name: 'Bayern', clubs: [], groups: [] }, PORTAL_REGIONS, PORTAL_LEGAL);
+  assert.ok(!html.includes('<ul class="portal-list">'));
+  assert.ok(html.includes('<h2 id="vereine-heading">Vereine</h2>'));
+});
+
 // --- Archiv-Tab & "nicht gemeldet" Banner ---
 
 test('Team ohne Archiv-Dateien: kein Archiv-Tab in generierter Seite', () => {
@@ -1404,7 +1624,7 @@ test('Team MIT Archiv-Eintrag: Archiv-Tab erscheint mit Saison-Label und Gegner/
   const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
   try {
     writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
-    const archiveDir = join(dir, 'archive');
+    const archiveDir = join(dir, 'archive', '4468');
     require('fs').mkdirSync(archiveDir, { recursive: true });
     writeFileSync(join(archiveDir, '2025.json'), JSON.stringify({
       season: 2025,
@@ -1423,7 +1643,7 @@ test('Team MIT Archiv-Eintrag: Archiv-Tab erscheint mit Saison-Label und Gegner/
       },
     }));
     const { genHTML } = requireGenHTML(dir);
-    genHTML(DEFAULT_THEME);
+    genHTML(DEFAULT_THEME, {}, { archiveDir });
     const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
     assert.ok(html.includes('tab-167881-archive'), 'Archiv-Tab-Button fehlt');
     assert.ok(html.includes('panel-167881-archive'), 'Archiv-Tab-Panel fehlt');
@@ -1439,7 +1659,7 @@ test('Archivierte Saison mit status "provisional" zeigt "vorläufig" Hinweis', (
   const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
   try {
     writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
-    const archiveDir = join(dir, 'archive');
+    const archiveDir = join(dir, 'archive', '4468');
     require('fs').mkdirSync(archiveDir, { recursive: true });
     writeFileSync(join(archiveDir, '2025.json'), JSON.stringify({
       season: 2025,
@@ -1456,7 +1676,7 @@ test('Archivierte Saison mit status "provisional" zeigt "vorläufig" Hinweis', (
       },
     }));
     const { genHTML } = requireGenHTML(dir);
-    genHTML(DEFAULT_THEME);
+    genHTML(DEFAULT_THEME, {}, { archiveDir });
     const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
     assert.ok(/vorläufig/i.test(html), '"vorläufig" Hinweis fehlt bei status: provisional');
   } finally {
@@ -1487,7 +1707,7 @@ test('Archivierter Gegnername mit <script> wird escaped ausgegeben', () => {
   const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
   try {
     writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
-    const archiveDir = join(dir, 'archive');
+    const archiveDir = join(dir, 'archive', '4468');
     require('fs').mkdirSync(archiveDir, { recursive: true });
     writeFileSync(join(archiveDir, '2025.json'), JSON.stringify({
       season: 2025,
@@ -1506,7 +1726,7 @@ test('Archivierter Gegnername mit <script> wird escaped ausgegeben', () => {
       },
     }));
     const { genHTML } = requireGenHTML(dir);
-    genHTML(DEFAULT_THEME);
+    genHTML(DEFAULT_THEME, {}, { archiveDir });
     const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
     assert.ok(!html.includes('<script>alert(1337)'), 'raw script tag aus Archiv-Gegnername darf nicht im Output sein');
     assert.ok(html.includes('&lt;script&gt;alert(1337)&lt;/script&gt;'), 'escaped Form des Archiv-Gegnernamens fehlt');
@@ -1515,10 +1735,51 @@ test('Archivierter Gegnername mit <script> wird escaped ausgegeben', () => {
   }
 });
 
+test('genHTML: ohne options.archiveDir kein Archiv-Tab, auch wenn ein (altes, globales) archive/<season>.json existiert', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    require('fs').mkdirSync(join(dir, 'archive'), { recursive: true });
+    writeFileSync(join(dir, 'archive', '2025.json'), JSON.stringify({
+      season: 2025,
+      teams: { '167881': { teamName: 'T', ageGroup: 'U10', gender: '', status: 'final', lastSeenAt: '', matches: [], competitions: [] } },
+    }));
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME);
+    const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
+    assert.ok(!html.includes('tab-167881-archive'), 'ohne club-spezifisches archiveDir darf kein Archiv gelesen werden');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('genHTML: liest nur das Archiv des übergebenen Clubs (archive/<clubId>/), nicht das eines anderen Clubs', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
+  try {
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify(sampleMetadata));
+    const entry = (opponent) => ({
+      season: 2025,
+      teams: { '167881': { teamName: 'T', ageGroup: 'U10', gender: '', status: 'final', lastSeenAt: '', competitions: [],
+        matches: [{ date: '2025-10-12', time: '15:00', opponent, isHome: true, result: '55:40', competition: 'Kreisliga', isNext: false, venueName: '', venueAddress: '', opponentLogoUrl: '' }] } },
+    });
+    for (const [clubId, opponent] of [['4468', 'EigenerArchivGegner'], ['5000', 'FremderArchivGegner']]) {
+      require('fs').mkdirSync(join(dir, 'archive', clubId), { recursive: true });
+      writeFileSync(join(dir, 'archive', clubId, '2025.json'), JSON.stringify(entry(opponent)));
+    }
+    const { genHTML } = requireGenHTML(dir);
+    genHTML(DEFAULT_THEME, {}, { archiveDir: join(dir, 'archive', '4468') });
+    const html = readFileSync(join(dir, 'teams', '167881.html'), 'utf8');
+    assert.ok(html.includes('EigenerArchivGegner'));
+    assert.ok(!html.includes('FremderArchivGegner'), 'Archiv eines anderen Clubs darf nicht erscheinen');
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
 test('loadTeamArchives: liest Archivdateien, ignoriert kaputte Dateien, sortiert absteigend', () => {
   const dir = mkdtempSync(join(tmpdir(), 'bbb-html-'));
   try {
-    const archiveDir = join(dir, 'archive');
+    const archiveDir = join(dir, 'archive', '4468');
     require('fs').mkdirSync(archiveDir, { recursive: true });
     writeFileSync(join(archiveDir, '2024.json'), JSON.stringify({
       season: 2024,
@@ -1539,11 +1800,68 @@ test('loadTeamArchives: liest Archivdateien, ignoriert kaputte Dateien, sortiert
     const { _testExports } = require('../../src/generateHTML.js');
     const { loadTeamArchives } = _testExports;
 
-    const archives = loadTeamArchives(dir, '167881');
+    const archives = loadTeamArchives(archiveDir, '167881');
     assert.equal(archives.length, 2, 'sollte nur die 2 Archive mit passender teamId liefern');
     assert.equal(archives[0].season, 2025, 'sollte absteigend sortiert sein');
     assert.equal(archives[1].season, 2024, 'sollte absteigend sortiert sein');
   } finally {
     rmSync(dir, { recursive: true });
   }
+});
+
+// ---- Privater Portalbetrieb (ADR-027) ----
+
+test('buildFooter privat: ohne contactUrl kein Impressum- und kein Kontakt-Link', () => {
+  const { buildFooter } = require('../../src/generateHTML.js')._testExports;
+  const html = buildFooter({ private: true, operator: 'Privat' }, './');
+  assert.ok(!html.includes('impressum.html'));
+  assert.ok(!html.includes('Kontakt'));
+  assert.ok(html.includes('href="./datenschutz.html"') && html.includes('href="./barrierefreiheit.html"'));
+});
+
+test('buildFooter privat: contactUrl als Kontakt-Link (target/rel, escaped), kein Impressum', () => {
+  const { buildFooter } = require('../../src/generateHTML.js')._testExports;
+  const html = buildFooter({ private: true, operator: 'Privat', contactUrl: 'https://x.test/k?a=1&b="2"' }, '../');
+  assert.ok(html.includes('<a href="https://x.test/k?a=1&amp;b=&quot;2&quot;" target="_blank" rel="noopener">Kontakt</a>'), html);
+  assert.ok(!html.includes('impressum.html'));
+  assert.ok(html.includes('href="../datenschutz.html"'));
+});
+
+test('buildFooter: Club-Legal ohne private bleibt unverändert (Impressum-Link, kein Kontakt)', () => {
+  const { buildFooter } = require('../../src/generateHTML.js')._testExports;
+  const html = buildFooter({ operator: 'Verein', address: 'A', email: 'a@b.de' }, './');
+  assert.ok(html.includes('<a href="./impressum.html">Impressum</a>'));
+  assert.ok(!html.includes('Kontakt'));
+});
+
+test('buildPortalLegalPages privat: nur datenschutz + barrierefreiheit, mit Operator und Kontaktlink', () => {
+  const { buildPortalLegalPages } = require('../../src/generateHTML.js');
+  const legal = { private: true, operator: 'Privat <b>& Co', contactUrl: 'https://x.test/k?a=1&b=2' };
+  const pages = buildPortalLegalPages(legal, []);
+  assert.deepEqual(Object.keys(pages).sort(), ['barrierefreiheit', 'datenschutz']);
+  for (const html of Object.values(pages)) {
+    assert.ok(html.includes('Privat &lt;b&gt;&amp; Co') || pages.barrierefreiheit === html);
+    assert.ok(html.includes('href="https://x.test/k?a=1&amp;b=2"'));
+    assert.ok(!/Impressum/.test(html), 'kein Verweis auf Impressum');
+    assert.ok(!html.includes('mailto:'));
+  }
+  assert.ok(pages.datenschutz.includes('Privat &lt;b&gt;&amp; Co'));
+  assert.ok(!pages.datenschutz.includes('<b>& Co'));
+});
+
+test('buildPortalLegalPages privat ohne contactUrl: Fallbacksatz, kein Impressum-Verweis', () => {
+  const { buildPortalLegalPages } = require('../../src/generateHTML.js');
+  const pages = buildPortalLegalPages({ private: true, operator: 'Privat' }, []);
+  for (const html of Object.values(pages)) {
+    assert.ok(html.includes('Bitte wenden Sie sich an den Seitenbetreiber.'));
+    assert.ok(!/Impressum/.test(html));
+    assert.ok(!html.includes('mailto:'));
+  }
+  assert.ok(pages.datenschutz.includes('Privat'));
+});
+
+test('buildPortalLegalPages strikt: liefert weiterhin impressum + datenschutz + barrierefreiheit', () => {
+  const { buildPortalLegalPages } = require('../../src/generateHTML.js');
+  const pages = buildPortalLegalPages({ operator: 'X', address: 'Y', email: 'a@b.de' }, []);
+  assert.deepEqual(Object.keys(pages).sort(), ['barrierefreiheit', 'datenschutz', 'impressum']);
 });

@@ -1,0 +1,3917 @@
+{
+  "generatedAt": "2026-09-29T13:12:58.436Z",
+  "ligenByVerbandId": {
+    "2": [
+      {
+        "ligaId": 52497,
+        "liganame": "Regionalliga Damen HR-Nord (RLD-HRN)",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52498,
+        "liganame": "Regionalliga Damen HR-Süd (RLD-HRS)",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52501,
+        "liganame": "RLSO-Meisterschaft Ü35m",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52499,
+        "liganame": "RLSO-Meisterschaft Ü40m",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52500,
+        "liganame": "RLSO-Meisterschaft Ü40w",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52515,
+        "liganame": "1. Regionalliga Herren HR-Nord (1RLH-HRN)",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52514,
+        "liganame": "1. Regionalliga Herren HR-Süd (1RLH-HRS)",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52527,
+        "liganame": "2. Regionalliga Nord (2RLN)",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52528,
+        "liganame": "2. Regionalliga Süd (2RLS)",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52530,
+        "liganame": "Bayernliga Herren  Nord (ByLHN)",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52531,
+        "liganame": "Bayernliga Herren Mitte (ByLHM)",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52532,
+        "liganame": "Bayernliga Herren Süd (ByLHS)",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52535,
+        "liganame": "Bayernliga Herren Vorbereitung",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52533,
+        "liganame": "Bayernliga Nord Damen (ByLND)",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52534,
+        "liganame": "Bayernliga Süd Damen (ByLSD)",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52536,
+        "liganame": "Bayernliga Damen Vorbereitung",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54305,
+        "liganame": "Bayernliga U16 männlich Mitte",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54303,
+        "liganame": "Bayernliga U16 männlich Nord",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54304,
+        "liganame": "Bayernliga U16 männlich Süd",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56305,
+        "liganame": "BBV-Pokal U16 männlich",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54307,
+        "liganame": "Bayernliga U16 weiblich Nord",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54306,
+        "liganame": "Bayernliga U16 weiblich Süd",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54331,
+        "liganame": "Vorbereitungsspiele Jugend",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54308,
+        "liganame": "Bayernliga U14 männlich Einteilungsrunde Nord",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54309,
+        "liganame": "Bayernliga U14 männlich Einteilungsrunde Süd",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54324,
+        "liganame": "Bayernliga U14 männlich Hauptrunde",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54325,
+        "liganame": "Bayernliga U14 männlich Platzierungsrunde",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54310,
+        "liganame": "Bayernliga U14 weiblich Einteilungsrunde Nord",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54311,
+        "liganame": "Bayernliga U14 weiblich Einteilungsrunde Süd",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54326,
+        "liganame": "Bayernliga U14 weiblich Hauptrunde",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54327,
+        "liganame": "Bayernliga U14 weiblich Platzierungsrunde",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52537,
+        "liganame": "Bayernpokal 2027 Herren",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52538,
+        "liganame": "Bayernpokal 2027 Damen",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 55524,
+        "liganame": "BM Bayernliga Herren 2026",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 55526,
+        "liganame": "BM Bayernliga Damen 2026",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56052,
+        "liganame": "BM Ü35 Herren",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56053,
+        "liganame": "BM Ü35 Damen Gruppe A",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56097,
+        "liganame": "BM Ü35 Damen Gruppe B",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56058,
+        "liganame": "BM Ü40 Herren Vorrunde A",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56059,
+        "liganame": "BM Ü40 Herren Vorrunde B",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56060,
+        "liganame": "BM Ü40 Herren Vorrunde C",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56061,
+        "liganame": "BM Ü40 Damen",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54332,
+        "liganame": "Bayerische Meisterschaft U20m",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54333,
+        "liganame": "Bayerische Meisterschaft U20w",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54334,
+        "liganame": "Bayerische Meisterschaft U18m",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54335,
+        "liganame": "Bayerische Meisterschaft U18w",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54336,
+        "liganame": "Bayerische Meisterschaft U16m",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54337,
+        "liganame": "Bayerische Meisterschaft U16w",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54338,
+        "liganame": "Bayerische Meisterschaft U14m",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54339,
+        "liganame": "Bayerische Meisterschaft U14w",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54345,
+        "liganame": "Bayerische Meisterschaft U12w",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54343,
+        "liganame": "Bayerische Meisterschaft U12 mix",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54340,
+        "liganame": "Qualirunde Nordbayern U12 Gr.A (Samstag)",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54341,
+        "liganame": "Qualirunde Nordbayern U12 Gr.B (Samstag)",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54342,
+        "liganame": "Qualirunde Nordbayern U12 mix (Sonntag)",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54344,
+        "liganame": "Qualirunde Südbayern U12 mix",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54347,
+        "liganame": "BBV MiniMasters U10w",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54346,
+        "liganame": "BBV MiniMasters U10mix",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54348,
+        "liganame": "Landesliga U20 männlich Nord",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54349,
+        "liganame": "Landesliga U20 weiblich Nord",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54350,
+        "liganame": "Landesliga U18 m Einteilungsrunde Ost",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54351,
+        "liganame": "Landesliga U18 m Einteilungsrunde West",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54355,
+        "liganame": "Landesliga U18 männlich Nord A",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54356,
+        "liganame": "Landesliga U18 männlich Nord B",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54357,
+        "liganame": "Qualifikation 26/27 JLLU18m R1 Gr.A",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54358,
+        "liganame": "Qualifikation 26/27 JLLU18m R1 Gr.B",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54352,
+        "liganame": "Landesliga U14 männlich Nord",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54353,
+        "liganame": "Landesliga U14 männlich Süd",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54359,
+        "liganame": "Finalturnier Landesliga U14 männlich",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54362,
+        "liganame": "Qualifikation 2025/26 JLLU14m R1 Gr.D",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54365,
+        "liganame": "Qualifikation 2025/26 JLLU14m R2 Gr.B",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54360,
+        "liganame": "Qualifikation 26/27 JLLU14m R1 Gr.A",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54363,
+        "liganame": "Qualifikation 26/27 JLLU14m R1 Gr.B",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54361,
+        "liganame": "Qualifikation 26/27 JLLU14m R1 Gr.C",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54364,
+        "liganame": "Qualifikation 26/27 JLLU14m R2",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54354,
+        "liganame": "Landesliga U12 weiblich Nord",
+        "skEbeneId": 0,
+        "skEbeneName": "Verband",
+        "bezirknr": null,
+        "bezirkName": null,
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53725,
+        "liganame": "Bezirksoberliga Herren (BOLH) - 2026/27 ",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54453,
+        "liganame": "Bezirksoberliga Herren 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53709,
+        "liganame": "MFR Bezirksoberliga Herren",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54755,
+        "liganame": "OPF Bezirksoberliga Herren 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 4,
+        "bezirkName": "Oberpfalz",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52802,
+        "liganame": "Bezirksoberliga Herren",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 55568,
+        "liganame": "UFR Bezirksoberliga Herren",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54480,
+        "liganame": "Schwaben Vorbereitung Herren 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56298,
+        "liganame": "Vorbereitungsliga Herren",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53875,
+        "liganame": "Bezirksoberliga Damen (bold) 26/27 ",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54455,
+        "liganame": "Bezirksoberliga Damen Nord 25/26",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54456,
+        "liganame": "Bezirksoberliga Damen Süd 25/26",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54454,
+        "liganame": "Bezirksoberliga Damen 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53710,
+        "liganame": "MFR Bezirksoberliga Damen",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 55572,
+        "liganame": "UFR Bezirksoberliga Damen",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54477,
+        "liganame": "BOLD Playoffs 25/26",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52803,
+        "liganame": "Bezirksoberliga Damen",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54481,
+        "liganame": "Schwaben Vorbereitung Damen 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56301,
+        "liganame": "Vorbereitungsliga Damen",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 55419,
+        "liganame": "Bezirksoberliga U20 ml (BOL20M) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54457,
+        "liganame": "Bezirksoberliga U20 männlich 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56156,
+        "liganame": "MFR U20m Bezirksoberliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56595,
+        "liganame": "U20 männlich Bezirksoberliga ",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 4,
+        "bezirkName": "Oberpfalz",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 55321,
+        "liganame": "Bezirksoberliga U20 männlich",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54458,
+        "liganame": "Bezirksoberliga U20 weiblich 26/27 - siehe BOLU18W",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56157,
+        "liganame": "MFR U20w Bezirksoberliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56596,
+        "liganame": "U20 weiblich Bezirksoberliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 4,
+        "bezirkName": "Oberpfalz",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56299,
+        "liganame": "Vorbereitungsliga Jugend",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53744,
+        "liganame": "Bezirksoberliga U18 ml (BOL18M) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54459,
+        "liganame": "Bezirksoberliga U18 männlich 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56158,
+        "liganame": "MFR U18m Bezirksoberliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56457,
+        "liganame": "U18 männlich Bezirksoberliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 4,
+        "bezirkName": "Oberpfalz",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53745,
+        "liganame": "Bezirksoberliga U18 wbl (bol18w) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54460,
+        "liganame": "Bezirksoberliga U18 weiblich 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56159,
+        "liganame": "MFR U18w Bezirksoberliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56463,
+        "liganame": "U18 weiblich Bezirksoberliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 4,
+        "bezirkName": "Oberpfalz",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 55322,
+        "liganame": "Bezirksoberliga U18 weiblich",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53769,
+        "liganame": "Bezirksoberliga U16 ml (BOL16M) 2026/27 ",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54461,
+        "liganame": "Bezirksoberliga U16 männlich 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56160,
+        "liganame": "MFR U16m Bezirksoberliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56458,
+        "liganame": "U16 männlich Bezirksoberliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 4,
+        "bezirkName": "Oberpfalz",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56634,
+        "liganame": "Bezirksoberliga U16 mänlich",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53770,
+        "liganame": "Bezirksoberliga U16 wbl (bol16w) 2026/27 ",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54462,
+        "liganame": "Bezirksoberliga U16 weiblich 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56161,
+        "liganame": "MFR U16w Bezirksoberliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56464,
+        "liganame": "U16 weiblich Bezirksoberliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 4,
+        "bezirkName": "Oberpfalz",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56615,
+        "liganame": "Bezirksoberliga U16 weiblich",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53790,
+        "liganame": "Bezirksoberliga U14 ml (BOL14M) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54466,
+        "liganame": "Bezirksoberliga U14 männlich 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56162,
+        "liganame": "MFR U14m Bezirksoberliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56461,
+        "liganame": "U14 männlich Bezirksoberliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 4,
+        "bezirkName": "Oberpfalz",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56629,
+        "liganame": "Bezirksoberliga U14 mänlich",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53791,
+        "liganame": "Bezirksoberliga U14 wbl (bol14w) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54467,
+        "liganame": "Bezirksoberliga U14 weiblich 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56163,
+        "liganame": "MFR U14w Bezirksoberliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56465,
+        "liganame": "U14 weiblich Bezirksoberliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 4,
+        "bezirkName": "Oberpfalz",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56614,
+        "liganame": "Bezirksoberliga U14 weiblich",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53810,
+        "liganame": "Bezirksoberliga U12 ml (BOL12M) 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53811,
+        "liganame": "Bezirksoberliga U12 wbl (bol12w) 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54472,
+        "liganame": "Bezirksoberliga U12 weiblich 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56166,
+        "liganame": "MFR U12w Bezirksoberliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56466,
+        "liganame": "U12 weiblich Bezirksoberliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 4,
+        "bezirkName": "Oberpfalz",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56613,
+        "liganame": "Bezirksoberliga U12 weiblich",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54471,
+        "liganame": "Bezirksoberliga U12 gemischt 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56165,
+        "liganame": "MFR U12 mix Bezirksoberliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56167,
+        "liganame": "MFR U11 mix Bezirksoberliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53860,
+        "liganame": "Bezirksoberliga u10 (BOL10M) 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53861,
+        "liganame": "Bezirksoberliga u10 wbl (bol10w) 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54474,
+        "liganame": "Bezirksoberliga U10 weiblich 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56169,
+        "liganame": "MFR U10w Bezirksoberliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56467,
+        "liganame": "U10 weiblich Bezirksoberliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 4,
+        "bezirkName": "Oberpfalz",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56612,
+        "liganame": "Bezirksoberliga U10 weiblich",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54473,
+        "liganame": "Bezirksoberliga U10 gemischt 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56168,
+        "liganame": "MFR U10 mix Bezirksoberliga Einteilungsrunde",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54475,
+        "liganame": "Bezirksoberliga U9 gemischt 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56170,
+        "liganame": "MFR U9 mix Bezirksoberliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54476,
+        "liganame": "Bezirksoberliga U8 gemischt 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56171,
+        "liganame": "MFR U8 mix Bezirksoberliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56642,
+        "liganame": "Bezirksoberliga U8 mix",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56450,
+        "liganame": "OPF Bezirkspokal Damen 26-27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 4,
+        "bezirkName": "Oberpfalz",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56451,
+        "liganame": "OPF Bezirkspokal Herren 26-27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 4,
+        "bezirkName": "Oberpfalz",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54482,
+        "liganame": "Bezirkspokal Herren 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56067,
+        "liganame": "MFR Bezirkspokal Herren",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52804,
+        "liganame": "Bezirkspokal Herren",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52805,
+        "liganame": "Kreispokal Herren",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 55573,
+        "liganame": "UFR Bezirkspokal Herren ",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54483,
+        "liganame": "Bezirkspokal Damen 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56068,
+        "liganame": "MFR Bezirkspokal Damen",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52185,
+        "liganame": "Bezirkspokal Oberpfalz Damen 25-26",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 4,
+        "bezirkName": "Oberpfalz",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52806,
+        "liganame": "Bezirkspokal Damen",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56099,
+        "liganame": "UFR Bezirkspokal Damen",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56433,
+        "liganame": "Qualifikationsspiel bayerische Meisterschaft U18 männlich",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53728,
+        "liganame": "Bezirksliga Herren (BZLH-O) - Gruppe Ost 2026/27 ",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53727,
+        "liganame": "Bezirksliga Herren (BZLH-W) - Gruppe West 2026/27 ",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54485,
+        "liganame": "Bezirksliga Herren Nord 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54484,
+        "liganame": "Bezirksliga Herren Süd 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53711,
+        "liganame": "MFR Bezirksliga Herren",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54792,
+        "liganame": "OPF Bezirksliga Herren 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 4,
+        "bezirkName": "Oberpfalz",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52807,
+        "liganame": "Bezirksliga Herren",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 55569,
+        "liganame": "UFR Bezirksliga Herren ",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53876,
+        "liganame": "Bezirksliga Damen (bzld) 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52808,
+        "liganame": "Bezirksliga Damen A",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52809,
+        "liganame": "Bezirksliga Damen B",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54787,
+        "liganame": "Bezirksliga Ü45 männlich",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54786,
+        "liganame": "Bezirksliga Ü50 männlich",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 55323,
+        "liganame": "Bezirksliga Ü55 männlich",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56004,
+        "liganame": "UFR Bezirksliga U20 männlich",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53746,
+        "liganame": "Bezirksliga U18 ml (BZL18M)  2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54486,
+        "liganame": "Bezirksliga U18 männlich Nord 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54487,
+        "liganame": "Bezirksliga U18 männlich Süd 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 55327,
+        "liganame": "Bezirksliga U18 männlich Einteilungsrunde A",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 55330,
+        "liganame": "Bezirksliga U18 männlich Einteilungsrunde B",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56005,
+        "liganame": "UFR Bezirksliga U18 männlich",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 55333,
+        "liganame": "Bezirksliga U18 männlich Meisterschaftsspiele ",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 55336,
+        "liganame": "Bezirksliga U18 männlich Spiele um Platz 5-8",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 55337,
+        "liganame": "Bezirksliga U18 männlich Spiele um Platz 9-12",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56006,
+        "liganame": "UFR Bezirksliga U18 weiblich",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53771,
+        "liganame": "Bezirksliga U16 ml (BZL16M) 2026/27 ",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54490,
+        "liganame": "Bezirksliga U16 männlich Mitte 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54488,
+        "liganame": "Bezirksliga U16 männlich Nord 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54489,
+        "liganame": "Bezirksliga U16 männlich Süd 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56210,
+        "liganame": "MFR U16m Bezirksliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56460,
+        "liganame": "U16 männlich Bezirksliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 4,
+        "bezirkName": "Oberpfalz",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56635,
+        "liganame": "Bezirksliga U16 männlich",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56007,
+        "liganame": "UFR Bezirksliga U16 männlich",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56008,
+        "liganame": "UFR Bezirksliga U16 weiblich",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53792,
+        "liganame": "Bezirksliga U14 ml (BZL14M) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54493,
+        "liganame": "Bezirksliga U14 männlich Mitte Süd 25/26",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54494,
+        "liganame": "Bezirksliga U14 männlich Mitte 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54491,
+        "liganame": "Bezirksliga U14 männlich Nord 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54492,
+        "liganame": "Bezirksliga U14 männlich Süd 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56175,
+        "liganame": "MFR U14m Bezirksliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56462,
+        "liganame": "U14 männlich Bezirksliga",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 4,
+        "bezirkName": "Oberpfalz",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56630,
+        "liganame": "Bezirksliga U14 männlich A",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56631,
+        "liganame": "Bezirksliga U14 männlich B",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56009,
+        "liganame": "UFR Bezirksliga U14 weiblich",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53812,
+        "liganame": "Bezirksliga U12 ml (BZL12M) 26/27 ",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56019,
+        "liganame": "UFR Bezirksliga U12 weiblich",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 55701,
+        "liganame": "Bezirksliga U12 gemischt Mitte Nord 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54497,
+        "liganame": "Bezirksliga U12 gemischt Mitte 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54495,
+        "liganame": "Bezirksliga U12 gemischt Nord 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54496,
+        "liganame": "Bezirksliga U12 gemischt Süd 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56177,
+        "liganame": "MFR U12 mix Bezirksliga Nord",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56176,
+        "liganame": "MFR U12 mix Bezirksliga Süd",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56021,
+        "liganame": "UFR Bezirksliga U10 weiblich",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54498,
+        "liganame": "Bezirksliga U10 gemischt Nord 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54499,
+        "liganame": "Bezirksliga U10 gemischt Süd 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56017,
+        "liganame": "UFR Bezirksliga U10 mix 1",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56010,
+        "liganame": "UFR Bezirksliga U10 mix 2",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56011,
+        "liganame": "UFR Bezirksliga U10 mix 3",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56012,
+        "liganame": "UFR Bezirksliga U9 mix",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56013,
+        "liganame": "UFR Bezirksliga U8 mix",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53729,
+        "liganame": "Bezirksklasse Herren (MI-BKH) Mitte 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53731,
+        "liganame": "Nord - Bezirksklasse Herren 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 2,
+        "kreisname": "Kreis Nordost"
+      },
+      {
+        "ligaId": 53732,
+        "liganame": "Bezirksklasse Herren Südost  (SO-BKH) 2026/27 ",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 3,
+        "kreisname": "Kreis Südost"
+      },
+      {
+        "ligaId": 53733,
+        "liganame": "West - Bezirksklasse Herren (WE-BKH) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 54508,
+        "liganame": "Bezirksklasse Herren Mitte 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54507,
+        "liganame": "Bezirksklasse Herren Nord 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54509,
+        "liganame": "Bezirksklasse Herren Süd 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53712,
+        "liganame": "MFR Bezirksklasse Herren",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54793,
+        "liganame": "OPF Bezirksklasse Herren 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 4,
+        "bezirkName": "Oberpfalz",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52810,
+        "liganame": "Bezirksklasse Herren",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 55570,
+        "liganame": "UFR Bezirksklasse Herren Ost",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 55571,
+        "liganame": "UFR Bezirksklasse Herren West",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56564,
+        "liganame": "Vorbereitungsspiele Einzelspiele",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56563,
+        "liganame": "Vorbereitungsspiele Turniere",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 55001,
+        "liganame": "Bezirksklasse Damen Ost (kü-bkdo) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 55004,
+        "liganame": "Bezirksklasse Damen West (kü-bkdw) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 54101,
+        "liganame": "Nord - Bezirksklasse Damen 4x4 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 2,
+        "kreisname": "Kreis Nordost"
+      },
+      {
+        "ligaId": 53713,
+        "liganame": "MFR Bezirksklasse Damen",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54891,
+        "liganame": "OPF Bezirksklasse Damen 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 4,
+        "bezirkName": "Oberpfalz",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53747,
+        "liganame": "Bezirksklasse U18m Nordgruppe (MI-BK18M-N) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53748,
+        "liganame": "Bezirksklasse u18m Südgruppe (MI-BK18M-S) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53749,
+        "liganame": "Nord - Bezirksklasse U18m 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 2,
+        "kreisname": "Kreis Nordost"
+      },
+      {
+        "ligaId": 53750,
+        "liganame": "Bezirksklasse Südost (SO-BK18M) u18m 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 3,
+        "kreisname": "Kreis Südost"
+      },
+      {
+        "ligaId": 53751,
+        "liganame": "West - Bezirksklasse U18m-A (WE-BK18M-A) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 55423,
+        "liganame": "West - Bezirksklasse U18m-B (WE-BK18M-B) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 55441,
+        "liganame": "Bezirksklasse u18w (kü-bk18w) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 3,
+        "kreisname": "Kreis Südost"
+      },
+      {
+        "ligaId": 53772,
+        "liganame": "Bezirksklasse U16m Nord (MI-BK16M-N) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53773,
+        "liganame": "Bezirksklasse U16m Süd (MI-BK16M-S) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53774,
+        "liganame": "Nord - Bezirksklasse U16m 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 2,
+        "kreisname": "Kreis Nordost"
+      },
+      {
+        "ligaId": 53775,
+        "liganame": "Bezirksklasse Südost (SO-BK16M) u16m 2026/27 ",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 3,
+        "kreisname": "Kreis Südost"
+      },
+      {
+        "ligaId": 53776,
+        "liganame": "West - Bezirksklasse U16m (WE-BK16M) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 56636,
+        "liganame": "Bezirksklasse U16 männlich",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 55418,
+        "liganame": "West - Bezirksklasse U16w (we-bku16w) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 53793,
+        "liganame": "Bezirksklasse u14m Nordgruppe (MI-BK14M-N) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53794,
+        "liganame": "Bezirksklasse u14m Südgruppe (MI-BK14M-S) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53795,
+        "liganame": "Nord - Bezirksklasse U14m 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 2,
+        "kreisname": "Kreis Nordost"
+      },
+      {
+        "ligaId": 53796,
+        "liganame": "Bezirksklasse Südost u14m (SO-BK14M) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 3,
+        "kreisname": "Kreis Südost"
+      },
+      {
+        "ligaId": 53797,
+        "liganame": "West - Bezirksklasse U14m (WE-BK14M) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 56632,
+        "liganame": "Bezirksklasse U14 männlich A",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56633,
+        "liganame": "Bezirksklasse U14 männlich B",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56025,
+        "liganame": "UFR Einteilungsrunde 1 U14 männlich",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 55416,
+        "liganame": "West - Bezirksklasse U14w (we-bku14w) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 53813,
+        "liganame": "Bezirksklasse U12m Nord (MI-BK12M-N) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53814,
+        "liganame": "Bezirksklasse u12m Süd (MI-BK12M-S) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53815,
+        "liganame": "Nord - Bezirksklasse u12m 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 2,
+        "kreisname": "Kreis Nordost"
+      },
+      {
+        "ligaId": 53816,
+        "liganame": "Bezirksklasse Südost (SO-BK12) u12m 26/27 ",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 3,
+        "kreisname": "Kreis Südost"
+      },
+      {
+        "ligaId": 53817,
+        "liganame": "West - Bezirksklasse U12m (WE-BK12M) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 53818,
+        "liganame": "Bezirksklasse u12w (kü-bk12w) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 56032,
+        "liganame": "UFR Einteilungsrunde 1 U12 mix",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56033,
+        "liganame": "UFR Einteilungsrunde 3 U12 mix",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53858,
+        "liganame": "Nord - Bezirksklasse u10m 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 2,
+        "kreisname": "Kreis Nordost"
+      },
+      {
+        "ligaId": 53863,
+        "liganame": "Bezirksklasse Südost u10m (SO-BK10M) 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 3,
+        "kreisname": "Kreis Südost"
+      },
+      {
+        "ligaId": 55413,
+        "liganame": "West - Bezirksklasse U10m (WE-BK10M) 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 55699,
+        "liganame": "Bezirksklasse U10 gemischt 26/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 2,
+        "bezirkName": "Schwaben",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53859,
+        "liganame": "Nord - Bezirksklasse u8m 2026/27",
+        "skEbeneId": 1,
+        "skEbeneName": "Bezirk",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 2,
+        "kreisname": "Kreis Nordost"
+      },
+      {
+        "ligaId": 53735,
+        "liganame": "Kreisliga Herren A (MI-KLHA) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53736,
+        "liganame": "Kreisliga Herren B (MI-KLHB) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53737,
+        "liganame": "Kreisliga Herren Südost  (SO-KLH) 2026/27 ",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 3,
+        "kreisname": "Kreis Südost"
+      },
+      {
+        "ligaId": 53738,
+        "liganame": "West - Kreisliga Herren (WE-KLH) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 53718,
+        "liganame": "MFR Kreisliga Herren Mitte",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53716,
+        "liganame": "MFR Kreisliga Herren Nord",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53717,
+        "liganame": "MFR Kreisliga Herren Süd",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52811,
+        "liganame": "Kreisliga Herren A",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 52812,
+        "liganame": "Kreisliga Herren B",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 55006,
+        "liganame": "Kreisliga Damen Ost (kü-kldo) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 55008,
+        "liganame": "Kreisliga Damen West (kü-kldw) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53720,
+        "liganame": "MFR Kreisliga Damen",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 54798,
+        "liganame": "West - Kreisliga Ü40 (WE-KLÜ40) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 53752,
+        "liganame": "Kreisliga U18m (MI-KL18M) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 55438,
+        "liganame": "Kreisliga u18m Südost (SO-KL18M) 2026/27 ",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 3,
+        "kreisname": "Kreis Südost"
+      },
+      {
+        "ligaId": 56179,
+        "liganame": "MFR U18m Kreisliga Nord",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56180,
+        "liganame": "MFR U18m Kreisliga Süd",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56014,
+        "liganame": "UFR Kreisliga U18 männlich",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53755,
+        "liganame": "U18 wbl Kreisliga  (kü-kl18w) 2026/27 ",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 3,
+        "kreisname": "Kreis Südost"
+      },
+      {
+        "ligaId": 56181,
+        "liganame": "MFR U18w Kreisliga",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53778,
+        "liganame": "Kreisliga U16m Nord (MI-KL16M-N) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 55011,
+        "liganame": "Kreisliga U16m Süd (MI-KL16M-S) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53779,
+        "liganame": "Kreisliga u16m Südost  (SO-KL16M) 2026/27 ",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 3,
+        "kreisname": "Kreis Südost"
+      },
+      {
+        "ligaId": 53780,
+        "liganame": "West - Kreisliga U16m-A (WE-KL16M-A) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 53781,
+        "liganame": "West - Kreisliga U16m-B (WE-KL16M-B) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 56182,
+        "liganame": "MFR U16m Kreisliga Nord",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56183,
+        "liganame": "MFR U16m Kreisliga Süd",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56015,
+        "liganame": "UFR Kreisliga U16 männlich",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53782,
+        "liganame": "West - Kreisliga u16w-A (we-kl16w-a) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 53785,
+        "liganame": "West - Kreisliga u16w-B (we-kl16w-b) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 53783,
+        "liganame": "West - Kreisliga u16w-C (we-kl16w-c) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 53786,
+        "liganame": "West - Kreisliga u16w-a (we-kl16w-a) 2025/26 Platzierungsrunde",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 53787,
+        "liganame": "West - Kreisliga u16w-b (we-kl16w-b) 2025/26 Platzierungsrunde\t ",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 53798,
+        "liganame": "Kreisliga u14m Nord (MI-KL14M-N) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53799,
+        "liganame": "Kreisliga u14m Süd (MI-KL14M-S) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53801,
+        "liganame": "Kreisliga u14m Südost (SO-KL14M) 2026/27 ",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 3,
+        "kreisname": "Kreis Südost"
+      },
+      {
+        "ligaId": 53802,
+        "liganame": "West - Kreisliga U14m (WE-KL14M) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 56185,
+        "liganame": "MFR U14m Kreisliga Mitte",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56186,
+        "liganame": "MFR U14m Kreisliga Nord",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56187,
+        "liganame": "MFR U14m Kreisliga Süd",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53804,
+        "liganame": "West - Kreisliga u14w-A (we-kl14w-a) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 53803,
+        "liganame": "West - Kreisliga u14w-B (we-kl14w-b) 2026/27 ",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 53805,
+        "liganame": "West - Kreisliga u14w-C (we-kl14w-c) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 56212,
+        "liganame": "MFR U14w Kreisliga",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53819,
+        "liganame": "Kreisliga u12 Nordgruppe (MI-KL12M-N) 26/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53820,
+        "liganame": "Kreisliga u12 Südgruppe (MI-KL12M-S) 26/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 56559,
+        "liganame": "Kreisliga u12 Zentralgruppe (MI-KL12M-Z) 26/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53823,
+        "liganame": "KL u12m Südost  (SO-KL12) 26/27 ",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 3,
+        "kreisname": "Kreis Südost"
+      },
+      {
+        "ligaId": 53825,
+        "liganame": "West - Kreisliga U12m (WE-KL12M) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 53826,
+        "liganame": "Kreisliga u12w Nordgruppe (kü-kl12w-n) 26/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53827,
+        "liganame": "Kreisliga u12w Südgruppe (kü-klu12w-s) 26/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53828,
+        "liganame": "Kreisliga u12w Westgruppe (kü-kl12w-w) 26/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53829,
+        "liganame": "Kreisliga u12w Zentralgruppe (kü-kl12w-z) 26/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 56503,
+        "liganame": "Kreisliga u12w Zentralsüdgruppe (kü-kl12w-zs) 26/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 56191,
+        "liganame": "MFR U12w Kreisliga Nord",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56429,
+        "liganame": "MFR U12w Kreisliga Süd",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56428,
+        "liganame": "MFR U12 mix Kreisliga 1",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56189,
+        "liganame": "MFR U12 mix Kreisliga 2",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56190,
+        "liganame": "MFR U12 mix Kreisliga 3",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56204,
+        "liganame": "MFR U12 mix Kreisliga 4",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53865,
+        "liganame": "Kreisliga u10 Nordgruppe (MI-KL10M-N) 26/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53866,
+        "liganame": "Kreisliga u10 Südgruppe (MI-KL10M-S) 26/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53864,
+        "liganame": "Kreisliga u10 Zentralnordgruppe (MI-KL10M-ZN) 26/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 56504,
+        "liganame": "Kreisliga u10 Zentralsüdgruppe (MI-KL10M-ZS) 26/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53867,
+        "liganame": "West - Kreisliga U10m-A (WE-KL10M-A) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 55411,
+        "liganame": "West - Kreisliga U10m-B (WE-KL10M-B) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 53868,
+        "liganame": "Kreisliga u10w Westgruppe (kü-kl10w-w) 26/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53869,
+        "liganame": "Kreisliga u10w Zentraleregruppe (kü-kl10w-z) 26/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 56192,
+        "liganame": "MFR U10 mix Kreisliga 1",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56197,
+        "liganame": "MFR U10 mix Kreisliga 2",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56196,
+        "liganame": "MFR U10 mix Kreisliga 3",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56194,
+        "liganame": "MFR U10 mix Kreisliga 4",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 3,
+        "bezirkName": "Mittelfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53739,
+        "liganame": "Kreisklasse Herren A (MI-KKHA) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53740,
+        "liganame": "Kreisklasse Herren B Nordgruppe (MI-KKHB-N) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53741,
+        "liganame": "Kreisklasse Herren B Südgruppe (MI-KKHB-S) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53742,
+        "liganame": "Kreisklasse Herren Südost (SO-KKH) 2026/27 ",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 3,
+        "kreisname": "Kreis Südost"
+      },
+      {
+        "ligaId": 53743,
+        "liganame": "West - Kreisklasse Herren (WE-KKH) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 53788,
+        "liganame": "Kreisklasse U16m (MI-KK16M) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53789,
+        "liganame": "West - Kreisklasse u16w-(we-kk16w) 2025/26 Platzierungsrunde\t ",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 53807,
+        "liganame": "Kreisklasse u14m (MI-KK14M) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53808,
+        "liganame": "West - Kreisklasse U14m-A (WE-KK14M-A) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 53809,
+        "liganame": "West - Kreisklasse U14m-B (WE-KK14M-B) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 56026,
+        "liganame": "UFR Einteilungsrunde 2 U14 männlich",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56027,
+        "liganame": "UFR Einteilungsrunde 3 U14 männlich",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53832,
+        "liganame": "Kreisklasse u12 Mittignordgruppe (MI-KK12M-MN) 26/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53834,
+        "liganame": "Kreisklasse u12 Mittigostgruppe (MI-KK12M-MO) 26/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 56560,
+        "liganame": "Kreisklasse u12 Mittigsüdgruppe (MI-KK12M-MS) 26/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53833,
+        "liganame": "Kreisklasse u12 Nordgruppe (MI-KK12M-N) 26/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53835,
+        "liganame": "Kreisklasse u12 Südgruppe (MI-KK12M-S) 26/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53840,
+        "liganame": "West - Kreisklasse U12m-A (WE-KK12M-A) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 53841,
+        "liganame": "West - Kreisklasse U12m-B (WE-KK12M-B) 2026/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 4,
+        "kreisname": "Kreis West"
+      },
+      {
+        "ligaId": 56034,
+        "liganame": "UFR Einteilungsrunde 2 U12 mix",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56035,
+        "liganame": "UFR Einteilungsrunde 4 U12 mix",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 6,
+        "bezirkName": "Unterfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56584,
+        "liganame": "Vorrunde U12 mix 1",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56623,
+        "liganame": "Vorrunde U12 mix 2",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56624,
+        "liganame": "Vorrunde U12 mix 3",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56625,
+        "liganame": "Vorrunde U12 mix 4",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56626,
+        "liganame": "Vorrunde U12 mix 5",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56627,
+        "liganame": "Vorrunde U12 mix 6",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56628,
+        "liganame": "Vorrunde U12 mix 7",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 53870,
+        "liganame": "Kreisklasse u10 Nordgruppe (MI-KK10M-N) 26/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53872,
+        "liganame": "Kreisklasse u10 Südgruppe (MI-KK10M-S) 26/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 53871,
+        "liganame": "Kreisklasse u10 Zentralgruppe (MI-KK10M-Z) 26/27",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 1,
+        "bezirkName": "Oberbayern",
+        "kreisnr": 1,
+        "kreisname": "Kreis Mitte"
+      },
+      {
+        "ligaId": 56616,
+        "liganame": "Vorrunde U10 mix 1",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56618,
+        "liganame": "Vorrunde U10 mix 2",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56619,
+        "liganame": "Vorrunde U10 mix 3",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56620,
+        "liganame": "Vorrunde U10 mix 4",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56621,
+        "liganame": "Vorrunde U10 mix 5",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      },
+      {
+        "ligaId": 56622,
+        "liganame": "Vorrunde U10 mix 6",
+        "skEbeneId": 2,
+        "skEbeneName": "Kreis",
+        "bezirknr": 5,
+        "bezirkName": "Oberfranken",
+        "kreisnr": null,
+        "kreisname": null
+      }
+    ]
+  }
+}

@@ -8,7 +8,7 @@
   "scripts": {
     "start": "node src/server.js",
     "update": "node src/cronUpdate.js",
-    "generate-html": "node src/generateHTML.js",
+    "wam:refresh": "node scripts/refresh-wam-cache.js",
     "test": "node --test 'tests/e2e/*.test.js'",
     "test:watch": "node --watch --test 'tests/e2e/*.test.js'",
     "test:a11y": "playwright test --project=chromium-a11y",

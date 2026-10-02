@@ -32,6 +32,7 @@ a|
 * Negative: Keine Echtzeit-Updates (Client bestimmt die Sync-Frequenz, typischerweise stündlich). Keine bidirektionale Synchronisation möglich (Nutzer können keine Events bearbeiten).
 |===
 
+[[adr-002-eine-clubid-als-einzige-konfiguration]]
 === ADR-002: Eine clubId als einzige Konfiguration
 
 [cols="2,5", options="header"]
@@ -39,7 +40,7 @@ a|
 | Aspekt | Inhalt
 
 | *Status*
-| Akzeptiert
+| Ersetzt durch <<adr-018-verzeichnis-pro-club,ADR-018>> (Verzeichnis pro Club; die zugehörige Bundesland-Ableitung steht in <<adr-017-automatische-bundesland-ableitung,ADR-017>>), Multi-Club-Umbau, 2026-09
 
 | *Datum*
 | 2024
@@ -412,6 +413,7 @@ a|
 * CSS: `.result-icon`, `.result-icon--win`, `.result-icon--loss` in `buildSharedStyles`
 |===
 
+[[adr-014-saison-archivierung]]
 === ADR-014: Saison-Archivierung mit Rolling-Update-Mechanismus und Persistenz nicht gemeldeter Teams
 
 [cols="2,5", options="header"]
@@ -419,7 +421,7 @@ a|
 | Aspekt | Inhalt
 
 | *Status*
-| Akzeptiert
+| Akzeptiert; Speicherort im Multi-Club-Betrieb präzisiert durch <<adr-026-saison-archiv-pro-club,ADR-026>> (`generated/archive/<clubId>/{seasonId}.json` statt `generated/archive/{seasonId}.json`)
 
 | *Datum*
 | 2026-09-08
@@ -480,4 +482,394 @@ a|
 a|
 * Positive: Korrekte, stabile Team-Labels unabhängig von Array-Reihenfolge; keine geratene Nummerierung mehr; einheitliche Formatierung ("Herren"/"Damen" bzw. "{Altersklasse}{m\|w}") über alle Aufrufer hinweg.
 * Negative: Für alte oder unvollständige `metadata.json`-Einträge (geschrieben vor diesem Fix, ohne `teamAkjId`/`teamNumber`) greift ein weniger präziser Fallback (`teamLabel()`, rohe API-Teamname + Altersgruppe ohne Nummerierung), bis der nächste Update-Zyklus die Felder nachliefert.
+|===
+
+[[adr-016-alt-pfad-duplikat-ausgabe]]
+=== ADR-016: Dauerhafte Alt-Pfad-Duplikat-Ausgabe statt Redirects für Bestandsclubs
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Teilweise ersetzt durch <<adr-023-wegfall-legacy-html,ADR-023>> (HTML-Anteil; die ICS-Duplikate gelten unverändert)
+
+| *Datum*
+| 2026-09-22
+
+| *Kontext*
+| Der Umbau auf ein Multi-Club-Datenmodell verschiebt die ICS- und HTML-Ausgabe vom bisherigen flachen Pfad (`generated/{teamId}_{type}.ics`, `generated/teams/{teamId}.html`) auf einen verschachtelten Pfad (`generated/<bundesland>/<club-slug>/...`). Zum Zeitpunkt des Umbaus existieren bereits von Nutzern abonnierte Kalender-Links auf den alten, flachen Pfad. GitHub Pages bietet keine serverseitigen Redirects für Verzeichnisse, und Kalender-Clients (Kalender.app, Google Calendar) folgen keinen HTML-Meta-Redirects bei `.ics`-Abrufen.
+
+| *Entscheidung*
+| Für Clubs, die zum Zeitpunkt des v1→v2-Übergangs bereits unter dem alten flachen Pfad liefen (markiert über `legacyRootOutput: true` in der jeweiligen `clubs/<bundesland>/<club>/config.json`), wird die ICS- und HTML-Ausgabe dauerhaft zusätzlich an ihrem alten Pfad erzeugt — als vollständiges Duplikat neben der neuen verschachtelten Struktur, nicht als Weiterleitung. Die Alt-Pfad-ICS-Dateien enthalten zusätzlich ein einmaliges, ganztägiges Hinweis-VEVENT mit der neuen Abo-URL; die Alt-Pfad-HTML-Seiten erhalten einen sichtbaren Migrationsbanner. Neue, nach dem Umbau hinzugefügte Clubs bekommen `legacyRootOutput` nicht gesetzt und somit ausschließlich die neue Struktur.
+
+| *Begründung*
+a|
+* Ein 404 auf einem abonnierten `.ics`-Link wird von Kalender-Clients unterschiedlich behandelt (teils stilles Nichtaktualisieren, teils Fehleranzeige) — beides ist für Nutzer unbefriedigend und für den Betreiber schwer zu diagnostizieren.
+* Ein Datei-Duplikat ist bei der überschaubaren Datenmenge dieses Projekts (ICS-Dateien im Kilobyte-Bereich) technisch vernachlässigbar teuer.
+* Das Hinweis-VEVENT erreicht Nutzer direkt im Kalender, ohne dass sie die Webseite erneut besuchen müssen — die reine Website-Banner-Lösung allein hätte Nutzer nicht erreicht, die nur noch den Kalender-Feed nutzen.
+* Es gibt bewusst keinen automatischen Abschaltzeitpunkt für die Alt-Pfad-Ausgabe in diesem ADR — das Entfernen ist eine spätere, manuelle Entscheidung, sobald die Migration der Nutzer als abgeschlossen gilt.
+
+| *Konsequenzen*
+a|
+* Positive: Kein bestehendes Kalender-Abo bricht durch den Umbau. Nutzer werden sowohl über die Website als auch direkt im Kalender auf die neue URL hingewiesen.
+* Negative: Doppelte Dateierzeugung und doppelter Speicherplatz für Clubs mit `legacyRootOutput: true` (dauerhaft, bis manuell entfernt). Der Alt-Pfad-Mechanismus ist technische Schuld, die nur für den/die zum Umbauzeitpunkt bereits laufenden Bestandsclub(s) gilt und bewusst nicht generalisiert wird.
+|===
+
+[[adr-017-automatische-bundesland-ableitung]]
+=== ADR-017: Automatische statt manuelle Bundesland-Zuordnung pro Club
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-22
+
+| *Kontext*
+| Der Multi-Club-Umbau organisiert Clubs über eine Bundesland-Ebene in der URL-Struktur (`generated/<bundesland-slug>/<club-slug>/...`). Ein Verein kann Teams in mehreren Ligen und damit mehreren Landesverbänden gleichzeitig haben (z.B. Jugendteams in einer Bezirksliga, eine Herrenmannschaft in einer bundesweiten Liga), und diese Zusammensetzung ändert sich über Zeit durch Auf- und Abstieg.
+
+| *Entscheidung*
+| Das Bundesland eines Clubs wird bei jedem Cron-Lauf neu aus den ohnehin abgerufenen API-Liga-Daten berechnet (`src/verbandMapping.js`, `deriveClubBundesland`): für jedes Team wird der Verband seiner aktuellen Liga ermittelt (`verbandId`), Verbände die auf keinen einzelnen Bundesland abbilden (z.B. bundesweite Ligen) werden ignoriert, und das häufigste verbleibende Bundesland gewinnt. Der Ordnername unter `clubs/<bundesland-slug>/<club-slug>/` im Quellbaum ist davon unabhängig — er ist nur eine Organisationshilfe für Menschen im Repo und wird nicht als Datenquelle verwendet.
+
+| *Begründung*
+a|
+* Eine manuell gepflegte Bundesland-Zuordnung würde bei jedem Auf-/Abstieg zwischen Landesverbänden veralten und müsste manuell nachgepflegt werden — die API liefert diese Information aber bereits strukturiert (`verbandId`/`verbandName` in `ligaData`).
+* Die Mehrheitsregel bildet die tatsächliche regionale Verwurzelung eines Vereins ab, auch wenn einzelne Mannschaften bundesweit spielen.
+* Die Trennung zwischen Repo-Ordnername (Mensch-lesbare Organisation) und berechnetem Wert (verbindliche Quelle) vermeidet, dass ein falsch benannter Ordner stillschweigend zu einer falschen URL führt.
+
+| *Konsequenzen*
+a|
+* Positive: Keine manuelle Pflege der Bundesland-Zuordnung nötig, bleibt automatisch korrekt bei Liga-Wechseln.
+* Negative: Ein Club kann bei einem Cron-Lauf theoretisch das Bundesland wechseln (wenn sich die Mehrheitsverhältnisse seiner Ligen ändern), was seine URL ändert und dadurch bestehende Links auf diesen Club brechen könnte — dieses Risiko ist für die aktuell einzige betroffene Konstellation (Fibalon, `legacyRootOutput: true`, siehe <<adr-016-alt-pfad-duplikat-ausgabe,ADR-016>>) durch die Alt-Pfad-Duplikat-Ausgabe abgefedert, gilt aber uneingeschränkt für alle künftig hinzukommenden Clubs ohne diese Absicherung.
+|===
+
+[[adr-018-verzeichnis-pro-club]]
+=== ADR-018: Verzeichnis-pro-Club (`clubs/<bundesland>/<club>/config.json`) statt zentraler Config-Datei mit Array
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-22
+
+| *Kontext*
+| Ersetzt <<adr-002-eine-clubid-als-einzige-konfiguration,ADR-002>>: Das Projekt unterstützt jetzt mehrere Clubs. Es musste entschieden werden, ob deren Konfiguration in einer einzigen Datei (z.B. `config.json` mit einem `clubs`-Array) oder über mehrere Dateien organisiert wird.
+
+| *Entscheidung*
+| Jeder Club bekommt eine eigene `config.json` unter `clubs/<bundesland-slug>/<club-slug>/`. Ein neues Modul `src/clubs.js` (`loadClubs`) liest diese Struktur rekursiv ein.
+
+| *Begründung*
+a|
+* Neue Vereine werden über einen neuen Ordner hinzugefügt, nicht über eine Änderung an einer bestehenden, gemeinsam genutzten Datei — das minimiert Merge-Konflikte, wenn mehrere Vereine gleichzeitig via Pull Request hinzugefügt oder geändert werden.
+* Die Ordnerstruktur macht das Repo für Menschen navigierbar, ohne eine große JSON-Datei durchsuchen zu müssen.
+* Passt zu dem in <<adr-017-automatische-bundesland-ableitung,ADR-017>> etablierten Prinzip, dass der Ordnername nur Organisationshilfe ist.
+
+| *Konsequenzen*
+a|
+* Positive: Isolierte, unabhängig review- und mergebare Änderungen pro Club. Einfaches Onboarding: ein neuer Ordner mit einer `config.json` genügt.
+* Negative: Ein Überblick über alle Clubs auf einmal erfordert das Einlesen mehrerer Dateien (`loadClubs` kapselt das), statt eine einzige Datei zu öffnen.
+|===
+
+[[adr-019-testbreite-multi-club]]
+=== ADR-019: Mindestbreite für Multi-Club-Orchestrierungstests (9 Clubs, 6+ Bundesländer, 1 bundesweit)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-22
+
+| *Kontext*
+| Beim End-to-End-Test gegen die reale Basketball-Bund.net-API mit 10 echten Clubs aus 9 verschiedenen Bundesländern wurde ein kritischer Bug gefunden: Der Teams-Cache in `src/storage.js` war eine einzige globale Datei ohne Club-Bezug, sodass jeder Club nach dem ersten stillschweigend die gecachte Team-Liste des ERSTEN Clubs erhielt — falsche Teams, falsche Spiele, falsch hergeleitetes Bundesland. Keiner der zu diesem Zeitpunkt 176 bestehenden Tests fand diesen Bug, weil kein Integrationstest, der `updateAll()`/`updateClub()` aufruft, mit mehr als zwei Clubs gleichzeitig testete (der bis dahin einzige Multi-Club-Test deckte genau zwei Clubs ab).
+
+| *Entscheidung*
+| Integrationstests, die `updateAll()`/`updateClub()` aufrufen und clubübergreifendes Orchestrierungsverhalten prüfen (nicht reine Einzelfunktionslogik), müssen mit mindestens 9 Clubs aus mindestens 6 verschiedenen Bundesländern testen, plus mindestens einem Club, dessen Teams ausschließlich in bundesweiten Wettbewerben spielen (verbandId ohne Bundesland-Zuordnung, z.B. Bundesligen). Diese Regel ist in `CLAUDE.md` unter „Testregeln“ verbindlich festgehalten.
+
+| *Begründung*
+a|
+* Die eigentliche Eigenschaft — keine Datenlecks zwischen Clubs — ließe sich bereits mit zwei Clubs nachweisen (siehe der bestehende Zwei-Club-Regressionstest). Die höhere Schwelle ist bewusst deutlich über diesem Minimum gewählt, damit ein Test nicht nur "gerade so" die Mindestanforderung einer zweiten Instanz erfüllt, sondern echte Vielfalt erzwingt.
+* 9 Clubs über mindestens 6 Bundesländer stellen sicher, dass ein Test gleichzeitig mehrere Klassen von Kollisionsrisiken abdeckt, die bei nur zwei Clubs unsichtbar bleiben können: echte Bundesland-Gruppierung (mehrere Clubs im selben Bundesland, um Verwechslung innerhalb einer Gruppe auszuschließen), alphabetisch benachbarte Bundesland-Slugs (die sich bei fehlerhafter String-Verarbeitung eher gegenseitig überschreiben würden) und Verarbeitungsreihenfolge-Effekte, die bei nur zwei Elementen zufällig unauffällig bleiben können.
+* Der verpflichtende bundesweite Club deckt den einzigen Sonderfall ab, der nicht über die "Mehrheits-Bundesland"-Logik läuft (siehe <<adr-017-automatische-bundesland-ableitung,ADR-017>>), sondern direkt auf `bundesweit` fällt — ein Bug, der nur diesen Pfad betrifft, würde von einer reinen Bundesland-zu-Bundesland-Stichprobe nicht gefunden.
+* Die konkrete Zahl 9 ist damit kein Zufallswert, sondern die kleinste Zahl, mit der sich 6+ Bundesländer UND mindestens eine Bundesland-Gruppe mit mehr als einem Club UND ein bundesweiter Sonderfall gleichzeitig in einem einzigen Testlauf realistisch abbilden lassen.
+
+| *Konsequenzen*
+a|
+* Positive: Multi-Club-Orchestrierungsbugs, die nur bei echter Vielfalt auftreten (wie der Cache-Contamination-Bug), werden künftig vor dem Merge gefunden statt erst im realen Cron-Lauf.
+* Negative: Neue Multi-Club-Integrationstests sind aufwändiger zu schreiben und langsamer in der Ausführung als ein einfacher Zwei-Club-Test (siehe `tests/e2e/cron-update-integration.test.js` für das etablierte Muster mit einer einzigen Clubs-Tabelle als Quelle der Wahrheit für Mock-Setup und erwartete Pfade).
+|===
+
+[[adr-020-aggregation-aus-laufzeit-ergebnissen]]
+=== ADR-020: Bund-/Land-Aggregation aus den Laufzeit-Ergebnissen statt aus `metadata.json`-Dateien
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-29
+
+| *Kontext*
+| Für die Bund-/Land-Seiten müssen die Daten aller Clubs zusammengeführt werden. Zwei Wege standen zur Wahl: (a) die pro Club geschriebenen `metadata.json`-Dateien unter `generated/` nach der Club-Schleife wieder einlesen, (b) die von `updateClub()` ohnehin zurückgegebenen Ergebnisse (`{ club, bundesland, meta }`) direkt weiterreichen.
+
+| *Entscheidung*
+| `aggregatePages(results, …)` (`src/aggregatePages.js`) erhält die Ergebnisliste von `updateAll()` im Speicher. Clubs mit leeren Team-Daten (`meta.length === 0`, z.B. API-Ausfall) werden auf den Portal-Seiten nicht aufgelistet.
+
+| *Begründung*
+a|
+* Kein Wieder-Einlesen von Dateien: keine veralteten Ordner entfernter Clubs (`generated/<land>/<club>/` bliebe sonst bei lokalen Läufen liegen und würde weiter gelistet), kein Widerspruch zwischen Datei-Quelle und Config-Quelle (Banner-Bedingung), keine Sonderbehandlung des Legacy-Roots.
+* Die Alternative (Datei-basiert) bleibt für ein späteres Matrix-Batching (Plan C) offen: ein Merge-Job kann die Ergebnisliste aus `metadata.json`-Dateien rekonstruieren und dieselbe Funktion aufrufen. Das ist bewusst NICHT Teil von Plan B (YAGNI).
+* Ohne den Leer-Filter würde ein API-Ausfall einen Club unter `bundesweit` ohne Teams auf der Bund-Seite erscheinen lassen.
+
+| *Konsequenzen*
+a|
+* Positive: einfachere Datenquelle, deterministisch pro Lauf.
+* Negative: `aggregatePages` ist an den Prozesslauf gekoppelt; ein separater Aggregationslauf ohne Club-Verarbeitung ist erst mit einem Loader möglich.
+|===
+
+[[adr-021-wam-cache-versioniert]]
+=== ADR-021: Quartalsweiser, versionierter WAM-Cache statt Live-Abruf pro Cron-Lauf
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-29
+
+| *Kontext*
+| `POST /rest/wam/liga/list?startAtIndex=<n>` (Body `{"token":0,"verbandIds":[<id>]}`) liefert paginiert (10/Seite, Antwort unter `data.ligen`, Fortsetzung über `hasMoreData`) alle Ligen eines Verbands inkl. Ebene (`skEbeneId` 0/1/2) und Bezirk/Kreis. Der Endpunkt ist in der OpenAPI-Spec des basketball-bund-api-Repos beschrieben (Tag `WAM`, operationId `searchLigen`). Abweichung Spec ↔ Realität (live geprüft am 2026-09-29): Die Spec beschreibt die Antwort verschachtelt unter `data.ligaListe.{ligen,hasMoreData,size}`, die reale API liefert `ligen`, `hasMoreData` und `size` flach unter `data`; der Client folgt der Realität. Bayern: 40 Seiten, ~391 Ligen (inkl. 9 Ligen mit `verbandId` 32). Verifiziert am 2026-09-29: alle 8 `ligaData.ligaId`-Werte aus `club/id/4468/actualmatches` kommen in der WAM-Liste vor — die `ligaId` ist der Join-Schlüssel zwischen Match-Daten und WAM.
+
+| *Entscheidung*
+| Die WAM-Daten werden alle 3 Monate per Workflow (`wam-refresh.yml`, `scripts/refresh-wam-cache.js`) für die Verbände der eingebundenen Bundesländer abgerufen und als `data/wam-ligen-cache.json` im Repo versioniert. Der 6-Stunden-Cron liest nur den Cache. TTL: 150 Tage (`WAM_CACHE_TTL_MS`, `src/wamCache.js`). Zugriff über `src/wamClient.js` (sequenzielle Pagination, `startAtIndex` als Query-Parameter).
+
+| *Begründung*
+a|
+* 40+ Requests pro Verband bei jedem 6-Stunden-Lauf wären unverhältnismäßig für Daten, die sich pro Saison ändern; der Cache hält die API-Last niedrig (Rate-Limit ~1 req/s).
+* Versionierung im Repo macht Änderungen nachvollziehbar und den Deploy unabhängig von WAM-Verfügbarkeit.
+* TTL 150 Tage statt exakt einem Quartal, damit der Cache kurz vor jedem Refresh nicht als veraltet gilt.
+* Es gibt keine Stabilitätszusage der Plattform für diesen Endpunkt; er kann sich ändern — der Cache entkoppelt das Portal davon.
+
+| *Konsequenzen*
+a|
+* Positive: geringe Last, deterministische Builds, Struktur für die spätere "alle Ligen bundesweit"-Vision liegt bereit.
+* Negative: Liga-Metadaten sind bis zu ~3 Monate alt; Schedule-Workflows laufen nur auf dem Default-Branch (auf `v2` nur per `workflow_dispatch` testbar); Pushes mit `GITHUB_TOKEN` lösen kein Deployment aus, der nächste 6-Stunden-Lauf übernimmt den Cache.
+|===
+
+[[adr-022-graceful-degradation-wam-cache]]
+=== ADR-022: Graceful Degradation bei fehlendem/veraltetem WAM-Cache und Erhalt des alten Stands bei Teilabrufen
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-29
+
+| *Kontext*
+| Der WAM-Cache ist eine Anreicherung (Gruppierung der Land-Seiten nach Ebene/Bezirk/Kreis), keine Voraussetzung für die Seiten. Zudem kann ein Abruf mitten in der Pagination fehlschlagen.
+
+| *Entscheidung*
+| (1) Fehlt der Cache, ist er unlesbar oder älter als 150 Tage, erzeugt `aggregatePages` die Land-Seiten trotzdem — flach, alphabetisch, ohne Ebenen-Gruppierung — und loggt `console.warn`; der Lauf bricht nie ab. (2) `fetchLeaguesForVerband` liefert `{ ligen, complete }`. Schlägt eine Seite fehl, ist `complete=false`; `refreshWamCache` übernimmt dann für diesen Verband den ALTEN Cache-Stand (oder lässt ihn weg, falls keiner existiert), vermerkt ihn in `partialVerbandIds` und der Refresh-Job endet mit Fehlerstatus (kein Commit). Für `bundesweit` gibt es keine Anreicherung.
+
+| *Begründung*
+a|
+* Portal-Seiten dürfen nicht von der Verfügbarkeit eines externen Endpunkts ohne Stabilitätszusage abhängen.
+* Ein Teilabruf mit frischem `generatedAt` würde Lücken tarnen und einen guten Cache durch einen schlechteren ersetzen.
+
+| *Konsequenzen*
+a|
+* Positive: Robustheit; Fehler bleiben in CI sichtbar.
+* Negative: Ohne Cache sind die Land-Seiten weniger strukturiert; unbekannte Ligen erscheinen unter "Weitere Ligen".
+|===
+
+[[adr-023-wegfall-legacy-html]]
+=== ADR-023: Wegfall der Alt-Pfad-HTML — Rückwärtskompatibilität nur für ICS
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert (ersetzt den HTML-Teil von <<adr-016-alt-pfad-duplikat-ausgabe,ADR-016>>)
+
+| *Datum*
+| 2026-09-29
+
+| *Kontext*
+| <<adr-016-alt-pfad-duplikat-ausgabe,ADR-016>> ließ Clubs mit `legacyRootOutput: true` (Fibalon) zusätzlich HTML unter dem flachen Alt-Pfad schreiben. Plan B braucht `generated/index.html` für die Bund-Seite. Schützenswert waren immer die Kalender-Abonnenten (ICS-URLs), nicht die HTML-Seite.
+
+| *Entscheidung*
+| `legacyRootOutput` erzeugt nur noch die Alt-Pfad-ICS (`generated/{teamId}_{kind}.ics`, mit Migrations-VEVENT und echten Spielen). Kein `generated/index.html`, keine `generated/teams/*.html`, kein Root-`metadata.json` mehr. `generated/index.html` ist ausschließlich die Bund-Seite; der Migrationshinweis erscheint als generischer Banner darauf (genau dann, wenn mindestens ein Club das Flag hat).
+
+| *Begründung*
+a|
+* Kein Konflikt zweier Schreiber am selben Pfad; die ICS-Garantie bleibt vollständig erhalten.
+* `generated/` ist gitignored und wird pro Deploy frisch gebaut — alte HTML-Dateien verschwinden ohne Migrationsschritt.
+* Der Banner ist generisch, damit er unabhängig von der Anzahl betroffener Clubs korrekt bleibt; die handlungsrelevante neue URL steht im ICS-Migrations-VEVENT.
+
+| *Konsequenzen*
+a|
+* Positive: eindeutige Zuständigkeit für `generated/index.html`.
+* Negative: alte HTML-URLs (z.B. `/teams/<id>.html`) liefern nach dem Deploy 404; bewusst akzeptiert.
+|===
+
+[[adr-024-bundesweit-eigener-block]]
+=== ADR-024: `bundesweit` als eigener Block mit eigener Seite; reservierter Slug `index`
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-29
+
+| *Kontext*
+| Clubs, deren Teams nur in bundesweiten Wettbewerben spielen, haben kein Bundesland (`bundesweit`, siehe <<adr-017-automatische-bundesland-ableitung,ADR-017>>). Die Navigation Bund → Land braucht dafür ein Ziel.
+
+| *Entscheidung*
+| `bundesweit` wird wie ein Bundesland behandelt (eigene Seite `generated/bundesweit/index.html` mit `buildLandPage`), auf der Bund-Seite als Block "Bundesweite Wettbewerbe" nach allen Bundesländern. Keine WAM-Anreicherung. Zusätzlich ist der Slug `index` reserviert (`sanitizeSlug`, `RESERVED_SLUGS`).
+
+| *Begründung*
+a|
+* Einheitliche Navigation ohne Sonderfälle im Nutzerfluss.
+* `index` ist vorsorglich reserviert (mehrdeutige URLs `/land/index` vs. `/land/index.html` bei manchen Servern). Es gibt KEINEN Dateisystem-Konflikt: Ordner `index/` und Datei `index.html` haben verschiedene Namen.
+
+| *Konsequenzen*
+a|
+* Positive: keine Sonderlogik in der Navigation; der bundesweite Fall ist getestet (ADR-019).
+* Negative: `bundesweit` ist ein Pseudo-Bundesland in Slug-Listen und Nav.
+|===
+
+[[adr-025-fehlerisolation-pro-club]]
+=== ADR-025: Fehlerisolation pro Club und tolerantes Deployment
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-29
+
+| *Kontext*
+| `updateAll()` brach bei einem Fehler in einem Club (`sanitizeSlug`, `updateClub`) die gesamte Schleife ab — alle folgenden Clubs und die Aggregation fielen aus.
+
+| *Entscheidung*
+| `updateAll()` fängt Fehler pro Club, loggt sie und gibt `{ results, failures }` zurück. Der CLI-Einstieg setzt `process.exitCode = 1`, wenn `failures` nicht leer ist (auch bei einem Fehler in der Portal-Aggregation, z.B. fehlender `portal.json`). `deploy.yml` führt `npm run update` mit `continue-on-error` aus, prüft, dass mindestens eine ICS-Datei existiert, deployt und markiert den Job am Ende rot. Eine Portal-Seite ohne Impressum wird nie veröffentlicht: fehlt `portal.json` oder sind Pflichtfelder leer, entstehen keine Bund-/Land-Seiten (zum privaten Betrieb ohne Impressum siehe <<adr-027-privater-portalbetrieb,ADR-027>>).
+
+| *Begründung*
+a|
+* Ein defekter Club darf die Kalender aller anderen nicht blockieren; sichtbar bleibt der Fehler über den roten Job.
+* Der ICS-Guard verhindert, dass ein Totalausfall die funktionierende Seite durch eine leere ersetzt.
+* Der Exitcode wird im CLI-Einstieg statt in `updateAll()` gesetzt, damit `node:test`-Läufe nicht beeinflusst werden.
+
+| *Konsequenzen*
+a|
+* Positive: Teilausfälle sind toleriert und trotzdem sichtbar.
+* Negative: Ein Deploy mit Teilfehlern veröffentlicht einen unvollständigen Stand (bewusste Abwägung gegen Totalausfall).
+* Negative: Der Deploy-Guard prüft nur auf ICS-Dateien, nicht auf `generated/index.html`. Ohne `portal.json` wird ohne Bund-/Land-Seiten deployt (Job rot); Kalender-Abos haben Vorrang vor den Portal-Seiten.
+|===
+
+[[adr-026-saison-archiv-pro-club]]
+=== ADR-026: Saison-Archiv pro Club unter `generated/archive/<clubId>/`
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-29
+
+| *Kontext*
+a|
+* <<adr-014-saison-archivierung,ADR-014>> (Saison-Archivierung, entstanden im Single-Club-Betrieb) schreibt ein File pro Saison für *alle* Teams: `generated/archive/{seasonId}.json`. Mit der Zusammenführung in den Multi-Club-Zweig (Plan A/B) würden sich darin die Teams aller Clubs vermischen — dieselbe Fehlerklasse wie der geteilte Teams-Cache, der zur Testpolicy <<adr-019-testbreite-multi-club,ADR-019>> geführt hat (ein nicht nach Club gescopter Speicher, dessen Eindeutigkeit implizit angenommen, aber nirgends erzwungen wird).
+* Der Archiv-Tab einer Team-Seite liegt jetzt unter `generated/<bundesland>/<club-slug>/teams/`. Das Bundesland wird bei jedem Lauf aus den Liga-Daten abgeleitet (<<adr-017-automatische-bundesland-ableitung,ADR-017>>) und kann wechseln — insbesondere fällt ein Club bei einem API-Ausfall (keine Team-Daten) auf `bundesweit`.
+* Auf `main` sind zum Zeitpunkt der Entscheidung noch keine Archivdateien committet — es gibt keinen Migrationsbedarf.
+
+| *Entscheidung*
+a|
+* Pfad: `generated/archive/<clubId>/<seasonId>.json`. Schlüssel ist die `clubId` aus `clubs/<bundesland>/<club>/config.json`, nicht `<bundesland>/<club-slug>`.
+* `src/seasonArchive.js`: `saveArchive(clubId, season, data)`, `loadArchive(clubId, season)`, `updateArchiveForTeam(clubId, teamMeta, …)` und `clubArchiveDir(clubId)`. Die `clubId` wird wie im Teams-Cache strikt gegen `/^\d+$/` validiert (`Ungültige clubId: …`), ohne `clubId` wird geworfen (kein stiller globaler Fallback). Die `season`-Validierung (`/^\d{4}$/`) bleibt als Path-Traversal-Schutz bestehen. Neue Archivdateien enthalten zusätzlich das Feld `clubId`.
+* `generateHTML.genHTML(…, { archiveDir })` liest nur das übergebene Club-Archiv; ohne `archiveDir` wird kein Archiv gelesen (kein Fallback auf `generated/archive/`).
+* Ein Archiv-Fehler (z.B. defekte Archivdatei) wird pro Team in `updateClub()` gefangen: das Team bleibt mit seiner aktuellen Saison auf der Club-Seite, in den ICS und auf den Portal-Seiten; `updateAll()` meldet den Club zusätzlich in `failures` (Exitcode 1, Job rot, vgl. <<adr-025-fehlerisolation-pro-club,ADR-025>>).
+* Der CI-Commit-Schritt (`file_pattern: 'generated/archive/**'`) und die `.gitignore`-Ausnahme `!/generated/archive/**` decken die Unterordner ohne Änderung ab.
+
+| *Begründung*
+a|
+* Die `clubId` ist stabil und eindeutig; das Bundesland ist ein pro Lauf berechneter, veränderlicher Wert. Ein Pfad über `<bundesland>/<club-slug>` würde das Archiv bei jedem Bundesland-Wechsel (Auf-/Abstieg, API-Ausfall → `bundesweit`) aufspalten; der Archiv-Tab zeigte dann nur noch einen Teil der Historie.
+* Auch der Club-Slug (Ordnername) ist weniger stabil als die `clubId` (Umbenennung des Ordners) und nicht zwingend bundesweit eindeutig.
+* Strikte Validierung statt Normalisierung verhindert, dass zwei verschiedene `clubId`-Werte auf dasselbe Verzeichnis abgebildet werden, und schützt vor Path-Traversal.
+* Archivdaten sind nicht wiederbeschaffbar (die API liefert alte Saisons irgendwann nicht mehr). Ein Archiv-Fehler darf deshalb weder unbemerkt bleiben (→ `failures`) noch die aktuelle Saison eines Clubs von der Seite nehmen.
+
+| *Konsequenzen*
+a|
+* Positive: Kein Vermischen von Clubs; das Archiv überlebt Bundesland-Wechsel; der bundesweite Club und Clubs verschiedener Bundesländer haben je ein eigenes Archiv. Abgesichert durch `tests/e2e/season-archive-multiclub.test.js` (10-Club-Fixture gemäß <<adr-019-testbreite-multi-club,ADR-019>>, inkl. Rolling-Update über mehrere Läufe, ausgefallenem Club, Bundesland-Wechsel und defekter Archivdatei).
+* Negative: Die Persistenz nicht gemeldeter Teams (`notCurrentlyListed`, <<adr-014-saison-archivierung,ADR-014>>) liest die `metadata.json` des vorherigen Laufs aus dem Club-Ausgabeverzeichnis `generated/<bundesland>/<club-slug>/` — sie ist damit (anders als das Archiv) nicht bundeslandstabil, und in CI existiert die vorherige `metadata.json` ohnehin nicht (`generated/` ist außer dem Archiv nicht versioniert). Die Archivdateien werden nicht bei Club-Entfernung aufgeräumt (bewusst: kein automatisches Löschen historischer Daten).
+|===
+
+[[adr-027-privater-portalbetrieb]]
+=== ADR-027: Privater Portalbetrieb ohne Impressum (Opt-in `private: true`)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-10-02
+
+| *Kontext*
+a|
+* Der Portal-Betreiber ist eine Privatperson, betreibt das Portal nicht geschäftsmäßig und möchte keine Privatadresse in einem Impressum veröffentlichen.
+* Bisher verlangte `portal.json` zwingend `operator`, `address` und `email` (<<adr-025-fehlerisolation-pro-club,ADR-025>>); ohne diese Angaben entstanden keine Portal-Seiten.
+
+| *Entscheidung*
+a|
+* Opt-in per `"private": true` in `portal.json` (nur der Boolean `true` aktiviert den Modus; Strings, Zahlen u.ä. lassen die bisherige strenge Prüfung greifen).
+* Im privaten Modus ist nur `operator` (Name) Pflicht, optional `contactUrl` (muss mit `https://` beginnen, Schutz vor `javascript:`-/`data:`-Links). `address`, `email`, `phone` und `responsible` werden ignoriert und nie ausgegeben.
+* Es wird kein `impressum.html` erzeugt; der Footer der Portal-Seiten zeigt statt des Impressum-Links (falls `contactUrl` gesetzt) einen Link „Kontakt". Datenschutz- und Barrierefreiheitsseite nennen den Namen als Verantwortlichen und verweisen auf den Kontaktlink bzw. „Bitte wenden Sie sich an den Seitenbetreiber."
+* Dies ist eine ausdrückliche Entscheidung des Betreibers. Es handelt sich nicht um eine rechtliche Feststellung und nicht um Rechtsberatung.
+
+| *Begründung*
+a|
+* Betreiber ist Privatperson und betreibt das Portal nicht geschäftsmäßig; die Privatadresse soll nicht veröffentlicht werden.
+* Ein Opt-in mit strikter Boolean-Prüfung verhindert, dass der Modus versehentlich (z.B. durch `"true"`) aktiviert wird; der strenge Modus bleibt der Default.
+
+| *Konsequenzen*
+a|
+* Verantwortung und Risiko der Entscheidung liegen beim Betreiber.
+* Ein Wechsel zurück auf den strengen Modus ist jederzeit möglich: `address`/`email` eintragen und `private` entfernen.
+* Club-Seiten behalten ihre eigenen Impressen (Club-`legal`); sie sind von dieser Betriebsart nicht betroffen.
+* Abgesichert durch Tests in `tests/e2e/portal-config.test.js`, `html-generation.test.js`, `portal-aggregation-integration.test.js` (10-Club-Fixture) und `tests/accessibility/portal.spec.js`.
 |===

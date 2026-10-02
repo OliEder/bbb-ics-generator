@@ -45,7 +45,7 @@ flowchart TD
 
 | *GitHub Actions*
 | GitHub Actions → BBB Vereinsportal (triggert Build)
-| Führt den Node.js-Prozess (`npm run update` und `npm run generate-html`) in einer Ubuntu-Runner-Umgebung aus. Trigger: Cron alle 6 Stunden, Push auf `main`, manueller `workflow_dispatch`.
+| Führt den Node.js-Prozess (`npm run update`, der ICS- und HTML-Generierung pro Club übernimmt) in einer Ubuntu-Runner-Umgebung aus. Trigger: Cron alle 6 Stunden, Push auf `main`, manueller `workflow_dispatch`.
 
 | *GitHub Pages*
 | BBB Vereinsportal → GitHub Pages (HTTP Upload via Actions)
@@ -82,6 +82,10 @@ flowchart TD
 | GitHub Actions API / HTTP Upload
 | Artefakt-Upload via `actions/upload-pages-artifact@v3`; Deployment via `actions/deploy-pages@v5`; Concurrency-Gruppe `pages` verhindert parallele Deployments
 
+| GitHub Actions → GitHub-Repository (`main`)
+| Git push (`stefanzweifel/git-auto-commit-action@v5`, `GITHUB_TOKEN`, `contents: write`)
+| Committet nach jedem Lauf ausschließlich `generated/archive/**` (Saison-Archiv pro Club, `generated/archive/<clubId>/{seasonId}.json`) mit `[skip ci]` zurück auf `main`; auch bei Teilfehlern, nicht bei Totalausfall (siehe Kapitel 7, <<adr-014-saison-archivierung,ADR-014>>, <<adr-026-saison-archiv-pro-club,ADR-026>>)
+
 | GitHub Pages → Kalender-Clients
 | HTTPS (TLS 1.2+) / text/calendar
 | Statische Datei-Auslieferung; kein Content-Negotiation; `Content-Type: text/calendar` für `.ics`-Dateien
@@ -94,6 +98,18 @@ flowchart TD
 | HTTPS / JS + CSS
 | Leaflet.js v1.9.4 (SRI-Hash-gesichert); lädt anschließend Kartenkacheln direkt von OpenStreetMap-Tile-Servern nach; nur auf Team-Seiten mit bekannter Spielhallen-Adresse
 |===
+
+=== Multi-Club-Datenfluss
+
+Seit dem Multi-Club-Umbau beginnt der Datenfluss nicht mehr bei einer einzigen Root-`config.json`, sondern potenziell bei vielen Konfigurationsquellen: `src/clubs.js` liest rekursiv jede `clubs/<bundesland-slug>/<club-slug>/config.json` ein und liefert pro gefundenem Club eine `clubId` sowie optionale Theme-, Cup-Farb- und Legal-Einstellungen. `cronUpdate.js` verarbeitet danach jeden Club unabhängig: Für jedes Team eines Clubs wird über die Basketball-Bund-API die `verbandId` seiner aktuellen Liga ermittelt und per `src/verbandMapping.js` auf ein Bundesland abgebildet; das Bundesland des gesamten Clubs ergibt sich als Mehrheitsvotum über alle seine Teams (`deriveClubBundesland`). Dieses Bundesland wird bei jedem Update-Lauf neu aus den ohnehin abgerufenen Liga-Daten berechnet — es ist keine manuell gepflegte Konfiguration, und der Ordnername im Quellbaum (`clubs/<bundesland-slug>/...`) ist davon unabhängig und dient nur der menschlichen Organisation im Repository. Die generierten ICS- und HTML-Dateien landen entsprechend unter `generated/<bundesland-slug>/<club-slug>/`. Ein Club, der bereits vor dem Umbau unter dem alten, flachen Pfad (`generated/{teamId}_{type}.ics`) lief und dessen Kalender-Links bereits von Nutzern abonniert sind, kann in seiner `config.json` mit `legacyRootOutput: true` markiert werden; für solche Clubs wird zusätzlich zur neuen, verschachtelten Struktur ein vollständiges Duplikat der ICS-Ausgabe am alten, flachen Pfad erzeugt (inklusive einem Migrationshinweis-Termin im Kalender), damit bestehende Abonnements nicht brechen. Alt-Pfad-HTML entfällt (<<adr-023-wegfall-legacy-html,ADR-023>>); stattdessen zeigt die Bund-Seite einen generischen Migrationsbanner.
+
+Abgelaufene Saisons archiviert `src/seasonArchive.js` pro Club unter `generated/archive/<clubId>/{seasonId}.json` — bewusst nach der stabilen `clubId` und nicht nach dem pro Lauf abgeleiteten Bundesland, damit das Archiv einen Bundesland-Wechsel (z.B. API-Ausfall → `bundesweit`) übersteht und sich Clubs nicht vermischen (<<adr-026-saison-archiv-pro-club,ADR-026>>). Die Team-Seiten unter `generated/<bundesland-slug>/<club-slug>/teams/` lesen ihren Archiv-Tab aus diesem Club-Archiv.
+
+=== Portal-Aggregation und WAM-Refresh
+
+Nach der Club-Schleife erzeugt `aggregatePages()` aus den Ergebnissen aller Clubs die Bund-Seite (`generated/index.html`), je eine Land-Seite pro Bundesland und für `bundesweit` sowie die Portal-Legal-Seiten (<<adr-020-aggregation-aus-laufzeit-ergebnissen,ADR-020>>). Die Betreiberangaben dafür stammen aus `portal.json` (Vorlage `portal.example.json`, geladen über `src/portalConfig.js`). Schlägt ein Club fehl, laufen die übrigen und die Aggregation weiter (<<adr-025-fehlerisolation-pro-club,ADR-025>>).
+
+Als separater, externer Datenfluss aktualisiert der Workflow `wam-refresh.yml` quartalsweise `data/wam-ligen-cache.json` über `POST /rest/wam/liga/list` (<<adr-021-wam-cache-versioniert,ADR-021>>). Der 6-Stunden-Lauf liest nur diesen Cache; fehlt er oder ist er älter als 150 Tage, entstehen die Land-Seiten ohne Ebenen-Gruppierung (<<adr-022-graceful-degradation-wam-cache,ADR-022>>).
 
 === Externe API-Endpunkte im Detail
 
@@ -124,4 +140,8 @@ flowchart TD
 | `/rest/competition/id/{ligaId}/matchday/{day}`
 | GET
 | Liefert die Spiele eines einzelnen Spieltags eines Pokalwettbewerbs. Wird für jeden Eintrag in `spieltage[]` aufgerufen.
+
+| `/rest/wam/liga/list?startAtIndex=<n>`
+| POST
+| Body `{"token":0,"verbandIds":[<id>]}`; `startAtIndex` ist ein Query-Parameter. Antwort `data.ligen[]` (`ligaId`, `liganame`, `skEbeneId`, `bezirknr`, `bezirkName`, `kreisnr`, `kreisname`, …), `hasMoreData`, `size` (10). In der OpenAPI-Spec als `searchLigen` (Tag `WAM`) beschrieben, dort aber mit anderer Antwortstruktur (`data.ligaListe.ligen`) als die reale API (siehe ADR-021); nur vom WAM-Refresh (`src/wamClient.js`) genutzt.
 |===

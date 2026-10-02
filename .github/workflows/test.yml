@@ -60,8 +60,10 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Run Playwright accessibility tests
-        run: npx playwright test
+      # @network-Tests (API-Smoke-Tests gegen basketball-bund.net) laufen NICHT im PR-Lauf, damit
+      # PRs nicht von der Live-API abhängen — siehe .github/workflows/api-smoke.yml.
+      - name: Run Playwright tests (ohne Netzwerk-Smoke-Tests)
+        run: npx playwright test --grep-invert @network
 
       - name: Upload Playwright report
         if: always()

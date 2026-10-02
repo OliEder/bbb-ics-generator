@@ -3,16 +3,16 @@
 const fs   = require('fs');
 const path = require('path');
 
-const BASE_URL = 'https://olieder.github.io/bbb-ics-generator/';
+const DEFAULT_BASE_URL = 'https://olieder.github.io/bbb-ics-generator/';
 
-function makeWebcalLink(filename) {
-  return BASE_URL.replace(/^https:/, 'webcal:') + filename;
+function makeWebcalLink(filename, baseUrl) {
+  return baseUrl.replace(/^https:/, 'webcal:') + filename;
 }
-function makeHttpsLink(filename) {
-  return BASE_URL + filename;
+function makeHttpsLink(filename, baseUrl) {
+  return baseUrl + filename;
 }
-function makeGoogleCalLink(filename) {
-  return 'https://www.google.com/calendar/render?cid=' + encodeURIComponent(makeWebcalLink(filename));
+function makeGoogleCalLink(filename, baseUrl) {
+  return 'https://www.google.com/calendar/render?cid=' + encodeURIComponent(makeWebcalLink(filename, baseUrl));
 }
 
 // Returns an HTML span with a visible symbol and a screen-reader label.
@@ -82,6 +82,15 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function buildMigrationBanner(migrationNotice) {
+  if (!migrationNotice || !migrationNotice.newBasePath) return '';
+  const href = escapeHtml(migrationNotice.newBasePath);
+  return `<div class="migration-banner" role="note">` +
+    `Diese Seite ist umgezogen. Bitte besuche und aktualisiere deine Lesezeichen: ` +
+    `<a href="${href}">${href}</a>` +
+    `</div>`;
 }
 
 const ICON_WIN = `<svg class="result-icon result-icon--win" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Sieg"><path d="M6 9H4a2 2 0 0 1-2-2V5h4"/><path d="M18 9h2a2 2 0 0 0 2-2V5h-4"/><path d="M12 17v4"/><path d="M8 21h8"/><path d="M6 9a6 6 0 0 0 12 0V3H6z"/></svg>`;
@@ -194,9 +203,11 @@ function buildCalHelp() {
 </details>`;
 }
 
-function loadTeamArchives(generatedDir, teamId) {
-  const archiveDir = path.join(generatedDir, 'archive');
-  if (!fs.existsSync(archiveDir)) return [];
+// archiveDir ist das Archiv-Verzeichnis EINES Clubs (generated/archive/<clubId>/, siehe
+// seasonArchive.clubArchiveDir und ADR-026). Ohne archiveDir gibt es keine Archive — es wird
+// bewusst kein globales generated/archive/ als Fallback gelesen (Vermischung mehrerer Clubs).
+function loadTeamArchives(archiveDir, teamId) {
+  if (!archiveDir || !fs.existsSync(archiveDir)) return [];
 
   const files = fs.readdirSync(archiveDir).filter(f => /^\d{4}\.json$/.test(f));
   const entries = [];
@@ -407,6 +418,14 @@ function buildTeaserCard(team) {
 </div>`;
 }
 
+// Teamname als Link, wenn die Zeile ein Ziel hat (Portal-Land-Seiten verlinken eingebundene
+// Clubs); sonst reiner Text. Alle Werte werden escaped.
+function standingsTeamCell(row) {
+  const name = escapeHtml(row.teamName);
+  return row.href ? `<a href="${escapeHtml(row.href)}">${name}</a>` : name;
+}
+
+
 function buildStandingsTable(comp) {
   if (!comp.table) {
     return `<p class="comp-unavailable">Tabelle noch nicht verfügbar.</p>`;
@@ -418,7 +437,7 @@ function buildStandingsTable(comp) {
     const diff = (row.korbdiff ?? 0) > 0 ? `+${row.korbdiff}` : String(row.korbdiff ?? 0);
     return `<tr${row.isOwn ? ' class="standings-own"' : ''}>` +
       `<td class="standings-rank">${escapeHtml(String(row.rank))}</td>` +
-      `<td>${escapeHtml(row.teamName)}</td>` +
+      `<td>${standingsTeamCell(row)}</td>` +
       `<td class="standings-num">${escapeHtml(String(row.played))}</td>` +
       `<td class="standings-num">${escapeHtml(String(row.points))}</td>` +
       `<td class="standings-num">${escapeHtml(String(row.won))}</td>` +
@@ -441,7 +460,7 @@ function buildStandingsTable(comp) {
       const gbCell = row.gb === null ? '–' : (Number.isInteger(row.gb) ? String(row.gb) : row.gb.toFixed(1));
       return `<tr${row.isOwn ? ' class="standings-own"' : ''}>` +
         `<td class="standings-rank">${i + 1}</td>` +
-        `<td>${escapeHtml(row.teamName)}</td>` +
+        `<td>${standingsTeamCell(row)}</td>` +
         `<td class="standings-num">${escapeHtml(String(row.played))}</td>` +
         `<td class="standings-num">${escapeHtml(String(row.points))}</td>` +
         `<td class="standings-num">${escapeHtml(String(row.won))}</td>` +
@@ -554,6 +573,9 @@ function buildSharedStyles(primary, accent, cupColor) {
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--color-surface); color: var(--color-text); min-height: 100vh; }
+    /* Migration banner */
+    .migration-banner { background: var(--color-info-bg); border-bottom: 1px solid var(--color-info-border); color: var(--color-text); padding: 10px 16px; font-size: 0.85rem; text-align: center; }
+    .migration-banner a { color: var(--color-primary); font-weight: 600; }
     /* Navigation */
     .site-nav { background: var(--color-primary); position: sticky; top: 0; z-index: 100; }
     .nav-bar { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; }
@@ -1027,7 +1049,12 @@ function buildSpotlightBlock(teams, cupColor) {
 </section>`;
 }
 
-function buildTeamPage(team, allTeams, theme, legal = {}, archives = []) {
+// renderOptions: { baseUrl, migrationNotice, archives } — archives sind die per
+// loadTeamArchives() geladenen Archiv-Saisons dieses Teams (leer → kein Archiv-Tab).
+function buildTeamPage(team, allTeams, theme, legal = {}, renderOptions = {}) {
+  const baseUrl = renderOptions.baseUrl || DEFAULT_BASE_URL;
+  const migrationNotice = renderOptions.migrationNotice || null;
+  const archives = renderOptions.archives || [];
   const { primary, accent, cupColor } = theme;
 
   const logoHtml = team.logoUrl
@@ -1070,9 +1097,9 @@ function buildTeamPage(team, allTeams, theme, legal = {}, archives = []) {
   const panels = variants.map(({ type }) =>
     buildTabPanel(
       team.teamId, type,
-      makeWebcalLink(`${team.teamId}_${type}.ics`),
-      makeGoogleCalLink(`${team.teamId}_${type}.ics`),
-      makeHttpsLink(`${team.teamId}_${type}.ics`),
+      makeWebcalLink(`${team.teamId}_${type}.ics`, baseUrl),
+      makeGoogleCalLink(`${team.teamId}_${type}.ics`, baseUrl),
+      makeHttpsLink(`${team.teamId}_${type}.ics`, baseUrl),
       team.matches || [],
       cupColor,
     )
@@ -1095,6 +1122,7 @@ function buildTeamPage(team, allTeams, theme, legal = {}, archives = []) {
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 </head>
 <body>
+  ${buildMigrationBanner(migrationNotice)}
   ${nav}
   <main>
     <div class="team-page-header">
@@ -1128,11 +1156,15 @@ function buildTeamPage(team, allTeams, theme, legal = {}, archives = []) {
 }
 
 function buildFooter(legal, relativePath) {
-  const hasImpressum = legal && Object.values(legal).some(v => v && String(v).trim());
+  const isPrivate = legal && legal.private === true;
+  const hasImpressum = !isPrivate && legal && Object.values(legal).some(v => v && String(v).trim());
   const safeRel = escapeHtml(relativePath);
-  const impressumLink = hasImpressum
-    ? ` &middot; <a href="${safeRel}impressum.html">Impressum</a>`
-    : '';
+  let impressumLink = '';
+  if (hasImpressum) {
+    impressumLink = ` &middot; <a href="${safeRel}impressum.html">Impressum</a>`;
+  } else if (isPrivate && legal.contactUrl) {
+    impressumLink = ` &middot; <a href="${escapeHtml(legal.contactUrl)}" target="_blank" rel="noopener">Kontakt</a>`;
+  }
   return `<footer role="contentinfo" class="site-footer">
   <span>Quelle: <a href="https://www.basketball-bund.net" target="_blank" rel="noopener">basketball-bund.net</a></span>${impressumLink}
   &middot; <a href="${safeRel}datenschutz.html">Datenschutz</a>
@@ -1140,7 +1172,7 @@ function buildFooter(legal, relativePath) {
 </footer>`;
 }
 
-function buildIndexPage(teams, theme, legal = {}) {
+function buildIndexPage(teams, theme, legal = {}, migrationNotice = null) {
   const { primary, accent, cupColor, logoUrl } = theme;
   const sorted = sortTeams(teams);
   const nav = buildNavigation(teams, 'index');
@@ -1160,6 +1192,7 @@ function buildIndexPage(teams, theme, legal = {}) {
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous">
 </head>
 <body>
+  ${buildMigrationBanner(migrationNotice)}
   ${nav}
   <main>
     <div class="team-page-header">
@@ -1182,16 +1215,16 @@ function buildIndexPage(teams, theme, legal = {}) {
 }
 
 
-function buildLegalSkeleton(title, content, allTeams, theme, legal) {
+function buildLegalSkeleton(title, content, allTeams, theme, legal, navOverride, extraStyles = '') {
   const { primary, accent, cupColor } = theme;
-  const nav = buildNavigation(allTeams, 'index');
+  const nav = navOverride || buildNavigation(allTeams, 'index');
   return `<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(title)}</title>
-  ${buildSharedStyles(primary, accent, cupColor)}
+  ${buildSharedStyles(primary, accent, cupColor)}${extraStyles ? '\n  ' + extraStyles : ''}
 </head>
 <body>
   ${nav}
@@ -1204,7 +1237,7 @@ function buildLegalSkeleton(title, content, allTeams, theme, legal) {
 </html>`;
 }
 
-function buildImpressum(legal, allTeams, theme) {
+function buildImpressum(legal, allTeams, theme, nav, extraStyles) {
   const op      = escapeHtml(legal.operator    || '');
   const addr    = escapeHtml(legal.address     || '');
   const email   = escapeHtml(legal.email       || '');
@@ -1224,18 +1257,30 @@ ${respRow}
 <p>Diese Seite aggregiert öffentlich verfügbare Spielplandaten von
 <a href="https://www.basketball-bund.net" target="_blank" rel="noopener">basketball-bund.net</a>.
 Für die Richtigkeit der Daten wird keine Gewähr übernommen.</p>`;
-  return buildLegalSkeleton('Impressum', content, allTeams, theme, legal);
+  return buildLegalSkeleton('Impressum', content, allTeams, theme, legal, nav, extraStyles);
 }
 
-function buildDatenschutz(legal, allTeams, theme) {
+// Kontakt-/Auskunftssatz im privaten Portalbetrieb (ADR-027): Kontaktlink oder Fallback, nie mailto/Impressum.
+function privateContactSentence(legal, lead) {
+  return legal.contactUrl
+    ? `${lead} <a href="${escapeHtml(legal.contactUrl)}" target="_blank" rel="noopener">über den Kontaktlink</a>.`
+    : 'Bitte wenden Sie sich an den Seitenbetreiber.';
+}
+
+function buildDatenschutz(legal, allTeams, theme, nav, extraStyles) {
+  const isPrivate = legal.private === true;
   const op    = escapeHtml(legal.operator || '');
-  const email = escapeHtml(legal.email    || '');
+  const email = isPrivate ? '' : escapeHtml(legal.email || '');
+  const contact = isPrivate
+    ? privateContactSentence(legal, 'Anfragen richten Sie bitte an den Seitenbetreiber')
+    : (email ? `Anfragen richten Sie bitte per E-Mail an: <a href="mailto:${email}">${email}</a>` : 'Bitte wenden Sie sich an den Seitenbetreiber (siehe Impressum).');
+  const privateNote = isPrivate ? '\n<p>Privates, nicht kommerzielles Projekt.</p>' : '';
   const year  = new Date().getFullYear();
   const content = `
 <h1>Datenschutzerklärung</h1>
 <p>Stand: ${year}</p>
 <h2>Verantwortlicher</h2>
-<p>${op || 'Siehe Impressum'}</p>
+<p>${op || (isPrivate ? 'Seitenbetreiber' : 'Siehe Impressum')}</p>${privateNote}
 <h2>Datenerhebung</h2>
 <p>Diese Website erhebt selbst keine personenbezogenen Daten, setzt keine Cookies und verwendet kein Tracking.</p>
 <h2>Technische Drittanbieter</h2>
@@ -1246,12 +1291,16 @@ function buildDatenschutz(legal, allTeams, theme) {
   <li><strong>nominatim.openstreetmap.org</strong> — Geocodierung von Spielfeldern (clientseitig, nur bei Aufruf einer Teamseite)</li>
 </ul>
 <h2>Auskunft und Löschung</h2>
-<p>${email ? `Anfragen richten Sie bitte per E-Mail an: <a href="mailto:${email}">${email}</a>` : 'Bitte wenden Sie sich an den Seitenbetreiber (siehe Impressum).'}</p>`;
-  return buildLegalSkeleton('Datenschutzerklärung', content, allTeams, theme, legal);
+<p>${contact}</p>`;
+  return buildLegalSkeleton('Datenschutzerklärung', content, allTeams, theme, legal, nav, extraStyles);
 }
 
-function buildBarrierefreiheit(legal, allTeams, theme) {
-  const email = escapeHtml(legal.email || '');
+function buildBarrierefreiheit(legal, allTeams, theme, nav, extraStyles) {
+  const isPrivate = legal.private === true;
+  const email = isPrivate ? '' : escapeHtml(legal.email || '');
+  const contact = isPrivate
+    ? privateContactSentence(legal, 'Bei Problemen mit der Barrierefreiheit wenden Sie sich bitte an den Seitenbetreiber')
+    : (email ? `Bei Problemen mit der Barrierefreiheit wenden Sie sich bitte an: <a href="mailto:${email}">${email}</a>` : 'Bitte wenden Sie sich an den Seitenbetreiber (siehe Impressum).');
   const year  = new Date().getFullYear();
   const content = `
 <h1>Barrierefreiheitserklärung</h1>
@@ -1265,14 +1314,177 @@ function buildBarrierefreiheit(legal, allTeams, theme) {
   <li>Die Darstellung bei stark vergrößertem Text (über 200&thinsp;%) wurde nicht vollständig getestet.</li>
 </ul>
 <h2>Feedback und Kontakt</h2>
-<p>${email ? `Bei Problemen mit der Barrierefreiheit wenden Sie sich bitte an: <a href="mailto:${email}">${email}</a>` : 'Bitte wenden Sie sich an den Seitenbetreiber (siehe Impressum).'}</p>
+<p>${contact}</p>
 <h2>Durchsetzungsverfahren</h2>
 <p>Wenn Sie nach Kontaktaufnahme keine zufriedenstellende Antwort erhalten haben, können Sie die
 <a href="https://www.schlichtungsstelle-bgg.de/" target="_blank" rel="noopener">Schlichtungsstelle nach dem Behindertengleichstellungsgesetz (BGG)</a> einschalten.</p>`;
-  return buildLegalSkeleton('Barrierefreiheitserklärung', content, allTeams, theme, legal);
+  return buildLegalSkeleton('Barrierefreiheitserklärung', content, allTeams, theme, legal, nav, extraStyles);
 }
 
-function genHTML(theme = {}, legal = {}) {
+// ---- Portal-Seiten (Plan B): Bund-Übersicht, Land-Seiten, Portal-Legal ----
+
+const PORTAL_NAME = 'BBB Vereinsportal';
+// Neutrales Portal-Theme = die Default-Palette der Club-Seiten (bereits per axe geprüft).
+const PORTAL_THEME = { primary: '#004174', accent: '#009ef3', cupColor: '#7c3aed', logoUrl: null };
+
+// rootPrefix: './' (Bund-/Legal-Seiten) oder '../' (Land-Seiten); activeSlug: 'index' | Region-Slug | null.
+function buildPortalNav(rootPrefix, regions, activeSlug) {
+  const rp = escapeHtml(rootPrefix);
+  const homeActive = activeSlug === 'index';
+  const links = regions.map(r => {
+    const active = r.slug === activeSlug;
+    return `<a href="${rp}${escapeHtml(r.slug)}/index.html"${active ? ' aria-current="page"' : ''}>${escapeHtml(r.name)}</a>`;
+  }).join('');
+  return `<nav class="site-nav" aria-label="Seitennavigation">
+  <div class="nav-bar">
+    <a class="nav-logo" href="${rp}index.html">${PORTAL_NAME}</a>
+    <button class="nav-toggle" aria-expanded="false" aria-controls="nav-drawer" aria-label="Menü öffnen">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+  <div id="nav-drawer" class="nav-drawer" hidden>
+    <a href="${rp}index.html"${homeActive ? ' aria-current="page"' : ''}>Startseite</a>
+    ${links}
+  </div>
+</nav>`;
+}
+
+// Portal-spezifische Ergänzungen zu buildSharedStyles. Bewusst nur var(--color-text) für Text
+// und Links, damit der Kontrast im Hell- UND Dunkelmodus gilt (--color-primary auf dunklem
+// Untergrund wäre zu kontrastarm).
+function buildPortalStyles() {
+  return `<style>
+    .portal-regions { list-style: none; display: grid; grid-template-columns: 1fr; gap: 12px; margin: 16px 0; }
+    @media (min-width: 600px) { .portal-regions { grid-template-columns: 1fr 1fr; align-items: start; } }
+    .portal-region { background: var(--color-surface-card); border: 1px solid var(--color-border); border-radius: 8px; padding: 14px 16px; }
+    .portal-region h2 { font-size: 1.05rem; margin-bottom: 2px; }
+    .portal-meta { font-size: 0.8rem; color: var(--color-text); margin-bottom: 8px; }
+    .portal-list { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+    .portal-region a, .portal-list a, .standings-table a, .site-footer a { color: var(--color-text); text-decoration: underline; }
+    .site-footer { color: var(--color-text); }
+    .portal-section { margin: 20px 0; }
+    .portal-section h2, .portal-group-heading { font-size: 1.1rem; margin: 20px 0 8px; }
+    .portal-liga { margin: 14px 0; }
+    .portal-liga h2, .portal-liga h3 { font-size: 0.95rem; margin-bottom: 6px; }
+  </style>`;
+}
+
+function buildPortalMigrationBanner() {
+  return `<div class="migration-banner" role="note">` +
+    `Einige Kalender-Abos sind umgezogen — wähle dein Bundesland und deinen Verein, um die neue Adresse zu finden.` +
+    `</div>`;
+}
+
+function plural(n, singular, pluralForm) {
+  return `${n} ${n === 1 ? singular : pluralForm}`;
+}
+
+function portalHead(title) {
+  const { primary, accent, cupColor } = PORTAL_THEME;
+  return `<meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapeHtml(title)}</title>
+  ${buildSharedStyles(primary, accent, cupColor)}
+  ${buildPortalStyles()}`;
+}
+
+// model: { regions: [{ slug, name, ligaCount, clubs: [{ name, href }] }], showMigrationBanner }
+// Alle hrefs sind relativ zur Bund-Seite (generated/index.html).
+function buildBundPage({ regions, showMigrationBanner }, legal) {
+  const clubCount = regions.reduce((n, r) => n + r.clubs.length, 0);
+  const blocks = regions.map(r => {
+    const clubs = r.clubs.map(c => `<li><a href="${escapeHtml(c.href)}">${escapeHtml(c.name)}</a></li>`).join('');
+    return `<li class="portal-region">` +
+      `<h2><a href="${escapeHtml(r.slug)}/index.html">${escapeHtml(r.name)}</a></h2>` +
+      `<p class="portal-meta">${plural(r.clubs.length, 'Verein', 'Vereine')} · ${plural(r.ligaCount, 'Liga', 'Ligen')}</p>` +
+      `${clubs ? `<ul class="portal-list">${clubs}</ul>` : ''}</li>`;
+  }).join('');
+  const content = regions.length > 0
+    ? `<ul class="portal-regions">${blocks}</ul>`
+    : `<p class="comp-unavailable">Noch keine Vereine eingebunden.</p>`;
+
+  return `<!DOCTYPE html>
+<html lang="de">
+<head>
+  ${portalHead(`${PORTAL_NAME} – Basketball Spielpläne`)}
+</head>
+<body>
+  ${showMigrationBanner ? buildPortalMigrationBanner() : ''}
+  ${buildPortalNav('./', regions, 'index')}
+  <main>
+    <div class="team-page-header">
+      <div>
+        <h1 class="team-page-title">${PORTAL_NAME}</h1>
+        <p class="team-page-meta">${plural(regions.length, 'Region', 'Regionen')} · ${plural(clubCount, 'Verein', 'Vereine')}</p>
+      </div>
+    </div>
+    ${content}
+  </main>
+  ${buildFooter(legal, './')}
+  ${buildNavScript()}
+</body>
+</html>`;
+}
+
+// region: { slug, name, clubs: [{ name, href }], groups: [{ heading|null, ligen: [{ ligaId, liganame, table }] }] }
+// hrefs in region.clubs und in den Tabellenzeilen sind relativ zur Land-Seite.
+// regions: alle Regionen (nur slug/name) für die Navigation.
+function buildLandPage(region, regions, legal) {
+  const ligaCount = region.groups.reduce((n, g) => n + g.ligen.length, 0);
+  const clubList = region.clubs.map(c => `<li><a href="${escapeHtml(c.href)}">${escapeHtml(c.name)}</a></li>`).join('');
+  const groups = region.groups.map(g => {
+    const ligaTag = g.heading ? 'h3' : 'h2';
+    const heading = g.heading ? `<h2 class="portal-group-heading">${escapeHtml(g.heading)}</h2>` : '';
+    const ligen = g.ligen.map(l =>
+      `<section class="portal-liga"><${ligaTag}>${escapeHtml(l.liganame)}</${ligaTag}>${buildStandingsTable(l)}</section>`
+    ).join('');
+    return `<section class="portal-group">${heading}${ligen}</section>`;
+  }).join('');
+  const body = ligaCount > 0
+    ? groups
+    : `<p class="comp-unavailable">Für dieses Gebiet sind noch keine Ligatabellen verfügbar.</p>`;
+
+  return `<!DOCTYPE html>
+<html lang="de">
+<head>
+  ${portalHead(`${region.name} – ${PORTAL_NAME}`)}
+</head>
+<body>
+  ${buildPortalNav('../', regions, region.slug)}
+  <main>
+    <div class="team-page-header">
+      <div>
+        <h1 class="team-page-title">${escapeHtml(region.name)}</h1>
+        <p class="team-page-meta">${plural(region.clubs.length, 'Verein', 'Vereine')} · ${plural(ligaCount, 'Liga', 'Ligen')}</p>
+      </div>
+    </div>
+    <section class="portal-section" aria-labelledby="vereine-heading">
+      <h2 id="vereine-heading">Vereine</h2>
+      ${clubList ? `<ul class="portal-list">${clubList}</ul>` : ''}
+    </section>
+    ${body}
+  </main>
+  ${buildFooter(legal, '../')}
+  ${buildTabScript()}
+  ${buildNavScript()}
+</body>
+</html>`;
+}
+
+// Impressum/Datenschutz/Barrierefreiheit des Portal-Betreibers (liegen unter generated/).
+function buildPortalLegalPages(legal, regions) {
+  const nav = buildPortalNav('./', regions, null);
+  const styles = buildPortalStyles();
+  const pages = {};
+  // Privater Betrieb (ADR-027): bewusst kein Impressum.
+  if (!legal.private) pages.impressum = buildImpressum(legal, [], PORTAL_THEME, nav, styles);
+  pages.datenschutz = buildDatenschutz(legal, [], PORTAL_THEME, nav, styles);
+  pages.barrierefreiheit = buildBarrierefreiheit(legal, [], PORTAL_THEME, nav, styles);
+  return pages;
+}
+
+
+function genHTML(theme = {}, legal = {}, options = {}) {
   const primary  = sanitizeCssColor(theme.primary  || '#004174');
   const accent   = sanitizeCssColor(theme.accent   || '#009ef3');
   const cupColor = sanitizeCssColor(theme.cupColor || '#7c3aed');
@@ -1280,21 +1492,23 @@ function genHTML(theme = {}, legal = {}) {
 
   const resolvedTheme = { primary, accent, cupColor, logoUrl };
 
-  const generatedDir = process.env.BBB_GENERATED_DIR || process.env.BBB_ICS_DIR || path.resolve(__dirname, '../generated');
+  const baseUrl = options.baseUrl || DEFAULT_BASE_URL;
+  const migrationNotice = options.migrationNotice || null;
+  const generatedDir = options.outputDir || process.env.BBB_GENERATED_DIR || process.env.BBB_ICS_DIR || path.resolve(__dirname, '../generated');
   const metaPath = path.join(generatedDir, 'metadata.json');
   const teams    = fs.existsSync(metaPath) ? JSON.parse(fs.readFileSync(metaPath, 'utf8')) : [];
 
   // Write index.html
-  fs.writeFileSync(path.join(generatedDir, 'index.html'), buildIndexPage(teams, resolvedTheme, legal), 'utf8');
+  fs.writeFileSync(path.join(generatedDir, 'index.html'), buildIndexPage(teams, resolvedTheme, legal, migrationNotice), 'utf8');
 
   // Write teams/{teamId}.html
   const teamsDir = path.join(generatedDir, 'teams');
   fs.mkdirSync(teamsDir, { recursive: true });
   for (const team of teams) {
-    const archives = loadTeamArchives(generatedDir, team.teamId);
+    const archives = loadTeamArchives(options.archiveDir, team.teamId);
     fs.writeFileSync(
       path.join(teamsDir, `${team.teamId}.html`),
-      buildTeamPage(team, teams, resolvedTheme, legal, archives),
+      buildTeamPage(team, teams, resolvedTheme, legal, { baseUrl, migrationNotice, archives }),
       'utf8'
     );
   }
@@ -1308,18 +1522,11 @@ function genHTML(theme = {}, legal = {}) {
   }
 }
 
-module.exports = { genHTML };
-module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket, buildNavScript, buildSharedStyles, buildTabScript, buildTeamPage, buildIndexPage, buildNextGameTeaser, buildSpotlightBlock, spotlightTeamLabel, buildTeamLabel, buildFooter, buildImpressum, buildDatenschutz, buildBarrierefreiheit, buildCalHelp, buildTabPanel, isWin, resultIcon, loadTeamArchives, buildArchiveSeasonBlock, buildArchiveTab };
+module.exports = { genHTML, buildBundPage, buildLandPage, buildPortalLegalPages, PORTAL_THEME };
+module.exports._testExports = { sortTeams, buildNavigation, buildTeaserCard, buildStandingsTable, buildBracket, buildNavScript, buildSharedStyles, buildTabScript, buildTeamPage, buildIndexPage, buildNextGameTeaser, buildSpotlightBlock, spotlightTeamLabel, buildTeamLabel, buildFooter, buildImpressum, buildDatenschutz, buildBarrierefreiheit, buildCalHelp, buildTabPanel, isWin, resultIcon, buildMigrationBanner, buildPortalNav, buildPortalMigrationBanner, loadTeamArchives, buildArchiveSeasonBlock, buildArchiveTab };
 
-if (require.main === module) {
-  const config = require('../config.json');
-  genHTML(
-    {
-      primary:  config.theme?.primary  || '#004174',
-      accent:   config.theme?.accent   || '#009ef3',
-      logoUrl:  config.theme?.logoUrl  || null,
-      cupColor: config.theme?.cupColor || '#7c3aed',
-    },
-    config.legal || {}
-  );
-}
+// Kein eigenständiger CLI-Einstiegspunkt mehr: seit der Multi-Club-Umstellung ruft
+// cronUpdate.js genHTML() bereits pro Club mit dem passenden Theme/outputDir auf
+// (siehe updateClub in src/cronUpdate.js). Ein separater "node src/generateHTML.js"-Aufruf
+// bräuchte eine eigene Club-Iteration über loadClubs() und wäre nur eine Duplizierung
+// der Logik in cronUpdate.js — deshalb entfernt statt auf loadClubs() umgestellt.

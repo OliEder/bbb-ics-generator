@@ -27,6 +27,17 @@ function generateTeamHtml(theme, metadata) {
   return { dir, htmlPath: join(dir, 'teams', `${metadata[0].teamId}.html`) };
 }
 
+function generateIndexHtmlWithOptions(theme, metadata, legal, options) {
+  const dir = mkdtempSync(join(tmpdir(), 'bbb-a11y-migration-'));
+  writeFileSync(join(dir, 'metadata.json'), JSON.stringify(metadata));
+  const modPath = require.resolve('../../src/generateHTML.js');
+  delete require.cache[modPath];
+  process.env.BBB_GENERATED_DIR = dir;
+  const { genHTML } = require('../../src/generateHTML.js');
+  genHTML(theme, legal, options);
+  return { dir, htmlPath: join(dir, 'index.html') };
+}
+
 const sampleMetadata = [
   {
     teamId: '167881',
@@ -167,6 +178,22 @@ test.describe('WCAG 2.1 AA — axe-core vollständiger Scan', () => {
       await page.goto(`file://${htmlPath}`);
       const results = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .analyze();
+      expect(results.violations).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  test('keine Violations mit Migrationsbanner (options.migrationNotice)', async ({ page }) => {
+    const { dir, htmlPath } = generateIndexHtmlWithOptions(DEFAULT_THEME, sampleMetadata, {}, {
+      migrationNotice: { newBasePath: '/bayern/fibalon/' },
+    });
+    try {
+      await page.goto('file://' + htmlPath);
+      await expect(page.locator('.migration-banner')).toBeVisible();
+      const results = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa'])
         .analyze();
       expect(results.violations).toEqual([]);
     } finally {

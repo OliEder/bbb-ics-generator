@@ -37,13 +37,33 @@ jobs:
       - name: Install dependencies
         run: npm install
         
-      - name: Generate ICS files
+      # Fehler einzelner Clubs (Exitcode 1) sollen das Deployment der übrigen Clubs nicht
+      # verhindern (ADR-025): Schritt darf fehlschlagen, der Job wird am Ende rot markiert.
+      - name: Generate ICS files and HTML
+        id: generate
+        continue-on-error: true
         run: npm run update
-        
-      - name: Generate HTML
-        run: npm run generate-html
 
+      # Guard: Bei Totalausfall (keine ICS erzeugt) NICHT deployen, sonst würde die
+      # funktionierende Seite durch eine leere ersetzt.
+      - name: Verify generated output
+        run: |
+          if ! find generated -name '*.ics' -print -quit | grep -q .; then
+            echo "::error::Keine ICS-Dateien erzeugt — Deployment abgebrochen"
+            exit 1
+          fi
+
+      # Saison-Archiv (generated/archive/<clubId>/<season>.json, ADR-014/ADR-026) zurück auf
+      # main committen. Reihenfolge/Bedingungen:
+      # - läuft NACH dem Guard: bei Totalausfall (Guard rot) wird weder committet noch deployt;
+      # - läuft auch bei Teilfehlern: "generate" hat continue-on-error, sein Fehlschlag lässt
+      #   success() true — die Archive der erfolgreichen Clubs werden also gesichert;
+      # - continue-on-error: ein Push-Fehler (z.B. main hat sich während des Laufs bewegt)
+      #   verhindert das Deployment nicht, markiert den Job aber am Ende rot (letzter Schritt).
       - name: Commit season archive
+        id: archive_commit
+        if: success()
+        continue-on-error: true
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "chore: update season archive [skip ci]"
@@ -54,7 +74,7 @@ jobs:
       - name: List generated files (debug)
         run: |
           echo "=== Contents of generated/ ==="
-          ls -la generated/
+          find generated/ -maxdepth 3 -type d
           echo "=== ICS files ==="
           find generated/ -name "*.ics" -ls
         
@@ -69,3 +89,14 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+      - name: Fail job if generation or archive commit reported errors
+        if: steps.generate.outcome == 'failure' || steps.archive_commit.outcome == 'failure'
+        run: |
+          if [ "${{ steps.generate.outcome }}" = "failure" ]; then
+            echo "::error::npm run update meldete Fehler (siehe Log). Die übrigen Clubs wurden deployt."
+          fi
+          if [ "${{ steps.archive_commit.outcome }}" = "failure" ]; then
+            echo "::error::Saison-Archiv konnte nicht committet werden (siehe Schritt 'Commit season archive')."
+          fi
+          exit 1

@@ -47,8 +47,8 @@ sequenceDiagram
 . Post-Processing: VCALENDAR-Header wird mit X-WR-CALNAME, X-WR-TIMEZONE etc. angereichert.
 . `saveICS(teamId, type, ics)` schreibt die Datei nach `generated/{teamId}_{type}.ics`.
 . Vor der Verarbeitung der aktuellen Saison ruft `cronUpdate.js` pro Team `updateArchiveForTeam()` aus `seasonArchive.js` auf (siehe Szenario 3 für den Rolling-Update-Mechanismus).
-. Nach allen Teams: `metadata.json` wird je Team mit Update-Zeitstempel, Spielzahlen, `logoUrl`, `teamAkjId`, `teamNumber` und einem `matches`-Array geschrieben. Das `matches`-Array enthält alle Spiele der aktuellen Saison, ermittelt per `currentSeasonId(matches)` (höchste vorkommende `seasonId` in den Roh-API-Daten des Teams — siehe ADR-009-Update), gefiltert und aufsteigend nach Datum sortiert. Jeder Eintrag enthält: `date`, `time`, `opponent`, `isHome`, `result` (null = noch nicht gespielt), `competition` (Liga-Name), `isNext` (erstes Spiel ohne Ergebnis). Die `logoUrl` wird direkt konstruiert: `https://www.basketball-bund.net/media/team/{teamPermanentId}/logo` — kein zusätzlicher API-Aufruf. Ein Team, das nicht mehr in der aktuellen API-Team-Liste auftaucht, wird stattdessen unverändert aus dem vorherigen Lauf übernommen und mit `notCurrentlyListed: true` markiert (siehe ADR-014).
-. GitHub Actions führt danach `npm run generate-html` aus, das `index.html` aus `metadata.json` erzeugt (Tab-UI mit Logos, ARIA-Tab-Pattern, eingebettetem Keyboard-Nav-JS). Jeder Tab-Panel zeigt oben den gefilterten Spielplan (Alle/Heim/Auswärts) mit H/A-Badges und Wettbewerbs-Label, darunter die Kalender-Abo-Buttons.
+. Nach allen Teams: `metadata.json` wird je Team mit Update-Zeitstempel, Spielzahlen, `logoUrl`, `teamAkjId`, `teamNumber` und einem `matches`-Array geschrieben. Das `matches`-Array enthält alle Spiele der aktuellen Saison, ermittelt per `currentSeasonId(matches)` (höchste vorkommende `seasonId` in den Roh-API-Daten des Teams — siehe ADR-009-Update), gefiltert und aufsteigend nach Datum sortiert. Jeder Eintrag enthält: `date`, `time`, `opponent`, `isHome`, `result` (null = noch nicht gespielt), `competition` (Liga-Name), `isNext` (erstes Spiel ohne Ergebnis). Die `logoUrl` wird direkt konstruiert: `https://www.basketball-bund.net/media/team/{teamPermanentId}/logo` — kein zusätzlicher API-Aufruf. Ein Team, das nicht mehr in der aktuellen API-Team-Liste des Clubs auftaucht, wird stattdessen unverändert aus dem vorherigen Lauf (`metadata.json` im Club-Verzeichnis) übernommen und mit `notCurrentlyListed: true` markiert (siehe ADR-014).
+. `cronUpdate.js` ruft direkt im Anschluss `genHTML()` je Club auf, das `index.html` aus `metadata.json` erzeugt (Tab-UI mit Logos, ARIA-Tab-Pattern, eingebettetem Keyboard-Nav-JS). Ein separater `npm run generate-html`-CI-Schritt existiert nicht mehr. Jeder Tab-Panel zeigt oben den gefilterten Spielplan (Alle/Heim/Auswärts) mit H/A-Badges und Wettbewerbs-Label, darunter die Kalender-Abo-Buttons.
 . Das `generated/`-Verzeichnis wird als GitHub Pages Artefakt hochgeladen und deployed.
 
 === Szenario 2: Update-Zyklus mit Cache-MISS (erster Start oder Cache abgelaufen)
@@ -87,28 +87,35 @@ Dieser Ablauf tritt pro Team bei jedem Update-Zyklus ein, sobald die API für ei
 sequenceDiagram
     participant CU as cronUpdate.js
     participant SA as seasonArchive.js
-    participant FS as generated/archive/
-    CU->>SA: updateArchiveForTeam(team, matches)
+    participant FS as generated/archive/<clubId>/
+    CU->>SA: updateArchiveForTeam(clubId, team, matches)
     SA->>SA: groupBySeasonId(matches)
     SA->>SA: currentSeasonId = höchste seasonId
     loop fuer jede aeltere seasonId in matches
-        SA->>FS: loadArchive(seasonId)
+        SA->>FS: loadArchive(clubId, seasonId)
         SA->>SA: baut/aktualisiert Team-Eintrag
-        SA->>FS: saveArchive(seasonId, status: provisional)
+        SA->>FS: saveArchive(clubId, seasonId, status: provisional)
     end
     loop fuer jede vorhandene Archiv-Datei ohne aktuelle Matches
-        SA->>FS: loadArchive(seasonId)
+        SA->>FS: loadArchive(clubId, seasonId)
         SA->>SA: prüft ob Team-Status provisional
-        SA->>FS: saveArchive(seasonId, status: final)
+        SA->>FS: saveArchive(clubId, seasonId, status: final)
     end
 ----
 
 ==== Ablauf als nummerierte Schritte
 
-. `cronUpdate.js` ruft für jedes Team `updateArchiveForTeam(teamMeta, groupedBySeason, currentSeasonId, ...)` auf, bevor die aktuelle Saison in `metadata.json` verarbeitet wird.
+. `updateClub()` in `cronUpdate.js` ruft für jedes Team `updateArchiveForTeam(clubId, teamMeta, groupedBySeason, currentSeasonId, ...)` auf, bevor das Team in `metadata.json` landet. Das Archiv ist pro Club getrennt (`generated/archive/<clubId>/`, <<adr-026-saison-archiv-pro-club,ADR-026>>) und hängt nicht vom pro Lauf abgeleiteten Bundesland ab.
 . `groupBySeasonId(matches)` gruppiert die rohen API-Matches des Teams nach `ligaData.seasonId`.
 . Für jede Saison außer der aktuellen (`currentSeasonId`, siehe Szenario 1): `buildArchiveTeamEntry()` baut Matches und Wettbewerbe (Tabelle oder Turnierbaum) analog zur Live-Saison-Verarbeitung.
-. Der bestehende Archiv-Eintrag dieser Saison wird geladen (`loadArchive(seasonId)`, falls vorhanden), der Team-Eintrag mit dem neuen Stand überschrieben, `status: 'provisional'` gesetzt, `lastSeenAt` aktualisiert, und die Datei zurückgeschrieben (`saveArchive`).
-. Anschließend werden alle vorhandenen Archiv-Dateien durchsucht: Taucht die Saison eines Teams nicht mehr unter den aktuell von der API gelieferten Matches auf (und ist nicht die aktuelle Saison) und war ihr Status bisher `provisional`, wird sie auf `status: 'final'` gesetzt. Ab diesem Zeitpunkt wird dieser Eintrag nie wieder verändert.
+. Der bestehende Archiv-Eintrag dieser Saison wird aus dem Club-Archiv geladen (`loadArchive(clubId, seasonId)`, falls vorhanden), der Team-Eintrag mit dem neuen Stand überschrieben, `status: 'provisional'` gesetzt, `lastSeenAt` aktualisiert, und die Datei zurückgeschrieben (`saveArchive`).
+. Anschließend werden alle vorhandenen Archiv-Dateien *dieses Clubs* durchsucht: Taucht die Saison eines Teams nicht mehr unter den aktuell von der API gelieferten Matches auf (und ist nicht die aktuelle Saison) und war ihr Status bisher `provisional`, wird sie auf `status: 'final'` gesetzt. Ab diesem Zeitpunkt wird dieser Eintrag nie wieder verändert.
 . `.github/workflows/deploy.yml` committet `generated/archive/**` nach jedem Lauf zurück auf `main` (Schritt „Commit season archive"), da `generated/` sonst als reines Build-Output verloren ginge.
-. `generateHTML.js` liest beim nächsten `npm run generate-html` alle vorhandenen `generated/archive/*.json`-Dateien pro Team (`loadTeamArchives`) und rendert sie als „Archiv"-Tab auf der jeweiligen Team-Seite.
+. `generateHTML.js` liest beim anschließenden `genHTML(..., { outputDir, archiveDir })`-Aufruf desselben Laufs alle `generated/archive/<clubId>/*.json`-Dateien des Clubs pro Team (`loadTeamArchives`) und rendert sie als „Archiv"-Tab auf der jeweiligen Team-Seite.
+
+==== Fehlerfälle und Multi-Club-Verhalten
+
+* *Archiv-Fehler eines Teams* (z.B. defekte Archivdatei): `updateClub()` fängt den Fehler pro Team; das Team bleibt mit der aktuellen Saison auf der Club-Seite, in den ICS und auf den Portal-Seiten. `updateAll()` trägt den Club mit `error: 'Archiv: …'` in `failures` ein → Exitcode 1, der Deploy-Job wird am Ende rot, andere Clubs sind nicht betroffen.
+* *Ausgefallener Club* (Exception in `updateClub()`, z.B. Club-API wirft): kein Archiv-Update für diesen Club, keine leeren Archiv-Verzeichnisse; alle übrigen Clubs archivieren normal.
+* *Bundesland-Wechsel*: Liefert die API für einen Club keine Team-Daten (Club fällt auf `bundesweit`), wird sein Archiv nicht angefasst; spielt der Club tatsächlich in einem anderen Verband, wird das Archiv am unveränderten Pfad `generated/archive/<clubId>/` fortgeschrieben und auf der Team-Seite unter dem neuen Bundesland-Pfad angezeigt.
+* *Nicht mehr gemeldete Teams* (`notCurrentlyListed`): Die Persistenz liest die `metadata.json` des vorherigen Laufs aus `generated/<bundesland>/<club-slug>/`. Wechselt das Bundesland des Clubs, findet sie den alten Stand nicht; in CI existiert die vorherige `metadata.json` ohnehin nicht (nur `generated/archive/**` wird versioniert). Das Archiv selbst ist davon unabhängig.
