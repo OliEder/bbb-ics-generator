@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-29T13:12:58.436Z",
+  "generatedAt": "2026-10-02T13:24:18.616Z",
   "ligenByVerbandId": {
     "2": [
       {
@@ -3133,26 +3133,6 @@
         "kreisname": "Kreis West"
       },
       {
-        "ligaId": 53786,
-        "liganame": "West - Kreisliga u16w-a (we-kl16w-a) 2025/26 Platzierungsrunde",
-        "skEbeneId": 2,
-        "skEbeneName": "Kreis",
-        "bezirknr": 1,
-        "bezirkName": "Oberbayern",
-        "kreisnr": 4,
-        "kreisname": "Kreis West"
-      },
-      {
-        "ligaId": 53787,
-        "liganame": "West - Kreisliga u16w-b (we-kl16w-b) 2025/26 Platzierungsrunde\t ",
-        "skEbeneId": 2,
-        "skEbeneName": "Kreis",
-        "bezirknr": 1,
-        "bezirkName": "Oberbayern",
-        "kreisnr": 4,
-        "kreisname": "Kreis West"
-      },
-      {
         "ligaId": 53798,
         "liganame": "Kreisliga u14m Nord (MI-KL14M-N) 2026/27",
         "skEbeneId": 2,
@@ -3601,16 +3581,6 @@
         "bezirkName": "Oberbayern",
         "kreisnr": 1,
         "kreisname": "Kreis Mitte"
-      },
-      {
-        "ligaId": 53789,
-        "liganame": "West - Kreisklasse u16w-(we-kk16w) 2025/26 Platzierungsrunde\t ",
-        "skEbeneId": 2,
-        "skEbeneName": "Kreis",
-        "bezirknr": 1,
-        "bezirkName": "Oberbayern",
-        "kreisnr": 4,
-        "kreisname": "Kreis West"
       },
       {
         "ligaId": 53807,
