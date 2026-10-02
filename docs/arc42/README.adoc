@@ -193,7 +193,7 @@ flowchart TD
 
 | *GitHub Actions*
 | GitHub Actions → BBB Vereinsportal (triggert Build)
-| Führt den Node.js-Prozess (`npm run update` und `npm run generate-html`) in einer Ubuntu-Runner-Umgebung aus. Trigger: Cron alle 6 Stunden, Push auf `main`, manueller `workflow_dispatch`.
+| Führt den Node.js-Prozess (`npm run update`, der ICS- und HTML-Generierung pro Club übernimmt) in einer Ubuntu-Runner-Umgebung aus. Trigger: Cron alle 6 Stunden, Push auf `main`, manueller `workflow_dispatch`.
 
 | *GitHub Pages*
 | BBB Vereinsportal → GitHub Pages (HTTP Upload via Actions)
@@ -230,6 +230,10 @@ flowchart TD
 | GitHub Actions API / HTTP Upload
 | Artefakt-Upload via `actions/upload-pages-artifact@v3`; Deployment via `actions/deploy-pages@v5`; Concurrency-Gruppe `pages` verhindert parallele Deployments
 
+| GitHub Actions → GitHub-Repository (`main`)
+| Git push (`stefanzweifel/git-auto-commit-action@v5`, `GITHUB_TOKEN`, `contents: write`)
+| Committet nach jedem Lauf ausschließlich `generated/archive/**` (Saison-Archiv pro Club, `generated/archive/<clubId>/{seasonId}.json`) mit `[skip ci]` zurück auf `main`; auch bei Teilfehlern, nicht bei Totalausfall (siehe Kapitel 7, <<adr-014-saison-archivierung,ADR-014>>, <<adr-026-saison-archiv-pro-club,ADR-026>>)
+
 | GitHub Pages → Kalender-Clients
 | HTTPS (TLS 1.2+) / text/calendar
 | Statische Datei-Auslieferung; kein Content-Negotiation; `Content-Type: text/calendar` für `.ics`-Dateien
@@ -242,6 +246,18 @@ flowchart TD
 | HTTPS / JS + CSS
 | Leaflet.js v1.9.4 (SRI-Hash-gesichert); lädt anschließend Kartenkacheln direkt von OpenStreetMap-Tile-Servern nach; nur auf Team-Seiten mit bekannter Spielhallen-Adresse
 |===
+
+=== Multi-Club-Datenfluss
+
+Seit dem Multi-Club-Umbau beginnt der Datenfluss nicht mehr bei einer einzigen Root-`config.json`, sondern potenziell bei vielen Konfigurationsquellen: `src/clubs.js` liest rekursiv jede `clubs/<bundesland-slug>/<club-slug>/config.json` ein und liefert pro gefundenem Club eine `clubId` sowie optionale Theme-, Cup-Farb- und Legal-Einstellungen. `cronUpdate.js` verarbeitet danach jeden Club unabhängig: Für jedes Team eines Clubs wird über die Basketball-Bund-API die `verbandId` seiner aktuellen Liga ermittelt und per `src/verbandMapping.js` auf ein Bundesland abgebildet; das Bundesland des gesamten Clubs ergibt sich als Mehrheitsvotum über alle seine Teams (`deriveClubBundesland`). Dieses Bundesland wird bei jedem Update-Lauf neu aus den ohnehin abgerufenen Liga-Daten berechnet — es ist keine manuell gepflegte Konfiguration, und der Ordnername im Quellbaum (`clubs/<bundesland-slug>/...`) ist davon unabhängig und dient nur der menschlichen Organisation im Repository. Die generierten ICS- und HTML-Dateien landen entsprechend unter `generated/<bundesland-slug>/<club-slug>/`. Ein Club, der bereits vor dem Umbau unter dem alten, flachen Pfad (`generated/{teamId}_{type}.ics`) lief und dessen Kalender-Links bereits von Nutzern abonniert sind, kann in seiner `config.json` mit `legacyRootOutput: true` markiert werden; für solche Clubs wird zusätzlich zur neuen, verschachtelten Struktur ein vollständiges Duplikat der ICS-Ausgabe am alten, flachen Pfad erzeugt (inklusive einem Migrationshinweis-Termin im Kalender), damit bestehende Abonnements nicht brechen. Alt-Pfad-HTML entfällt (<<adr-023-wegfall-legacy-html,ADR-023>>); stattdessen zeigt die Bund-Seite einen generischen Migrationsbanner.
+
+Abgelaufene Saisons archiviert `src/seasonArchive.js` pro Club unter `generated/archive/<clubId>/{seasonId}.json` — bewusst nach der stabilen `clubId` und nicht nach dem pro Lauf abgeleiteten Bundesland, damit das Archiv einen Bundesland-Wechsel (z.B. API-Ausfall → `bundesweit`) übersteht und sich Clubs nicht vermischen (<<adr-026-saison-archiv-pro-club,ADR-026>>). Die Team-Seiten unter `generated/<bundesland-slug>/<club-slug>/teams/` lesen ihren Archiv-Tab aus diesem Club-Archiv.
+
+=== Portal-Aggregation und WAM-Refresh
+
+Nach der Club-Schleife erzeugt `aggregatePages()` aus den Ergebnissen aller Clubs die Bund-Seite (`generated/index.html`), je eine Land-Seite pro Bundesland und für `bundesweit` sowie die Portal-Legal-Seiten (<<adr-020-aggregation-aus-laufzeit-ergebnissen,ADR-020>>). Die Betreiberangaben dafür stammen aus `portal.json` (Vorlage `portal.example.json`, geladen über `src/portalConfig.js`). Schlägt ein Club fehl, laufen die übrigen und die Aggregation weiter (<<adr-025-fehlerisolation-pro-club,ADR-025>>).
+
+Als separater, externer Datenfluss aktualisiert der Workflow `wam-refresh.yml` quartalsweise `data/wam-ligen-cache.json` über `POST /rest/wam/liga/list` (<<adr-021-wam-cache-versioniert,ADR-021>>). Der 6-Stunden-Lauf liest nur diesen Cache; fehlt er oder ist er älter als 150 Tage, entstehen die Land-Seiten ohne Ebenen-Gruppierung (<<adr-022-graceful-degradation-wam-cache,ADR-022>>).
 
 === Externe API-Endpunkte im Detail
 
@@ -272,6 +288,10 @@ flowchart TD
 | `/rest/competition/id/{ligaId}/matchday/{day}`
 | GET
 | Liefert die Spiele eines einzelnen Spieltags eines Pokalwettbewerbs. Wird für jeden Eintrag in `spieltage[]` aufgerufen.
+
+| `/rest/wam/liga/list?startAtIndex=<n>`
+| POST
+| Body `{"token":0,"verbandIds":[<id>]}`; `startAtIndex` ist ein Query-Parameter. Antwort `data.ligen[]` (`ligaId`, `liganame`, `skEbeneId`, `bezirknr`, `bezirkName`, `kreisnr`, `kreisname`, …), `hasMoreData`, `size` (10). In der OpenAPI-Spec als `searchLigen` (Tag `WAM`) beschrieben, dort aber mit anderer Antwortstruktur (`data.ligaListe.ligen`) als die reale API (siehe ADR-021); nur vom WAM-Refresh (`src/wamClient.js`) genutzt.
 |===
 
 == Lösungsstrategie
@@ -362,47 +382,128 @@ Das System ist als Single-Verein-Lösung konzipiert. Die gesamte Konfiguration b
 
 === Whitebox-Gesamtsystem
 
-Das System besteht aus sechs aktiven Modulen. Die Module sind lose gekoppelt und kommunizieren ausschließlich über Funktionsaufrufe (CommonJS `require`).
+Das System besteht aus zwölf aktiven Modulen sowie dem nur lokal genutzten `server.js` (dreizehn Spalten der Abhängigkeitsmatrix). `src/geocode.js` wird von keinem Modul eingebunden (Dead Code, siehe Kapitel 11) und ist weder hier noch in der Matrix aufgeführt. Die Module sind lose gekoppelt und kommunizieren ausschließlich über Funktionsaufrufe (CommonJS `require`).
 
 [source,mermaid]
 ----
 graph LR
-    CU["cronUpdate.js\nOrchestrator"] --> AC["apiClient.js\nAPI-Facade"]
+    CU["cronUpdate.js\nMulti-Club-Orchestrator"] --> CL["clubs.js\nClub-Config-Loader"]
+    CU --> VM["verbandMapping.js\nBundesland-Herleitung"]
+    CU --> AC["apiClient.js\nAPI-Facade"]
     CU --> IG["icsGenerator.js\nRFC 5545 Renderer"]
     CU --> ST["storage.js\nPersistenz"]
     CU --> SA["seasonArchive.js\nSaison-Archivierung"]
     CU --> GH["generateHTML.js\nPortal-Generator"]
+    CU --> AP["aggregatePages.js\nBund-/Land-Seiten"]
+    CU --> PC["portalConfig.js\nBetreiberangaben"]
+    CU --> WC["wamCache.js\nWAM-Liga-Cache"]
+    AP --> GH
+    AP --> VM
+    AP --> ST
+    AP --> WC
+    WC --> WCL["wamClient.js\nWAM-Liga-Abruf"]
     GH --> ST
     SV["server.js\nDev-Server"] -.->|nur lokal| ST
 ----
 
-=== Modul: cronUpdate.js (Orchestrator)
+=== Modul: cronUpdate.js (Multi-Club-Orchestrator)
 
 [cols="2,5", options="header"]
 |===
 | Aspekt | Beschreibung
 
 | *Verantwortlichkeit*
-| Einstiegspunkt des Update-Prozesses. Orchestriert den kompletten Daten-Refresh: Teams ermitteln, Spielpläne abrufen, ICS generieren, Dateien speichern, Metadaten schreiben.
+| Einstiegspunkt des Update-Prozesses. Orchestriert den kompletten Daten-Refresh für **alle** konfigurierten Clubs: Club-Configs laden, pro Club Teams ermitteln, Spielpläne abrufen, Bundesland herleiten, ICS + HTML generieren, für Bestandsclubs zusätzlich die Alt-Pfad-ICS schreiben und nach der Club-Schleife die Bund-/Land-Seiten aggregieren (`aggregatePages()`, siehe <<adr-020-aggregation-aus-laufzeit-ergebnissen,ADR-020>>).
 
 | *Schnittstellen (eingehend)*
-| Keine. Wird direkt via `node src/cronUpdate.js` gestartet (durch GitHub Actions oder manuell).
+| Keine. Wird direkt via `node src/cronUpdate.js` gestartet (durch GitHub Actions oder manuell). `module.exports = { getTeams, updateAll, updateClub, mapMatches, computeSpotlight, currentSeasonId }` — diese sechs Funktionen sind die öffentliche, testbare Oberfläche des Moduls. Der CLI-Einstieg (`require.main === module`) ruft `updateAll()` auf und setzt `process.exitCode = 1`, wenn `failures` nicht leer ist (bewusst nicht in `updateAll()` selbst, damit `node:test`-Läufe nicht beeinflusst werden, siehe <<adr-025-fehlerisolation-pro-club,ADR-025>>).
+
+| *Interne (nicht exportierte) Funktionen*
+a|
+* `resolveTheme(club, teams)` — ermittelt Primär-/Akzentfarbe, Cup-Farbe und Logo-URL eines Clubs aus `club.config.theme`/`club.config.cupColor`, mit Fallback auf den Standard-Fibalon-Look und einer aus der ersten `teamPermanentId` konstruierten Logo-URL
+* `fetchTeamData(team)` — lädt für ein Team Spiele, Match-Details (parallel via `mapWithConcurrency`), Saison-gefilterte `matches[]`, Tabellen/Turnierbäume je Wettbewerb, sowie die für die Bundesland-Herleitung benötigte `verbandId` des ersten Spiels (`firstVerbandId`); gibt `null` zurück, wenn das Team keine Spiele hat
+* `writeIcsVariants(teamId, teamName, matches, homeMatches, awayMatches, details, outputDir, makeMigrationNotice)` — erzeugt und speichert die drei ICS-Varianten (`all`/`home`/`away`) eines Teams; wird sowohl für den neuen Club-Pfad (`makeMigrationNotice = null`) als auch für den Alt-Pfad (mit `makeMigrationNotice`) verwendet; eine Variante ganz ohne Spiele wird übersprungen, bevor ein `migrationNotice` ins Spiel kommt
+* `writeClubIcs(meta, rawTeamData, clubOutputDir)` — ruft `writeIcsVariants` für alle Teams eines Clubs ohne Migrationshinweis auf (neuer, verschachtelter Pfad)
+* `writeLegacyOutput(rawTeamData, baseUrl)` — schreibt für Clubs mit `legacyRootOutput: true` ausschließlich die Alt-Pfad-ICS (`generated/{teamId}_{kind}.ics`, echte Spieldaten plus Migrationshinweis-VEVENT in jeder Variante); kein Alt-Pfad-HTML und kein Root-`metadata.json` mehr (siehe <<adr-023-wegfall-legacy-html,ADR-023>>)
+* `firstVerbandId(matches)` — liefert die `verbandId` des ersten (ungefilterten) Rohspiels eines Teams, das eine besitzt; Basis für die Bundesland-Mehrheitsentscheidung
+* `isLiga(liganame)` — Namensheuristik: enthält der Wettbewerbsname "liga", gilt er als Liga (Tabelle), sonst als Cup/Pokal (Turnierbaum)
 
 | *Schnittstellen (ausgehend)*
-| `apiClient.js`: `fetchTeamMatches(teamId)`, `fetchMatchInfo(matchId)`, `fetchClubTeams(clubId)` +
-`icsGenerator.js`: `generateICS(matches, details, teamId, kind, teamName)` +
-`storage.js`: `saveICS(teamId, type, data)`, `saveTeamsCache(teams)`, `loadTeamsCache()` +
-`seasonArchive.js`: `groupBySeasonId(matches)`, `updateArchiveForTeam(teamMeta, groupedBySeason, currentSeasonId, details, apiFns)` +
-`config.json`: `clubId`
+| `clubs.js`: `loadClubs(clubsRootDir)` +
+`verbandMapping.js`: `deriveClubBundesland(teamVerbandIds)` +
+`apiClient.js`: `fetchTeamMatches(teamId)`, `fetchMatchInfo(matchId)`, `fetchClubTeams(clubId)`, `fetchLeagueTable(ligaId, ownTeamId)`, `fetchTournamentRounds(ligaId)`, `mapWithConcurrency(items, limit, mapper)` +
+`icsGenerator.js`: `generateICS(matches, details, teamId, type, teamName, migrationNotice)` +
+`storage.js`: `saveICS(teamId, type, data, outputDir)`, `saveTeamsCache(teams, clubId)`, `loadTeamsCache(clubId)`, `sanitizeSlug(slug)` +
+`seasonArchive.js`: `groupBySeasonId(matches)`, `updateArchiveForTeam(clubId, teamMeta, groupedBySeason, currentSeasonId, details, apiFns)`, `clubArchiveDir(clubId)` +
+`generateHTML.js`: `genHTML(theme, legal, options)` +
+`portalConfig.js`: `loadPortalConfig()` +
+`wamCache.js`: `loadWamCache()` +
+`aggregatePages.js`: `aggregatePages(results, { generatedRootDir, portalLegal, wamCache, wamCacheStale })` +
+`clubs/<bundesland>/<club>/config.json`: `clubId`, `legacyRootOutput`, `theme`, `cupColor`, `legal`
 
 | *Wichtige Logik*
-| Zweistufige Strategie für Team-Ermittlung: (1) Cache-HIT → sofortige Nutzung, (2) Cache-MISS → API-Aufruf + Cache-Befüllung, (3) API-Fehler + abgelaufener Cache → Fallback auf alten Cache. Pro Team werden drei ICS-Varianten erzeugt: `all`, `home`, `away`. Pro Team werden zusätzlich `spotlightMatches` (0–2 Einträge) berechnet via `computeSpotlight`: letztes Ergebnis + nächstes Spiel, oder letzte 2 Ergebnisse, oder erste 2 zukünftige. Vor der Verarbeitung wird die bestehende `metadata.json` des vorherigen Laufs gelesen und mit der aktuellen Team-Liste (`getTeams()`) verglichen: Teams, die darin nicht mehr auftauchen (z.B. noch nicht für die neue Saison gemeldet, Saisonpause), werden unverändert mit `notCurrentlyListed: true` übernommen, statt komplett aus der Ausgabe zu verschwinden. Taucht ein Team später wieder in der Team-Liste auf, durchläuft es wieder den normalen Update-Pfad und das Flag entfällt automatisch.
+| `updateAll()` lädt alle Clubs via `loadClubs()` und verarbeitet jeden Club isoliert in einem try/catch: `club.slug` wird per `sanitizeSlug()` validiert (wirft bei ungültigem Slug), danach folgt `updateClub(club, generatedRootDir)`. Erfolgreiche Clubs landen als `{ club, bundesland, meta }` in `results`, fehlgeschlagene als `{ slug, error }` in `failures`; die Funktion gibt `{ results, failures }` zurück (ohne gefundene Clubs `{ results: [], failures: [] }`). Nach der Club-Schleife lädt `updateAll()` `loadPortalConfig()` und `loadWamCache()` und ruft `aggregatePages(results, { generatedRootDir, portalLegal, wamCache, wamCacheStale })` auf (<<adr-020-aggregation-aus-laufzeit-ergebnissen,ADR-020>>). `updateClub()` ist eine schlanke Orchestrierungsfunktion: Teams laden (`getTeams`, zweistufige Cache-Strategie wie zuvor), pro Team `fetchTeamData()` aufrufen, daraus `teamVerbandIds` sammeln und per `deriveClubBundesland()` das Bundesland bestimmen, den verschachtelten Ausgabepfad `generated/<bundesland>/<club-slug>/` bauen, `writeClubIcs()` + `genHTML()` dorthin schreiben, und — nur bei `club.config.legacyRootOutput === true` — zusätzlich `writeLegacyOutput()` aufrufen; `updateClub()` gibt `{ bundesland, meta, archiveErrors }` zurück. Pro Team bestimmt `fetchTeamData()` die aktuelle Saison per `currentSeasonId(matches)` (höchste vorkommende `seasonId` der Rohdaten, kein hartcodiertes Jahr) und gruppiert die Rohspiele per `groupBySeasonId()`; `updateClub()` ruft damit pro Team `updateArchiveForTeam(clubId, …)` auf (Archiv club-spezifisch unter `generated/archive/<clubId>/`, <<adr-026-saison-archiv-pro-club,ADR-026>>) und übergibt `genHTML()` das Club-Archiv als `archiveDir` für den Archiv-Tab. Ein Archiv-Fehler wird pro Team gefangen und als `archiveErrors` zurückgegeben: das Team bleibt in `meta` (Club-Seite, ICS, Portal), `updateAll()` trägt den Club zusätzlich mit `error: 'Archiv: …'` in `failures` ein. Vor dem Schreiben von `metadata.json` liest `updateClub()` die `metadata.json` des vorherigen Laufs aus dem Club-Verzeichnis: Teams, die nicht mehr in der aktuellen Team-Liste (`getTeams()`) auftauchen (z.B. noch nicht für die neue Saison gemeldet, Saisonpause), werden unverändert mit `notCurrentlyListed: true` übernommen, statt komplett aus der Ausgabe zu verschwinden; taucht ein Team später wieder auf, entfällt das Flag automatisch. Diese Einträge landen nur in `metadata.json`/HTML des Clubs, nicht im zurückgegebenen `meta` (keine ICS, keine Portal-Aggregation). Pro Team werden weiterhin `spotlightMatches` (0–2 Einträge) via `computeSpotlight()` berechnet: letztes Ergebnis + nächstes Spiel, oder letzte 2 Ergebnisse, oder erste 2 zukünftige.
 
 | *Fehlerbehandlung*
-| Fehler pro Team werden geloggt, aber der Gesamtprozess wird für die verbleibenden Teams fortgesetzt (Fail-Graceful per Team-Isolation in try/catch).
+| Fehler pro Team werden in `updateClub()` geloggt, der Prozess läuft für die verbleibenden Teams weiter (Fail-Graceful per Team-Isolation in try/catch, unverändert gegenüber dem Single-Club-Modell). `loadClubs()` überspringt nicht lesbare Verzeichnisse und ungültige `config.json`-Dateien (loggt, wirft nicht) — ein defekter Club bricht den Lauf für die übrigen Clubs nicht ab. Fehler bei einem gesamten Club (z.B. ungültiger Slug oder Exception in `updateClub()`) werden in `updateAll()` gefangen, geloggt und in `failures` gesammelt (<<adr-025-fehlerisolation-pro-club,ADR-025>>). Schlägt die Portal-Aggregation fehl (z.B. fehlende `portal.json`), wird das als `{ slug: '(portal)', error }` in `failures` vermerkt; die bereits geschriebene Club-Ausgabe bleibt unberührt.
 
 | *Abhängigkeiten*
-| `./apiClient`, `./icsGenerator`, `./storage`, `./seasonArchive`, `../config.json`, `fs`, `path`
+| `./apiClient`, `./icsGenerator`, `./storage`, `./seasonArchive`, `./generateHTML`, `./clubs`, `./verbandMapping`, `./portalConfig`, `./wamCache`, `./aggregatePages`, `fs`, `path`
+|===
+
+=== Modul: clubs.js (neu — Club-Config-Loader)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *Verantwortlichkeit*
+| Liest die Verzeichnisstruktur `clubs/<bundesland-slug>/<club-slug>/config.json` rekursiv ein und liefert eine Liste aller gültigen Club-Configs. Ersetzt das frühere Einlesen einer einzelnen Root-`config.json`.
+
+| *Exportierte Funktionen*
+a|
+* `loadClubs(clubsRootDir)` → `Array<{ slug, sourceBundeslandSlug, configPath, config }>`
+
+| *Rückgabeform*
+a|
+* `slug` — Ordnername des Clubs (z.B. `fibalon`)
+* `sourceBundeslandSlug` — Ordnername der übergeordneten Bundesland-Ebene im Quellbaum; **nur ein Hinweis für Menschen**, keine verbindliche Datenquelle (siehe <<adr-017-automatische-bundesland-ableitung,ADR-017>> — das tatsächliche Bundesland wird zur Laufzeit aus Liga-Daten berechnet, nicht aus diesem Ordnernamen)
+* `configPath` — absoluter Pfad zur `config.json`
+* `config` — geparster Inhalt der `config.json`
+
+| *Fehlertoleranz*
+| Nicht lesbare Bundesland-Verzeichnisse, fehlende `config.json`-Dateien, ungültiges JSON und Configs ohne `clubId` werden übersprungen und mit `console.error` geloggt — sie werfen keine Exception und brechen `loadClubs()` nicht ab. Existiert `clubsRootDir` nicht, liefert die Funktion eine leere Liste statt zu werfen.
+
+| *Abhängigkeiten*
+| `fs`, `path` (Node.js Stdlib)
+|===
+
+=== Modul: verbandMapping.js (neu — Bundesland-Herleitung)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *Verantwortlichkeit*
+| Bildet die von der Basketball-Bund-API gelieferte `verbandId` (Landesverband einer Liga) auf einen deutschen Bundesland-Slug ab und leitet daraus das Bundesland eines gesamten Clubs her (Mehrheitsentscheidung über alle seine Teams).
+
+| *Exportierte Funktionen*
+a|
+* `verbandIdToBundesland(verbandId)` → Bundesland-Slug (z.B. `'bayern'`) oder `'bundesweit'`
+* `deriveClubBundesland(teamVerbandIds)` → Bundesland-Slug; Mehrheitsvotum über die übergebene Liste von `verbandId`-Werten (einer je Team)
+* `bundeslandName(slug)` → Anzeigename (z.B. `'Baden-Württemberg'`, für `'bundesweit'` `'Bundesweite Wettbewerbe'`); unbekannte Slugs werden unverändert zurückgegeben
+* `bundeslandToVerbandId(slug)` → `verbandId` (Zahl) oder `null` für `'bundesweit'` und unbekannte Slugs; Umkehrung von `verbandIdToBundesland`, genutzt vom WAM-Refresh (`scripts/refresh-wam-cache.js`)
+* `BUNDESLAND_NAMES` → Tabelle Slug → Anzeigename
+* `BUNDESWEIT` → Konstante `'bundesweit'`
+
+| *Mapping-Tabelle*
+| Statische Tabelle `VERBAND_TO_BUNDESLAND` mit den 16 Landesverbands-IDs (1–16) auf die entsprechenden Bundesland-Slugs. Die öffentliche Basketball-Bund-API-Dokumentation nennt für `verbandId` nur zwei Beispielwerte (2=Bayern, 100=Bundesligen), keine vollständige Enum-Liste; die Tabelle ist daher gegen 1725 real gecrawlte Vereinsdatensätze (`verbandId`/`verbandName`-Paare) aus dem Schwesterprojekt `basketball-vereinsregister-deutschland` verifiziert. `verbandId` ohne Eintrag (z.B. bundesweite Ligen) fällt auf `'bundesweit'` zurück; ebenso `null`/`undefined`.
+
+| *Mehrheitslogik*
+| `deriveClubBundesland` zählt, wie oft jeder (Nicht-`'bundesweit'`-)Bundesland-Slug unter den übergebenen `verbandId`-Werten vorkommt, und gibt den häufigsten zurück. Bei Gleichstand gewinnt der Slug, der zuerst in der Eingabeliste auftrat (`firstSeenOrder`). Enthält die Liste ausschließlich `'bundesweit'`-Werte oder ist leer, ist das Ergebnis `'bundesweit'`.
+
+| *Abhängigkeiten*
+| Keine (reine Funktionen, keine I/O)
 |===
 
 === Modul: apiClient.js (API-Facade)
@@ -416,9 +517,12 @@ graph LR
 
 | *Exportierte Funktionen*
 a|
-* `fetchTeamMatches(teamId)` → `Array<Match>` (leer bei Fehler)
+* `fetchTeamMatches(teamId)` → `{ matches: Array<Match>, gender: string }` (leeres Array bei Fehler)
 * `fetchMatchInfo(matchId)` → `MatchInfo \| null` (null bei Fehler)
 * `fetchClubTeams(clubId)` → `Array<Team> \| null` (null bei Fehler, leer wenn keine Matches)
+* `fetchLeagueTable(ligaId, ownTeamId)` → `Array<TableRow> \| null` (null bei Fehler); jede `TableRow` enthält zusätzlich `teamId` (`teamPermanentId` als String oder `null`), mit dem `aggregatePages.js` Tabellenzeilen eingebundener Teams auf die Club-Seite verlinkt
+* `fetchTournamentRounds(ligaId)` → `Array<Round> \| null` (null bei Fehler oder keinen Runden)
+* `mapWithConcurrency(items, limit, mapper)` → `Promise<Array>` (geänderte/neue Funktion, siehe unten)
 
 | *Schnittstellen (ausgehend)*
 | Basketball-Bund REST-API via `axios` HTTP-Client. Basis-URL: `https://www.basketball-bund.net/rest`.
@@ -427,9 +531,13 @@ a|
 a|
 * `fetchClubTeams` dedupliziert Teams per `teamPermanentId` (Set-basiertes Seen-Tracking). Nur Teams, deren `clubId` mit der übergebenen `clubId` übereinstimmt, werden zurückgegeben.
 * `fetchTeamMatches` extrahiert aus `data.team` neben `gender` (aus `teamGenderId`) zusätzlich `teamAkjId` (Altersklassen-ID; `1` = Senioren, andere Werte = Jugend-Altersklassen) und `teamNumber` (die reale, von der API vergebene Team-Laufnummer innerhalb der Altersklasse/des Geschlechts). Beide Felder dienen `generateHTML.js` zur korrekten Team-Label-Disambiguierung (z. B. "Herren 2" vs. "Damen 2") anstelle einer geratenen Nummerierung anhand der Array-Position.
+* `fetchTournamentRounds` unterstützt zwei API-Formen (Pfad A: `spieltage[]` mit separatem Abruf je Spieltag; Pfad B: inline `matches[]` gruppiert nach `matchDay`, z.B. Bayernpokal) und füllt fehlende zukünftige Runden mit TBD-Platzhaltern basierend auf bekannten Siegern auf.
+
+| *`mapWithConcurrency(items, limit, mapper)` (geändert/neu)*
+| Generischer, von der Basketball-Bund-API unabhängiger Concurrency-Limited-Parallel-Map-Helfer: verarbeitet `items` mit `mapper`, wobei höchstens `limit` Aufrufe gleichzeitig laufen (Worker-Pool-Pattern, kein `Promise.all` über alle Items). Ergebnisse behalten die Original-Reihenfolge von `items`. Wirft bei `limit <= 0` oder einem nicht-ganzzahligen `limit`. Ein Fehler in `mapper` propagiert über `Promise.all` der Worker und bricht den gesamten Aufruf ab — Fehler werden in `cronUpdate.js` nicht stillschweigend verschluckt. Wird in `cronUpdate.js`'s `fetchTeamData()` genutzt, um `fetchMatchInfo()` für alle Spiele eines Teams parallel abzurufen, begrenzt durch `BBB_MATCH_INFO_CONCURRENCY` (Default 4).
 
 | *Fehlerbehandlung*
-| Alle Funktionen fangen HTTP-Fehler und Netzwerkfehler via try/catch. Bei Fehler: `fetchTeamMatches` → `[]`, `fetchMatchInfo` → `null`, `fetchClubTeams` → `null`.
+| Alle Funktionen fangen HTTP-Fehler und Netzwerkfehler via try/catch. Bei Fehler: `fetchTeamMatches` → `{ matches: [], gender: '' }`, `fetchMatchInfo` → `null`, `fetchClubTeams` → `null`, `fetchLeagueTable` → `null`, `fetchTournamentRounds` → `null`. `mapWithConcurrency` wirft synchron bei ungültigem `limit`, propagiert aber `mapper`-Fehler statt sie zu fangen.
 
 | *Abhängigkeiten*
 | `axios`
@@ -446,7 +554,7 @@ a|
 
 | *Exportierte Funktionen*
 a|
-* `generateICS(matches, details, teamId, type, teamName)` → `Promise<string \| null>`
+* `generateICS(matches, details, teamId, type, teamName, migrationNotice)` → `Promise<string \| null>` — `migrationNotice` ist ein neuer, optionaler sechster Parameter (siehe unten)
 
 | *Interne Funktionen*
 a|
@@ -466,6 +574,9 @@ a|
 | *Wichtige Logik*
 | Die `ics`-Bibliothek erzeugt RFC-konforme VEVENT-Blöcke. Der Generator führt danach eine zeilenbasierte Post-Processing-Pipeline aus: VCALENDAR-Header-Ersetzung mit X-WR-*-Properties, X-ALT-DESC-Injektion nach DESCRIPTION unter Berücksichtigung von Line-Folding, Entfernung automatisch generierter Duplikat-Header.
 
+| *`migrationNotice`-Parameter (neu)*
+| Optionales Objekt `{ newUrl, today? }`. Ist es gesetzt, fügt `generateICS` **vor** den eigentlichen Spiel-Events ein zusätzliches, ganztägiges Hinweis-VEVENT (`busyStatus: 'FREE'`, Titel „Kalender-Abo aktualisieren") ein, dessen Beschreibung auf `newUrl` verweist. `today` ist ausschließlich für Tests gedacht (deterministische Simulation von Monatsenden); ohne Angabe wird `new Date()` verwendet. Das Enddatum wird per echter `Date`-Arithmetik (`setDate(getDate() + 1)`) berechnet statt naiv den Tageswert zu inkrementieren — sonst könnte an Monatsenden ein ungültiges Datum (z.B. Tag 32) entstehen, das die `ics`-Bibliothek als `ValidationError` ablehnt. Wird ausschließlich für die Alt-Pfad-Ausgabe (`legacyRootOutput: true`) aus `cronUpdate.js` befüllt — im neuen, verschachtelten Club-Pfad bleibt der Parameter `null`.
+
 | *ICS-Escaping*
 | `icsEscape` kodiert die vier RFC-5545-Sonderzeichen: `\` → `\\`, `;` → `\;`, `,` → `\,`, `\n` → `\n` (literal), `\r` wird entfernt. HTML-Beschreibungen werden zusätzlich von echten Newlines bereinigt.
 
@@ -484,22 +595,31 @@ a|
 
 | *Exportierte Funktionen*
 a|
-* `saveICS(teamId, type, data)` → `string` (Dateipfad)
-* `readICS(teamId, type)` → `string \| null`
-* `saveTeamsCache(teams)` → schreibt `teams-cache.json`
-* `loadTeamsCache()` → `{ teams: Array \| null, stale: boolean }`
+* `saveICS(teamId, type, data, outputDir)` → `string` (Dateipfad) — `outputDir` ist ein neuer, optionaler vierter Parameter
+* `readICS(teamId, type, outputDir)` → `string \| null` — ebenfalls um `outputDir` erweitert
+* `saveTeamsCache(teams, clubId)` → schreibt `teams-cache-<clubId>.json` — `clubId` ist erforderlich (wirft ohne)
+* `loadTeamsCache(clubId)` → `{ teams: Array \| null, stale: boolean }` — `clubId` ist erforderlich (wirft ohne)
+* `sanitizeSlug(slug)` → `string` (neu) — validiert und gibt den Slug unverändert zurück, oder wirft; lehnt zusätzlich den reservierten Slug `index` ab (`RESERVED_SLUGS`, siehe <<adr-024-bundesweit-eigener-block,ADR-024>>)
+
+| *`outputDir`-Parameter (neu)*
+| Ohne Angabe fallen `saveICS`/`readICS` auf das globale `ICS_DIR` zurück (Rückwärtskompatibilität mit dem Single-Club-Verhalten). Mit Angabe landet/liest die Datei im club-spezifischen Verzeichnis (z.B. `generated/bayern/fibalon/`); `resolveDir()` legt dieses Verzeichnis bei Bedarf automatisch an.
+
+| *`sanitizeSlug(slug)` (neu)*
+| Validiert Pfadsegmente (Bundesland-/Club-Slugs) gegen `/^[a-z0-9-]+$/` — nur Kleinbuchstaben, Ziffern und Bindestrich. Wirft bei jedem anderen Wert (inkl. nicht-Strings) und für den reservierten Slug `index`. Zentrale Path-Traversal-Verteidigung für die vom `cronUpdate.js`-Orchestrator dynamisch aus Club-Configs und hergeleiteten Bundesländern zusammengesetzten Verzeichnisnamen (verhindert z.B. `../` oder uneinheitliche Groß-/Kleinschreibung).
 
 | *Sicherheitsmechanismen*
 a|
 * *Whitelist-Validierung für `type`*: Nur `'all'`, `'home'`, `'away'` erlaubt (via `Set`-Lookup).
 * *Regex-Validierung für `teamId`*: Nur reine Zahlenketten erlaubt (`/^\d+$/`).
-* Beide Prüfungen verhindern Path-Traversal (z. B. `../../etc/passwd`).
+* *Regex-Validierung für `clubId`* (im Teams-Cache, neu): Ebenfalls nur reine Zahlenketten (`/^\d+$/`) — bewusst eine strikte Validierung statt einer Zeichen-Normalisierung, siehe Cache-Logik unten.
+* *Regex-Validierung für Slugs* (`sanitizeSlug`, neu): Nur `/^[a-z0-9-]+$/`.
+* Alle vier Prüfungen verhindern Path-Traversal (z. B. `../../etc/passwd`).
 
 | *Cache-Logik*
-| `teams-cache.json` enthält `{ cachedAt: ISO-8601-String, teams: [...] }`. TTL = 30 Tage. `loadTeamsCache` gibt `stale: true` zurück wenn `Date.now() - cachedAt >= 30 * 24 * 60 * 60 * 1000`. Bei Parse-Fehler wird `{ teams: null, stale: true }` zurückgegeben.
+| Der Team-Cache ist pro Club gescoped: `teams-cache-<clubId>.json` enthält `{ cachedAt: ISO-8601-String, teams: [...] }`. TTL = 30 Tage. `loadTeamsCache(clubId)` gibt `stale: true` zurück wenn `Date.now() - cachedAt >= 30 * 24 * 60 * 60 * 1000`. Bei Parse-Fehler wird `{ teams: null, stale: true }` zurückgegeben. `clubId` ist ein PFLICHT-Parameter (kein optionaler globaler Fallback wie bei `outputDir`) — ohne clubId-Scoping würden alle Clubs sich denselben Cache teilen und der zweite/jeder weitere Club in einem Multi-Club-Lauf würde stillschweigend die Team-Liste des vorherigen Clubs erben (siehe ADR/Bugfix: geteilter Teams-Cache). `clubId` wird zusätzlich strikt gegen `/^\d+$/` validiert (wirft bei Nichterfüllung) statt nur zeichenweise normalisiert zu werden — eine reine Ersetzung ungültiger Zeichen (z.B. alles außer `[a-zA-Z0-9_-]` durch `_`) könnte zwei unterschiedliche `clubId`-Werte (z.B. `"44-68"` und `"44 68"`) auf denselben Cache-Dateinamen abbilden und damit dieselbe Bug-Klasse (kollidierende Cache-Schlüssel) reintroduzieren, die dieser Fix eigentlich beheben soll.
 
 | *Ausgabeverzeichnis*
-| `generated/` (relativ zum Projektroot). Wird bei Start automatisch angelegt wenn nicht vorhanden.
+| Global: `generated/` (relativ zum Projektroot, überschreibbar via `BBB_ICS_DIR`), wird bei Start automatisch angelegt wenn nicht vorhanden. Pro Club: `generated/<bundesland>/<club-slug>/`, via den neuen `outputDir`-Parameter von `cronUpdate.js` übergeben.
 
 | *Abhängigkeiten*
 | `fs`, `path` (Node.js Stdlib)
@@ -518,13 +638,21 @@ a|
 a|
 * `groupBySeasonId(matches)` → `{ [seasonId]: Array<Match> }` — gruppiert die rohen API-Matches eines Teams anhand von `ligaData.seasonId`; Matches ohne numerische `seasonId` werden übersprungen.
 * `buildArchiveTeamEntry(teamMeta, seasonMatches, details, apiFns)` → `Promise<ArchiveTeamEntry>` — baut den Archiv-Eintrag eines Teams für eine Saison: aufsteigend sortierte, angereicherte `matches[]` (Gegner, Heim/Auswärts, Ergebnis, Liganame) sowie `competitions[]` mit Tabelle (`fetchLeagueTable`) oder Turnierbaum (`fetchTournamentRounds`) je nach Liga-Heuristik (`isLiga`, gleiche Namens-Heuristik wie ADR-009).
-* `saveArchive(season, data)` → `string` (Dateipfad) — schreibt `generated/archive/{seasonId}.json`, validiert `season` per Regex (`/^\d{4}$/`) gegen Path-Traversal.
-* `loadArchive(season)` → `object \| null` — liest `generated/archive/{seasonId}.json`, `null` wenn nicht vorhanden.
-* `updateArchiveForTeam(teamMeta, groupedBySeason, currentSeasonId, details, apiFns)` → `Promise<void>` — die zentrale Rolling-Update-Logik (siehe unten).
+* `clubArchiveDir(clubId)` → `string` — Archiv-Verzeichnis eines Clubs, `generated/archive/<clubId>/` (Basis überschreibbar via `BBB_ICS_DIR`); legt nichts an.
+* `saveArchive(clubId, season, data)` → `string` (Dateipfad) — schreibt `generated/archive/<clubId>/{seasonId}.json` und legt das Club-Verzeichnis bei Bedarf an.
+* `loadArchive(clubId, season)` → `object \| null` — liest `generated/archive/<clubId>/{seasonId}.json`, `null` wenn nicht vorhanden (ohne Verzeichnis anzulegen).
+* `updateArchiveForTeam(clubId, teamMeta, groupedBySeason, currentSeasonId, details, apiFns)` → `Promise<void>` — die zentrale Rolling-Update-Logik (siehe unten), ausschließlich auf dem Archiv des übergebenen Clubs.
+
+| *Club-Scoping und Validierung (<<adr-026-saison-archiv-pro-club,ADR-026>>)*
+a|
+* Das Archiv ist pro Club getrennt: `generated/archive/<clubId>/{seasonId}.json`. Schlüssel ist die stabile `clubId`, nicht `<bundesland>/<club-slug>` — das Bundesland wird pro Lauf abgeleitet und kann (z.B. bei API-Ausfall → `bundesweit`) wechseln; das Archiv bleibt davon unberührt.
+* `clubId` wird in allen Funktionen strikt gegen `/^\d+$/` validiert (`Ungültige clubId: …`, analog zum Teams-Cache in `storage.js`); fehlt sie, wird geworfen (kein globaler Fallback).
+* `season` wird weiterhin gegen `/^\d{4}$/` validiert (Path-Traversal-Schutz).
+* Die final-Markierung durchsucht nur `<season>.json`-Dateien im eigenen Club-Verzeichnis.
 
 | *Rolling-Update-Mechanismus*
 a|
-* Für jede in `groupedBySeason` vorkommende Saison außer der aktuellen (`currentSeasonId`) wird der Archiv-Eintrag des Teams neu gebaut und mit `status: 'provisional'` sowie `lastSeenAt` (ISO-Zeitstempel) in `generated/archive/{seasonId}.json` gespeichert — bei jedem Lauf erneut, solange die API noch Matches dieser Saison für das Team liefert (kommt während des Saisonübergangs häufig vor).
+* Für jede in `groupedBySeason` vorkommende Saison außer der aktuellen (`currentSeasonId`) wird der Archiv-Eintrag des Teams neu gebaut und mit `status: 'provisional'` sowie `lastSeenAt` (ISO-Zeitstempel) in `generated/archive/<clubId>/{seasonId}.json` gespeichert — bei jedem Lauf erneut, solange die API noch Matches dieser Saison für das Team liefert (kommt während des Saisonübergangs häufig vor).
 * Anschließend werden alle vorhandenen Archivdateien durchsucht: Taucht die Saison eines Teams nicht mehr unter den aktuell von der API gelieferten Matches auf (und ist nicht die aktuelle Saison) und war ihr Status bisher `provisional`, wird sie auf `status: 'final'` gesetzt. Ab diesem Zeitpunkt wird dieser Eintrag nie wieder verändert.
 * Dieser Mechanismus verhindert sowohl vorzeitiges Einfrieren (Team wechselt noch mitten im Übergang) als auch dauerhaftes `provisional`-Verharren (kein expliziter Cutoff-Zeitpunkt nötig).
 
@@ -532,7 +660,7 @@ a|
 | `buildArchiveTeamEntry` und `updateArchiveForTeam` erhalten `fetchLeagueTable`/`fetchTournamentRounds` als Parameter (`apiFns`) statt sie selbst aus `apiClient.js` zu importieren. Das hält die Abhängigkeitsrichtung explizit (`cronUpdate.js` importiert bereits `seasonArchive.js`) und macht `seasonArchive.js` unabhängig von der konkreten API-Anbindung testbar — Tests injizieren Stub-Funktionen statt echter HTTP-Aufrufe. Ein direkter Import von `apiClient.js` wäre zwar kein echter Zyklus gewesen (`apiClient.js` importiert selbst nichts aus `seasonArchive.js`), wurde aber aus diesen Gründen bewusst vermieden.
 
 | *Speicherformat*
-| Ein JSON-File pro Saison unter `generated/archive/{seasonId}.json`: `{ season, teams: { [teamId]: { teamName, ageGroup, gender, matches[], competitions[], status, lastSeenAt } } }`.
+| Ein JSON-File pro Club und Saison unter `generated/archive/<clubId>/{seasonId}.json`: `{ season, clubId, teams: { [teamId]: { teamName, ageGroup, gender, matches[], competitions[], status, lastSeenAt } } }`. Auf `main` waren beim Umstieg noch keine Archivdateien committet — keine Migration nötig.
 
 | *Abhängigkeiten*
 | `fs`, `path` (Node.js Stdlib); keine Abhängigkeit auf `apiClient.js` (siehe Design-Entscheidung oben)
@@ -548,13 +676,14 @@ a|
 | Erzeugt die komplette statische Website aus `metadata.json`: Startseite (`index.html`) mit adaptiven Team-Teasern und Navigationsmenü sowie individuelle Team-Seiten (`teams/{teamId}.html`) mit Next-Game-Teaser, Ligatabellen, Turnierbäumen, Spielplan-Tabs, Kalender-Abo-Links und optionalem Archiv-Tab für vergangene Saisons.
 
 | *Eingang*
-| `generated/metadata.json` mit vollständigen Team-Metadaten: Spielplan (mit `isNext`, `ownShort`, `opponentShort`, `venueName`, `venueAddress`), Ligatabellen (`competitions[].table`), Turnierbäume (`competitions[].bracket`), Geschlecht, Altersgruppe, Logo-URL, `spotlightMatches` (0–2 Spotlight-Spiele pro Team), optional `notCurrentlyListed: true` (Team ist vorübergehend nicht in der API-Teamliste enthalten). Zusätzlich `generated/archive/{seasonId}.json`-Dateien (geschrieben von `seasonArchive.js`) mit archivierten Vorjahres-Saisons pro Team.
+| `generated/metadata.json` mit vollständigen Team-Metadaten: Spielplan (mit `isNext`, `ownShort`, `opponentShort`, `venueName`, `venueAddress`), Ligatabellen (`competitions[].table`), Turnierbäume (`competitions[].bracket`), Geschlecht, Altersgruppe, Logo-URL, `spotlightMatches` (0–2 Spotlight-Spiele pro Team), optional `notCurrentlyListed: true` (Team ist vorübergehend nicht in der API-Teamliste enthalten). Zusätzlich die Archivdateien des jeweiligen Clubs, `generated/archive/<clubId>/{seasonId}.json` (geschrieben von `seasonArchive.js`, Verzeichnis via `options.archiveDir`), mit archivierten Vorjahres-Saisons pro Team.
 
 | *Ausgang*
 | `generated/index.html` (Startseite), `generated/teams/{teamId}.html` (eine Datei pro Team), `generated/datenschutz.html` und `generated/barrierefreiheit.html` (immer), sowie `generated/impressum.html` (nur wenn `config.legal` mindestens ein nicht-leeres Feld hat). Alle HTML-Dateien sind vollständig eigenständig (inline CSS + JS, keine externen Assets außer Leaflet CDN, Font Awesome CDN und BBB-Logo-URL).
 
 | *Wichtige interne Funktionen*
 a|
+* `buildMigrationBanner(migrationNotice)` — rendert einen sichtbaren Banner (`role="note"`, CSS-Klasse `.migration-banner`, gestylt über die bestehenden Farbtoken `--color-info-bg`/`--color-info-border`), wenn `migrationNotice.newBasePath` gesetzt ist; leerer String sonst. `migrationNotice` hat hier die Form `{ newBasePath }` — bewusst eine andere Form als das gleichnamige Objekt `{ newUrl, today? }` in `icsGenerator.generateICS()`, da HTML-Banner auf eine Seite (Pfad) verlinken, ICS-Hinweise dagegen auf eine konkrete Datei-URL
 * `buildCalHelp()` — aufklappbarer `<details>`-Block mit Erklärung zu Kalender-Abonnements (iOS/macOS, Google, Outlook, ICS) inkl. offizieller Support-Links; wird in jedem Tab-Panel eingebettet
 * `buildTabPanel(teamId, type, webcalLink, googleLink, httpsLink, matches, cupColor)` — rendert einen Tab-Panel mit Spielplan, Abo-Buttons (inkl. „Link kopieren"-Button für Outlook/HTTPS-URL) und eingebettetem `buildCalHelp()`-Block
 * `buildScheduleRow(match, cupColor)` — rendert eine zweizeilige Spielzeile: Zeile 1 enthält Datum, Gegnername, Sieg/Niederlage-Icon und Ergebnis; Zeile 2 den Liganamen. Verwendet `resultIcon(match)` für das Icon.
@@ -563,10 +692,17 @@ a|
 * `buildSpotlightBlock(teams, cupColor)` — "Nächste Spiele"-Block auf der Startseite mit Tabs Alle/Heim/Auswärts, chronologisch sortiert über alle Teams; vergangene Spiele mit Sieg/Niederlage-Icon
 * `isWin(match)` — Hilfsfunktion: gibt `true` (Sieg), `false` (Niederlage) oder `null` (kein Ergebnis / Unentschieden) zurück; berücksichtigt `match.isHome` für korrekte Punktezuordnung
 * `resultIcon(match)` — gibt SVG-Icon-String für Sieg (Pokal) oder Niederlage (✕) zurück, oder leeren String wenn kein Ergebnis/Unentschieden
-* `buildStandingsTable(comp)` — zwei Tabs: offizielle Tabelle + Games-Behind-Ranking
+* `buildStandingsTable(comp)` — zwei Tabs: offizielle Tabelle + Games-Behind-Ranking; hat eine Tabellenzeile `row.href`, wird der Teamname als Link gerendert (Portal-Land-Seiten verlinken eingebundene Clubs), sonst als reiner Text
 * `buildBracket(comp, ownTeamName)` — Turnierbaum mit Highlight des eigenen Teams und TBD-Platzhaltern für zukünftige Runden
-* `buildTeamPage(team, allTeams, theme, legal, archives)` — vollständige Team-Seite; rendert bei `team.notCurrentlyListed === true` einen Hinweis „Team aktuell nicht gemeldet" oberhalb des Next-Game-Teasers, und bei nicht-leerem `archives`-Array einen zusätzlichen „Archiv"-Tab neben Alle/Heim/Auswärts
-* `loadTeamArchives(generatedDir, teamId)` — liest alle `generated/archive/{seasonId}.json`-Dateien, filtert auf den jeweiligen `teamId`-Eintrag und liefert die Ergebnisse absteigend nach Saison sortiert; nicht parsbare Archivdateien werden übersprungen, damit ein defektes Archiv nicht die gesamte HTML-Generierung blockiert
+* `buildPortalNav(rootPrefix, regions, activeSlug)` — Portal-Navigation (`<nav class="site-nav">`) mit Startseite und allen Regionen; `rootPrefix` ist `'./'` (Bund-/Legal-Seiten) oder `'../'` (Land-Seiten)
+* `buildPortalStyles()` — portal-spezifische CSS-Ergänzungen zu `buildSharedStyles`
+* `buildPortalMigrationBanner()` — generischer Migrationshinweis (CSS-Klasse `.migration-banner`) für die Bund-Seite; unabhängig von `buildMigrationBanner`
+* `buildBundPage({ regions, showMigrationBanner }, legal)` — *exportiert*; Bund-Startseite mit einem Block je Region (Vereinsliste, Anzahl Vereine/Ligen)
+* `buildLandPage(region, regions, legal)` — *exportiert*; Land-Seite mit Vereinsliste und Liga-Tabellen, gruppiert nach `region.groups`
+* `buildPortalLegalPages(legal, regions)` — *exportiert*; liefert `{ impressum, datenschutz, barrierefreiheit }` (HTML-Strings) des Portal-Betreibers mit Portal-Navigation
+* `PORTAL_THEME` — *exportiert*; neutrales Portal-Theme (Default-Palette der Club-Seiten)
+* `buildTeamPage(team, allTeams, theme, legal, renderOptions)` — vollständige Team-Seite; `renderOptions = { baseUrl, migrationNotice, archives }`; rendert bei `team.notCurrentlyListed === true` einen Hinweis „Team aktuell nicht gemeldet" oberhalb des Next-Game-Teasers, und bei nicht-leerem `archives`-Array einen zusätzlichen „Archiv"-Tab neben Alle/Heim/Auswärts
+* `loadTeamArchives(archiveDir, teamId)` — liest alle `{seasonId}.json`-Dateien im Archiv-Verzeichnis EINES Clubs (`generated/archive/<clubId>/`, von `genHTML` aus `options.archiveDir` übergeben; ohne `archiveDir` keine Archive, kein Fallback auf ein globales Verzeichnis), filtert auf den jeweiligen `teamId`-Eintrag und liefert die Ergebnisse absteigend nach Saison sortiert; nicht parsbare Archivdateien werden übersprungen, damit ein defektes Archiv nicht die gesamte HTML-Generierung blockiert
 * `buildArchiveSeasonBlock(archiveEntry, cupColor)` — rendert eine archivierte Saison: Überschrift „Saison YYYY/YY", optionaler „vorläufiger Stand"-Hinweis bei `status === 'provisional'`, Ligatabellen/Turnierbäume (wiederverwendet `buildStandingsTable`/`buildBracket`) und Spielplanzeilen (wiederverwendet `buildScheduleRow`)
 * `buildArchiveTab(teamId, archives, cupColor)` — liefert leeren String wenn keine Archive vorhanden sind, sonst ein `role="tabpanel"`-Element mit allen Saison-Blöcken
 * `buildIndexPage(teams, theme)` — Startseite
@@ -578,7 +714,7 @@ a|
 * `buildImpressum(legal, allTeams, theme)` — erzeugt `generated/impressum.html` nur wenn `config.legal` mindestens ein nicht-leeres Feld hat. Zeigt Betreiber, Adresse, Telefon (optional), E-Mail und Verantwortlichen (optional) aus der Konfiguration sowie einen Haftungshinweis zu aggregierten öffentlichen Daten.
 * `buildDatenschutz(legal, allTeams, theme)` — erzeugt `generated/datenschutz.html` (wird immer generiert). Nennt Drittanbieter: cdnjs.cloudflare.com (Font Awesome), basketball-bund.net (Spielplandaten + Logos). Betreiber und E-Mail werden aus `config.legal` bezogen.
 * `buildBarrierefreiheit(legal, allTeams, theme)` — erzeugt `generated/barrierefreiheit.html` (wird immer generiert). Status: "Teilweise konform mit WCAG 2.1 Stufe AA". E-Mail-Kontakt aus der Konfiguration.
-* `genHTML(theme, legal)` — Einstiegsfunktion; `legal`-Parameter wurde hinzugefügt (vorher `genHTML(theme)`).
+* `genHTML(theme, legal, options)` — Einstiegsfunktion; **geändert**: dritter Parameter `options = { baseUrl, outputDir, migrationNotice, archiveDir }` neu hinzugekommen (`archiveDir`: Archiv-Verzeichnis des Clubs für den Archiv-Tab, siehe `loadTeamArchives`) (vorher `genHTML(theme, legal)`). `baseUrl` überschreibt die Standard-GitHub-Pages-URL (`DEFAULT_BASE_URL`) für Kalender-Abo-Links; `outputDir` überschreibt das Zielverzeichnis (Default: `BBB_GENERATED_DIR`/`BBB_ICS_DIR`-Umgebungsvariable oder `generated/`); `migrationNotice` wird unverändert an `buildIndexPage`/`buildTeamPage` durchgereicht und von dort an `buildMigrationBanner`. Liest weiterhin `metadata.json` aus dem (jetzt club-spezifischen) `outputDir`. Es gibt **keinen eigenständigen CLI-Einstiegspunkt mehr** — das frühere `if (require.main === module)`, das eine Root-`config.json` gelesen hat, wurde entfernt: `cronUpdate.js` ruft `genHTML()` seit der Multi-Club-Umstellung intern pro Club auf, und der alte Einstiegspunkt wäre nach dem Löschen der Root-`config.json` ohnehin abgestürzt.
 
 | *Abhängigkeiten*
 | `fs`, `path` (Node.js Stdlib); Leaflet 1.9.4 (CDN, nur in Team-Seiten); Font Awesome (cdnjs.cloudflare.com, CDN)
@@ -600,11 +736,72 @@ a|
 | `express`
 |===
 
+=== Modul: aggregatePages.js (neu — Bund-/Land-Seiten)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *Verantwortlichkeit*
+| Erzeugt nach der Club-Schleife die Portal-Seiten aus den Laufzeit-Ergebnissen (<<adr-020-aggregation-aus-laufzeit-ergebnissen,ADR-020>>).
+
+| *Schnittstelle*
+| `aggregatePages(results, { generatedRootDir, portalLegal, wamCache, wamCacheStale })` mit `results = [{ club, bundesland, meta }]`; `wamCache` und `wamCacheStale` sind optional (Default `null`/`false`). Schreibt `generated/index.html` (Bund), `generated/<region>/index.html` (Land, inkl. `bundesweit`) sowie `generated/{impressum,datenschutz,barrierefreiheit}.html` (Portal-Betreiber). Rückgabe: `{ regionCount, clubCount, skippedClubs }`.
+
+| *Logik*
+a|
+* Gruppierung nach Bundesland; Regionen alphabetisch nach Anzeigename, `bundesweit` zuletzt.
+* Deduplizierung der Ligen über `ligaId` (eine Tabelle pro Liga, nur Wettbewerbe mit `isLiga` und Tabelle); `isOwn` wird aus den eingebundenen Team-IDs neu bestimmt.
+* Verlinkung eingebundener Teams auf ihre Club-Seite (relative Links).
+* Gruppierung nach Ebene/Bezirk/Kreis nur mit frischem WAM-Cache; ohne Cache, bei veraltetem Cache und für `bundesweit` eine flache, alphabetische Liste, unbekannte Ligen unter "Weitere Ligen" (<<adr-022-graceful-degradation-wam-cache,ADR-022>>).
+* Migrationsbanner auf der Bund-Seite, wenn mindestens ein Club `legacyRootOutput: true` hat.
+* Clubs ohne Team-Daten (`meta` leer) werden übersprungen und per `console.warn` gemeldet.
+* Slugs der Regionen werden per `sanitizeSlug()` geprüft.
+
+| *Abhängigkeiten*
+| `./generateHTML` (`buildBundPage`, `buildLandPage`, `buildPortalLegalPages`), `./verbandMapping` (`bundeslandName`, `BUNDESWEIT`), `./wamCache` (`buildLigaIndex`), `./storage` (`sanitizeSlug`), `fs`, `path`
+|===
+
+=== Modul: wamClient.js und wamCache.js (neu — WAM-Liga-Suche)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *wamClient.js*
+| `fetchLeaguesForVerband(verbandId, { gebietIds, delayMs })` → `Promise<{ ligen, complete }>`. Sequenzielle Pagination über `POST /rest/wam/liga/list?startAtIndex=<n>` (Body `{ token: 0, verbandIds: [verbandId] }`, optional `gebietIds`); pro Liga werden `ligaId`, `liganame`, `skEbeneId`, `skEbeneName`, `bezirknr`, `bezirkName`, `kreisnr` und `kreisname` übernommen. Bei Fehlern (auch unerwartete Antwortstruktur, leere Seite trotz `hasMoreData`, Seitenlimit) `complete=false` mit den bis dahin geholten Ligen. Exportiert außerdem `WAM_PAGE_DELAY_MS` (Abstand zwischen Seiten).
+
+| *wamCache.js*
+| `loadWamCache(filePath, now)` → `{ cache, stale }` (TTL `WAM_CACHE_TTL_MS` = 150 Tage; fehlende oder unlesbare Datei → `{ cache: null, stale: false }`), `buildLigaIndex(cache)` → `Map<ligaId, liga>`, `refreshWamCache({ verbandIds, existingCache, fetchLeagues, now })` → `{ cache, incompleteVerbandIds }` (bei Teilabruf bleibt der alte Stand des Verbands erhalten, siehe <<adr-022-graceful-degradation-wam-cache,ADR-022>>). Exportiert außerdem `DEFAULT_CACHE_PATH`. Datei: `data/wam-ligen-cache.json` (überschreibbar über `BBB_WAM_CACHE`), aktualisiert durch `scripts/refresh-wam-cache.js` (`npm run wam:refresh`) bzw. den Workflow `wam-refresh.yml` (<<adr-021-wam-cache-versioniert,ADR-021>>).
+
+| *Abhängigkeiten*
+| `wamClient.js`: `axios`. `wamCache.js`: `./wamClient`, `fs`, `path`. Das Skript `scripts/refresh-wam-cache.js` nutzt zusätzlich `../src/clubs` und `../src/verbandMapping` (`bundeslandToVerbandId`).
+|===
+
+=== Modul: portalConfig.js (neu — Betreiberangaben)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *Verantwortlichkeit*
+| Lädt und validiert die Betreiberangaben des Portals (Impressum der Bund-/Land-Seiten).
+
+| *Schnittstelle*
+| `loadPortalConfig(filePath)` → Objekt mit der Struktur von `legal` der Club-Configs. Standardpfad: `portal.json` im Repo-Root, überschreibbar über `BBB_PORTAL_CONFIG`; Vorlage: `portal.example.json`. Exportiert außerdem `REQUIRED_FIELDS` (`operator`, `address`, `email`). Mit `"private": true` (nur der Boolean) gilt der private Modus (<<adr-027-privater-portalbetrieb,ADR-027>>): Pflicht ist nur `operator`, optional `contactUrl` (nur `https://`); Rückgabe `{ private: true, operator, contactUrl? }`, `address`/`email`/`phone`/`responsible` werden verworfen. `buildPortalLegalPages()` liefert dann kein Impressum, `buildFooter()` zeigt statt des Impressum-Links einen Kontakt-Link.
+
+| *Fehlerbehandlung*
+| Fehlende Datei, ungültiges JSON, leere Pflichtfelder (im privaten Modus: leerer `operator` oder `contactUrl` ohne `https://`) führen zu einem Fehler. `updateAll()` meldet ihn als `(portal)` und schreibt dann keine Portal-Seiten (<<adr-025-fehlerisolation-pro-club,ADR-025>>).
+
+| *Abhängigkeiten*
+| `fs`, `path` (Node.js Stdlib)
+|===
+
 === Abhängigkeitsmatrix
 
-[cols="2,1,1,1,1,1,1,1", options="header"]
+[cols="2,1,1,1,1,1,1,1,1,1,1,1,1,1", options="header"]
 |===
-| Modul | cronUpdate | apiClient | icsGenerator | storage | seasonArchive | generateHTML | server
+| Modul | cronUpdate | clubs | verbandMapping | apiClient | icsGenerator | storage | seasonArchive | generateHTML | aggregatePages | wamClient | wamCache | portalConfig | server
 
 | *cronUpdate.js*
 | —
@@ -612,10 +809,52 @@ a|
 | nutzt
 | nutzt
 | nutzt
+| nutzt
+| nutzt
+| nutzt
+| nutzt
+| —
+| nutzt
+| nutzt
+| —
+
+| *clubs.js*
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+
+| *verbandMapping.js*
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
 | —
 | —
 
 | *apiClient.js*
+| —
+| —
+| —
+| —
+| —
+| —
 | —
 | —
 | —
@@ -632,8 +871,20 @@ a|
 | —
 | —
 | —
+| —
+| —
+| —
+| —
+| —
+| —
 
 | *storage.js*
+| —
+| —
+| —
+| —
+| —
+| —
 | —
 | —
 | —
@@ -650,17 +901,95 @@ a|
 | —
 | —
 | —
+| —
+| —
+| —
+| —
+| —
+| —
 
 | *generateHTML.js*
 | —
 | —
 | —
+| —
+| —
 | liest FS direkt
-| liest FS direkt
+| liest Archiv-Dateien direkt
+| —
+| —
+| —
+| —
+| —
+| —
+
+| *aggregatePages.js*
+| —
+| —
+| nutzt
+| —
+| —
+| nutzt
+| —
+| nutzt
+| —
+| —
+| nutzt
+| —
+| —
+
+| *wamClient.js*
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+
+| *wamCache.js*
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| nutzt
+| —
+| —
+| —
+
+| *portalConfig.js*
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
+| —
 | —
 | —
 
 | *server.js*
+| —
+| —
+| —
+| —
+| —
+| —
 | —
 | —
 | —
@@ -719,8 +1048,8 @@ sequenceDiagram
 . Post-Processing: VCALENDAR-Header wird mit X-WR-CALNAME, X-WR-TIMEZONE etc. angereichert.
 . `saveICS(teamId, type, ics)` schreibt die Datei nach `generated/{teamId}_{type}.ics`.
 . Vor der Verarbeitung der aktuellen Saison ruft `cronUpdate.js` pro Team `updateArchiveForTeam()` aus `seasonArchive.js` auf (siehe Szenario 3 für den Rolling-Update-Mechanismus).
-. Nach allen Teams: `metadata.json` wird je Team mit Update-Zeitstempel, Spielzahlen, `logoUrl`, `teamAkjId`, `teamNumber` und einem `matches`-Array geschrieben. Das `matches`-Array enthält alle Spiele der aktuellen Saison, ermittelt per `currentSeasonId(matches)` (höchste vorkommende `seasonId` in den Roh-API-Daten des Teams — siehe ADR-009-Update), gefiltert und aufsteigend nach Datum sortiert. Jeder Eintrag enthält: `date`, `time`, `opponent`, `isHome`, `result` (null = noch nicht gespielt), `competition` (Liga-Name), `isNext` (erstes Spiel ohne Ergebnis). Die `logoUrl` wird direkt konstruiert: `https://www.basketball-bund.net/media/team/{teamPermanentId}/logo` — kein zusätzlicher API-Aufruf. Ein Team, das nicht mehr in der aktuellen API-Team-Liste auftaucht, wird stattdessen unverändert aus dem vorherigen Lauf übernommen und mit `notCurrentlyListed: true` markiert (siehe ADR-014).
-. GitHub Actions führt danach `npm run generate-html` aus, das `index.html` aus `metadata.json` erzeugt (Tab-UI mit Logos, ARIA-Tab-Pattern, eingebettetem Keyboard-Nav-JS). Jeder Tab-Panel zeigt oben den gefilterten Spielplan (Alle/Heim/Auswärts) mit H/A-Badges und Wettbewerbs-Label, darunter die Kalender-Abo-Buttons.
+. Nach allen Teams: `metadata.json` wird je Team mit Update-Zeitstempel, Spielzahlen, `logoUrl`, `teamAkjId`, `teamNumber` und einem `matches`-Array geschrieben. Das `matches`-Array enthält alle Spiele der aktuellen Saison, ermittelt per `currentSeasonId(matches)` (höchste vorkommende `seasonId` in den Roh-API-Daten des Teams — siehe ADR-009-Update), gefiltert und aufsteigend nach Datum sortiert. Jeder Eintrag enthält: `date`, `time`, `opponent`, `isHome`, `result` (null = noch nicht gespielt), `competition` (Liga-Name), `isNext` (erstes Spiel ohne Ergebnis). Die `logoUrl` wird direkt konstruiert: `https://www.basketball-bund.net/media/team/{teamPermanentId}/logo` — kein zusätzlicher API-Aufruf. Ein Team, das nicht mehr in der aktuellen API-Team-Liste des Clubs auftaucht, wird stattdessen unverändert aus dem vorherigen Lauf (`metadata.json` im Club-Verzeichnis) übernommen und mit `notCurrentlyListed: true` markiert (siehe ADR-014).
+. `cronUpdate.js` ruft direkt im Anschluss `genHTML()` je Club auf, das `index.html` aus `metadata.json` erzeugt (Tab-UI mit Logos, ARIA-Tab-Pattern, eingebettetem Keyboard-Nav-JS). Ein separater `npm run generate-html`-CI-Schritt existiert nicht mehr. Jeder Tab-Panel zeigt oben den gefilterten Spielplan (Alle/Heim/Auswärts) mit H/A-Badges und Wettbewerbs-Label, darunter die Kalender-Abo-Buttons.
 . Das `generated/`-Verzeichnis wird als GitHub Pages Artefakt hochgeladen und deployed.
 
 === Szenario 2: Update-Zyklus mit Cache-MISS (erster Start oder Cache abgelaufen)
@@ -759,31 +1088,38 @@ Dieser Ablauf tritt pro Team bei jedem Update-Zyklus ein, sobald die API für ei
 sequenceDiagram
     participant CU as cronUpdate.js
     participant SA as seasonArchive.js
-    participant FS as generated/archive/
-    CU->>SA: updateArchiveForTeam(team, matches)
+    participant FS as generated/archive/<clubId>/
+    CU->>SA: updateArchiveForTeam(clubId, team, matches)
     SA->>SA: groupBySeasonId(matches)
     SA->>SA: currentSeasonId = höchste seasonId
     loop fuer jede aeltere seasonId in matches
-        SA->>FS: loadArchive(seasonId)
+        SA->>FS: loadArchive(clubId, seasonId)
         SA->>SA: baut/aktualisiert Team-Eintrag
-        SA->>FS: saveArchive(seasonId, status: provisional)
+        SA->>FS: saveArchive(clubId, seasonId, status: provisional)
     end
     loop fuer jede vorhandene Archiv-Datei ohne aktuelle Matches
-        SA->>FS: loadArchive(seasonId)
+        SA->>FS: loadArchive(clubId, seasonId)
         SA->>SA: prüft ob Team-Status provisional
-        SA->>FS: saveArchive(seasonId, status: final)
+        SA->>FS: saveArchive(clubId, seasonId, status: final)
     end
 ----
 
 ==== Ablauf als nummerierte Schritte
 
-. `cronUpdate.js` ruft für jedes Team `updateArchiveForTeam(teamMeta, groupedBySeason, currentSeasonId, ...)` auf, bevor die aktuelle Saison in `metadata.json` verarbeitet wird.
+. `updateClub()` in `cronUpdate.js` ruft für jedes Team `updateArchiveForTeam(clubId, teamMeta, groupedBySeason, currentSeasonId, ...)` auf, bevor das Team in `metadata.json` landet. Das Archiv ist pro Club getrennt (`generated/archive/<clubId>/`, <<adr-026-saison-archiv-pro-club,ADR-026>>) und hängt nicht vom pro Lauf abgeleiteten Bundesland ab.
 . `groupBySeasonId(matches)` gruppiert die rohen API-Matches des Teams nach `ligaData.seasonId`.
 . Für jede Saison außer der aktuellen (`currentSeasonId`, siehe Szenario 1): `buildArchiveTeamEntry()` baut Matches und Wettbewerbe (Tabelle oder Turnierbaum) analog zur Live-Saison-Verarbeitung.
-. Der bestehende Archiv-Eintrag dieser Saison wird geladen (`loadArchive(seasonId)`, falls vorhanden), der Team-Eintrag mit dem neuen Stand überschrieben, `status: 'provisional'` gesetzt, `lastSeenAt` aktualisiert, und die Datei zurückgeschrieben (`saveArchive`).
-. Anschließend werden alle vorhandenen Archiv-Dateien durchsucht: Taucht die Saison eines Teams nicht mehr unter den aktuell von der API gelieferten Matches auf (und ist nicht die aktuelle Saison) und war ihr Status bisher `provisional`, wird sie auf `status: 'final'` gesetzt. Ab diesem Zeitpunkt wird dieser Eintrag nie wieder verändert.
+. Der bestehende Archiv-Eintrag dieser Saison wird aus dem Club-Archiv geladen (`loadArchive(clubId, seasonId)`, falls vorhanden), der Team-Eintrag mit dem neuen Stand überschrieben, `status: 'provisional'` gesetzt, `lastSeenAt` aktualisiert, und die Datei zurückgeschrieben (`saveArchive`).
+. Anschließend werden alle vorhandenen Archiv-Dateien *dieses Clubs* durchsucht: Taucht die Saison eines Teams nicht mehr unter den aktuell von der API gelieferten Matches auf (und ist nicht die aktuelle Saison) und war ihr Status bisher `provisional`, wird sie auf `status: 'final'` gesetzt. Ab diesem Zeitpunkt wird dieser Eintrag nie wieder verändert.
 . `.github/workflows/deploy.yml` committet `generated/archive/**` nach jedem Lauf zurück auf `main` (Schritt „Commit season archive"), da `generated/` sonst als reines Build-Output verloren ginge.
-. `generateHTML.js` liest beim nächsten `npm run generate-html` alle vorhandenen `generated/archive/*.json`-Dateien pro Team (`loadTeamArchives`) und rendert sie als „Archiv"-Tab auf der jeweiligen Team-Seite.
+. `generateHTML.js` liest beim anschließenden `genHTML(..., { outputDir, archiveDir })`-Aufruf desselben Laufs alle `generated/archive/<clubId>/*.json`-Dateien des Clubs pro Team (`loadTeamArchives`) und rendert sie als „Archiv"-Tab auf der jeweiligen Team-Seite.
+
+==== Fehlerfälle und Multi-Club-Verhalten
+
+* *Archiv-Fehler eines Teams* (z.B. defekte Archivdatei): `updateClub()` fängt den Fehler pro Team; das Team bleibt mit der aktuellen Saison auf der Club-Seite, in den ICS und auf den Portal-Seiten. `updateAll()` trägt den Club mit `error: 'Archiv: …'` in `failures` ein → Exitcode 1, der Deploy-Job wird am Ende rot, andere Clubs sind nicht betroffen.
+* *Ausgefallener Club* (Exception in `updateClub()`, z.B. Club-API wirft): kein Archiv-Update für diesen Club, keine leeren Archiv-Verzeichnisse; alle übrigen Clubs archivieren normal.
+* *Bundesland-Wechsel*: Liefert die API für einen Club keine Team-Daten (Club fällt auf `bundesweit`), wird sein Archiv nicht angefasst; spielt der Club tatsächlich in einem anderen Verband, wird das Archiv am unveränderten Pfad `generated/archive/<clubId>/` fortgeschrieben und auf der Team-Seite unter dem neuen Bundesland-Pfad angezeigt.
+* *Nicht mehr gemeldete Teams* (`notCurrentlyListed`): Die Persistenz liest die `metadata.json` des vorherigen Laufs aus `generated/<bundesland>/<club-slug>/`. Wechselt das Bundesland des Clubs, findet sie den alten Stand nicht; in CI existiert die vorherige `metadata.json` ohnehin nicht (nur `generated/archive/**` wird versioniert). Das Archiv selbst ist davon unabhängig.
 
 == Verteilungssicht
 
@@ -795,8 +1131,7 @@ Das System kennt zwei Umgebungen: die lokale Entwicklungsumgebung und die Produk
 ----
 flowchart LR
     subgraph LOCAL["Lokale Entwicklung"]
-        DEV["Developer\nMaschine"] --> NS["node src/cronUpdate.js"]
-        DEV --> NH["node src/generateHTML.js"]
+        DEV["Developer\nMaschine"] --> NS["node src/cronUpdate.js\n(ruft genHTML() je Club intern auf)"]
         DEV --> NS2["node src/server.js\nPort 3000"]
     end
     subgraph GITHUB["Produktionsumgebung (GitHub)"]
@@ -806,7 +1141,7 @@ flowchart LR
 
 === GitHub Actions Workflow
 
-Der einzige CI/CD-Workflow ist in `.github/workflows/deploy.yml` definiert.
+Der Deployment-Workflow ist in `.github/workflows/deploy.yml` definiert. Der Workflow `wam-refresh.yml` aktualisiert separat den WAM-Liga-Cache (siehe unten).
 
 ==== Trigger
 
@@ -850,19 +1185,76 @@ Der Workflow benötigt drei spezifische Permissions:
 
 . *Install dependencies* (`npm install`): Installiert alle npm-Abhängigkeiten aus `package.json` (`axios`, `ics`, `express`, `node-cron`). Kein `--ci`-Flag, kein Lockfile-Enforcement.
 
-. *Generate ICS files* (`npm run update` → `node src/cronUpdate.js`): Hauptschritt. Ruft die Basketball-Bund-API ab, erzeugt alle ICS-Dateien und schreibt `metadata.json` in `generated/`.
+. *Generate ICS files and HTML* (`id: generate`, `continue-on-error: true`; `npm run update` → `node src/cronUpdate.js`): Hauptschritt. Iteriert über alle Clubs (`loadClubs()`), ruft je Club die Basketball-Bund-API ab, erzeugt alle ICS-Dateien, schreibt `metadata.json` und ruft `genHTML()` intern auf (pro Club unter `generated/<bundesland>/<club-slug>/`; für Clubs mit `legacyRootOutput: true` zusätzlich nur die Alt-Pfad-ICS direkt unter `generated/`, siehe <<adr-023-wegfall-legacy-html,ADR-023>>), aggregiert danach die Bund-/Land-Seiten (`aggregatePages()`). Ein separater `generate-html`-Schritt existiert seit der Multi-Club-Umstellung nicht mehr — er wäre redundant, da `cronUpdate.js` die HTML-Generierung bereits übernimmt. Endet der Prozess mit Exitcode 1 (Fehler bei einzelnen Clubs oder in der Portal-Aggregation), bricht der Schritt den Job dank `continue-on-error` nicht ab; das Ergebnis steht in `steps.generate.outcome` (<<adr-025-fehlerisolation-pro-club,ADR-025>>).
 
-. *Generate HTML* (`npm run generate-html` → `node src/generateHTML.js`): Erzeugt `generated/index.html` aus `metadata.json`.
+. *Verify generated output* (Guard): Bricht den Job mit `::error::` ab, wenn unter `generated/` keine einzige `*.ics`-Datei existiert. So ersetzt ein Totalausfall nicht die funktionierende Seite durch eine leere.
 
-. *Commit season archive* (`stefanzweifel/git-auto-commit-action@v5`): Committet ausschließlich `generated/archive/**` zurück auf den `main`-Branch, mit Commit-Message `chore: update season archive [skip ci]` (das `[skip ci]`-Suffix verhindert, dass dieser Commit den Deploy-Workflow erneut auslöst — sonst würde jeder Lauf einen weiteren Lauf triggern). Autor ist `github-actions[bot]`. Hintergrund: `generated/` ist ansonsten vollständig `.gitignore`t und reines, flüchtiges Build-Output — auf GitHub-Actions-Runnern (ephemer) geht es nach jedem Lauf verloren. Das Saison-Archiv (`src/seasonArchive.js`) muss davon abweichend dauerhaft erhalten bleiben, da die Basketball-Bund-API Match- und Tabellendaten einer abgelaufenen Saison irgendwann endgültig nicht mehr zurückliefert — ohne diesen Commit-Schritt gäbe es keine Möglichkeit, diese Daten zwischen den 6-stündigen Läufen zu bewahren. Details zur Architekturentscheidung siehe ADR-014 in `09-decisions.adoc`. Voraussetzung ist die Permission `contents: write` (siehe oben).
+. *Commit season archive* (`id: archive_commit`, `if: success()`, `continue-on-error: true`, `stefanzweifel/git-auto-commit-action@v5`): Committet ausschließlich `generated/archive/**` — seit <<adr-026-saison-archiv-pro-club,ADR-026>> pro Club `generated/archive/<clubId>/{seasonId}.json`; das Muster `generated/archive/**` und die `.gitignore`-Ausnahme `!/generated/archive/**` erfassen die Unterordner — zurück auf den `main`-Branch, mit Commit-Message `chore: update season archive [skip ci]` (das `[skip ci]`-Suffix verhindert, dass dieser Commit den Deploy-Workflow erneut auslöst — sonst würde jeder Lauf einen weiteren Lauf triggern). Autor ist `github-actions[bot]`. Hintergrund: `generated/` ist ansonsten vollständig `.gitignore`t und reines, flüchtiges Build-Output — auf GitHub-Actions-Runnern (ephemer) geht es nach jedem Lauf verloren. Das Saison-Archiv (`src/seasonArchive.js`) muss davon abweichend dauerhaft erhalten bleiben, da die Basketball-Bund-API Match- und Tabellendaten einer abgelaufenen Saison irgendwann endgültig nicht mehr zurückliefert — ohne diesen Commit-Schritt gäbe es keine Möglichkeit, diese Daten zwischen den 6-stündigen Läufen zu bewahren. Details zur Architekturentscheidung siehe <<adr-014-saison-archivierung,ADR-014>> und <<adr-026-saison-archiv-pro-club,ADR-026>> in `09-decisions.adoc`. Voraussetzung ist die Permission `contents: write` (siehe oben).
 
-. *List generated files (debug)* (`ls -la generated/`, `find generated/ -name "*.ics" -ls`): Diagnostik-Schritt, listet alle erzeugten Dateien im Actions-Log.
+. *List generated files (debug)* (`find generated/ -maxdepth 3 -type d`, `find generated/ -name "*.ics" -ls`): Diagnostik-Schritt, listet alle erzeugten Dateien im Actions-Log.
 
 . *Setup Pages* (`actions/configure-pages@v5`): Konfiguriert GitHub Pages für den aktuellen Repository-Kontext.
 
 . *Upload artifact* (`actions/upload-pages-artifact@v3`, `path: ./generated`): Packt das `generated/`-Verzeichnis als Pages-Artefakt.
 
 . *Deploy to GitHub Pages* (`actions/deploy-pages@v5`): Deployed das Artefakt auf GitHub Pages. Gibt die öffentliche URL als Output `page_url` zurück.
+
+. *Fail job if generation or archive commit reported errors* (`if: steps.generate.outcome == 'failure' || steps.archive_commit.outcome == 'failure'`): Markiert den Job nach dem Deployment als fehlgeschlagen (rot), obwohl die übrigen Clubs bereits deployt wurden. Der Fehler bleibt so sichtbar.
+
+==== Zusammenspiel Fehlertoleranz und Archiv-Commit
+
+Reihenfolge: *Generate* (`continue-on-error`) → *Verify generated output* (Guard) → *Commit season archive* → Debug-Listing → Pages-Setup/Upload/Deploy → *Fail job …*.
+
+[cols="3,2,2,2", options="header"]
+|===
+| Situation | Archiv-Commit | Deploy | Job-Status
+
+| Alle Clubs erfolgreich
+| ja
+| ja
+| grün
+
+| Teilfehler (einzelne Clubs, Portal-Aggregation oder Archiv-Fehler eines Clubs; `npm run update` endet mit Exitcode 1, mindestens eine ICS vorhanden)
+| ja — `continue-on-error` am Generate-Schritt lässt `success()` wahr; die Archive der erfolgreichen Clubs werden gesichert
+| ja
+| rot (letzter Schritt)
+
+| Totalausfall (keine einzige ICS-Datei)
+| nein — der Guard schlägt fehl, alle Folgeschritte werden übersprungen
+| nein
+| rot
+
+| Push des Archiv-Commits scheitert (z.B. `main` hat sich während des Laufs bewegt)
+| fehlgeschlagen (`continue-on-error`)
+| ja — das Deployment hängt nicht am Archiv-Commit
+| rot (letzter Schritt)
+|===
+
+*Bewusste Konsequenz (ADR-025):* Der Guard prüft ausschließlich auf ICS-Dateien, nicht auf `generated/index.html` — Kalender-Abos haben Vorrang. Fehlt `portal.json`, werden keine Bund-/Land-Seiten erzeugt; es wird dennoch (mit den ICS und den Club-Seiten) deployt und der Job anschließend rot markiert.
+
+==== Workflow wam-refresh.yml (WAM-Liga-Cache)
+
+Der Workflow `.github/workflows/wam-refresh.yml` aktualisiert quartalsweise den versionierten Cache `data/wam-ligen-cache.json` (<<adr-021-wam-cache-versioniert,ADR-021>>).
+
+[cols="2,4", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| Trigger
+| `schedule: cron: '0 3 1 */3 *'` (03:00 UTC am 1. Januar/April/Juli/Oktober) und manuell über `workflow_dispatch`. Schedule-Workflows laufen nur auf dem Default-Branch; auf anderen Branches ist nur `workflow_dispatch` nutzbar.
+
+| Berechtigung
+| `contents: write` (Commit des Caches ins Repository)
+
+| Schritte
+| `actions/checkout@v5`, `actions/setup-node@v5` (Node.js 24, npm-Cache), `npm ci`, `npm run wam:refresh`, dann Commit von `data/wam-ligen-cache.json` mit der Message `chore(data): refresh WAM liga cache [skip ci]` (nur bei Änderungen) und Push.
+
+| Fehlerfall
+| Wurde ein Verband nur unvollständig abgerufen, endet `npm run wam:refresh` mit Fehler; der Job bricht ab und es wird nichts committet (<<adr-022-graceful-degradation-wam-cache,ADR-022>>).
+
+| Deployment
+| Ein Push mit `GITHUB_TOKEN` löst keine Workflows aus; der neue Cache wird spätestens vom nächsten 6-Stunden-Lauf von `deploy.yml` übernommen.
+|===
 
 ==== Concurrency-Steuerung
 
@@ -916,8 +1308,12 @@ Der Workflow hat zwei parallele Jobs:
 | Führt `node --test tests/e2e/*.test.js` aus — alle Unit- und E2E-Tests mit Node.js built-in test runner.
 
 | `accessibility`
-| Installiert Playwright + Chromium, führt `npx playwright test` aus (WCAG 2.1 AA Tests via axe-core). Lädt den Playwright HTML Report als Artifact hoch (30 Tage aufbewahrt, abrufbar unter Actions → Run → Artifacts).
+| Installiert Playwright + Chromium, führt `npx playwright test --grep-invert @network` aus (WCAG 2.1 AA Tests via axe-core, UI-Tests; ohne die Live-API-Smoke-Tests, damit PRs nicht von basketball-bund.net abhängen). Lädt den Playwright HTML Report als Artifact hoch (30 Tage aufbewahrt, abrufbar unter Actions → Run → Artifacts).
 |===
+
+==== Workflow api-smoke.yml (API-Vertragstests)
+
+Der Workflow `.github/workflows/api-smoke.yml` führt wöchentlich (montags 05:00 UTC) sowie manuell (`workflow_dispatch`) die `@network`-Tests aus `tests/ui/api.spec.js` aus (`npx playwright test --project=chromium-ui --grep @network`). Sie prüfen gegen die Live-API die Felder, die der Code aus allen sieben genutzten Endpunkten liest (`club/actualmatches`, `team/matches`, `match/matchInfo`, `competition/table`, `competition/spielplan` samt `matchday`, `wam/liga/list`), inklusive der von der OpenAPI-Spec abweichenden flachen WAM-Antwortform (<<adr-021-wam-cache-versioniert,ADR-021>>) und des `ligaId`-Joins zwischen Match-Daten und WAM. Fehlen in der Saison passende Daten (Saisonpause, kein Pokal), werden einzelne Tests übersprungen. Ein roter Lauf meldet eine geänderte Antwortform; er blockiert weder PRs noch den Deploy. Bei Fehlern wird der Playwright-Report als Artifact `api-smoke-report` hochgeladen.
 
 ==== Playwright Report Artifact
 
@@ -927,15 +1323,20 @@ Nach jedem Accessibility-Job-Lauf (auch bei Fehlern, `if: always()`) wird `playw
 
 ....
 generated/
-├── {teamId}_all.ics       # Alle Spiele eines Teams
-├── {teamId}_home.ics      # Nur Heimspiele
-├── {teamId}_away.ics      # Nur Auswärtsspiele
-├── ... (3 Dateien pro Team)
-├── metadata.json          # Update-Metadaten für HTML-Generator
-├── teams-cache.json       # Team-Cache (effektiv nur lokal relevant)
-├── archive/                # Archivierte Vorjahres-Saisons (persistiert via Git-Commit, siehe oben)
-│   └── {seasonId}.json     # Ein File pro Saison, alle Teams enthalten
-└── index.html              # Übersichtsseite mit Subscription-Links
+├── index.html                  # Bund-Startseite (aggregatePages)
+├── impressum.html, datenschutz.html, barrierefreiheit.html   # Portal-Rechtsseiten
+├── <bundesland>/               # z.B. bayern/, bundesweit/
+│   ├── index.html              # Land-Seite
+│   └── <club-slug>/
+│       ├── index.html          # Club-Startseite
+│       ├── metadata.json       # Team-Metadaten (inkl. notCurrentlyListed-Teams)
+│       ├── teams/{teamId}.html # Team-Seiten (mit Archiv-Tab, falls Archivdaten vorhanden)
+│       └── {teamId}_{type}.ics # 3 Dateien pro Team (all/home/away)
+├── {teamId}_{type}.ics         # Alt-Pfad-ICS nur für Clubs mit legacyRootOutput: true
+├── teams-cache-<clubId>.json   # Team-Cache pro Club (effektiv nur lokal relevant)
+└── archive/                    # Saison-Archiv (persistiert via Git-Commit, siehe oben)
+    └── <clubId>/
+        └── {seasonId}.json     # Eine Datei pro Club und Saison, alle Teams dieses Clubs
 ....
 
 === Nutzer-Subscription
@@ -1213,6 +1614,7 @@ a|
 * Negative: Keine Echtzeit-Updates (Client bestimmt die Sync-Frequenz, typischerweise stündlich). Keine bidirektionale Synchronisation möglich (Nutzer können keine Events bearbeiten).
 |===
 
+[[adr-002-eine-clubid-als-einzige-konfiguration]]
 === ADR-002: Eine clubId als einzige Konfiguration
 
 [cols="2,5", options="header"]
@@ -1220,7 +1622,7 @@ a|
 | Aspekt | Inhalt
 
 | *Status*
-| Akzeptiert
+| Ersetzt durch <<adr-018-verzeichnis-pro-club,ADR-018>> (Verzeichnis pro Club; die zugehörige Bundesland-Ableitung steht in <<adr-017-automatische-bundesland-ableitung,ADR-017>>), Multi-Club-Umbau, 2026-09
 
 | *Datum*
 | 2024
@@ -1593,6 +1995,7 @@ a|
 * CSS: `.result-icon`, `.result-icon--win`, `.result-icon--loss` in `buildSharedStyles`
 |===
 
+[[adr-014-saison-archivierung]]
 === ADR-014: Saison-Archivierung mit Rolling-Update-Mechanismus und Persistenz nicht gemeldeter Teams
 
 [cols="2,5", options="header"]
@@ -1600,7 +2003,7 @@ a|
 | Aspekt | Inhalt
 
 | *Status*
-| Akzeptiert
+| Akzeptiert; Speicherort im Multi-Club-Betrieb präzisiert durch <<adr-026-saison-archiv-pro-club,ADR-026>> (`generated/archive/<clubId>/{seasonId}.json` statt `generated/archive/{seasonId}.json`)
 
 | *Datum*
 | 2026-09-08
@@ -1661,6 +2064,396 @@ a|
 a|
 * Positive: Korrekte, stabile Team-Labels unabhängig von Array-Reihenfolge; keine geratene Nummerierung mehr; einheitliche Formatierung ("Herren"/"Damen" bzw. "{Altersklasse}{m\|w}") über alle Aufrufer hinweg.
 * Negative: Für alte oder unvollständige `metadata.json`-Einträge (geschrieben vor diesem Fix, ohne `teamAkjId`/`teamNumber`) greift ein weniger präziser Fallback (`teamLabel()`, rohe API-Teamname + Altersgruppe ohne Nummerierung), bis der nächste Update-Zyklus die Felder nachliefert.
+|===
+
+[[adr-016-alt-pfad-duplikat-ausgabe]]
+=== ADR-016: Dauerhafte Alt-Pfad-Duplikat-Ausgabe statt Redirects für Bestandsclubs
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Teilweise ersetzt durch <<adr-023-wegfall-legacy-html,ADR-023>> (HTML-Anteil; die ICS-Duplikate gelten unverändert)
+
+| *Datum*
+| 2026-09-22
+
+| *Kontext*
+| Der Umbau auf ein Multi-Club-Datenmodell verschiebt die ICS- und HTML-Ausgabe vom bisherigen flachen Pfad (`generated/{teamId}_{type}.ics`, `generated/teams/{teamId}.html`) auf einen verschachtelten Pfad (`generated/<bundesland>/<club-slug>/...`). Zum Zeitpunkt des Umbaus existieren bereits von Nutzern abonnierte Kalender-Links auf den alten, flachen Pfad. GitHub Pages bietet keine serverseitigen Redirects für Verzeichnisse, und Kalender-Clients (Kalender.app, Google Calendar) folgen keinen HTML-Meta-Redirects bei `.ics`-Abrufen.
+
+| *Entscheidung*
+| Für Clubs, die zum Zeitpunkt des v1→v2-Übergangs bereits unter dem alten flachen Pfad liefen (markiert über `legacyRootOutput: true` in der jeweiligen `clubs/<bundesland>/<club>/config.json`), wird die ICS- und HTML-Ausgabe dauerhaft zusätzlich an ihrem alten Pfad erzeugt — als vollständiges Duplikat neben der neuen verschachtelten Struktur, nicht als Weiterleitung. Die Alt-Pfad-ICS-Dateien enthalten zusätzlich ein einmaliges, ganztägiges Hinweis-VEVENT mit der neuen Abo-URL; die Alt-Pfad-HTML-Seiten erhalten einen sichtbaren Migrationsbanner. Neue, nach dem Umbau hinzugefügte Clubs bekommen `legacyRootOutput` nicht gesetzt und somit ausschließlich die neue Struktur.
+
+| *Begründung*
+a|
+* Ein 404 auf einem abonnierten `.ics`-Link wird von Kalender-Clients unterschiedlich behandelt (teils stilles Nichtaktualisieren, teils Fehleranzeige) — beides ist für Nutzer unbefriedigend und für den Betreiber schwer zu diagnostizieren.
+* Ein Datei-Duplikat ist bei der überschaubaren Datenmenge dieses Projekts (ICS-Dateien im Kilobyte-Bereich) technisch vernachlässigbar teuer.
+* Das Hinweis-VEVENT erreicht Nutzer direkt im Kalender, ohne dass sie die Webseite erneut besuchen müssen — die reine Website-Banner-Lösung allein hätte Nutzer nicht erreicht, die nur noch den Kalender-Feed nutzen.
+* Es gibt bewusst keinen automatischen Abschaltzeitpunkt für die Alt-Pfad-Ausgabe in diesem ADR — das Entfernen ist eine spätere, manuelle Entscheidung, sobald die Migration der Nutzer als abgeschlossen gilt.
+
+| *Konsequenzen*
+a|
+* Positive: Kein bestehendes Kalender-Abo bricht durch den Umbau. Nutzer werden sowohl über die Website als auch direkt im Kalender auf die neue URL hingewiesen.
+* Negative: Doppelte Dateierzeugung und doppelter Speicherplatz für Clubs mit `legacyRootOutput: true` (dauerhaft, bis manuell entfernt). Der Alt-Pfad-Mechanismus ist technische Schuld, die nur für den/die zum Umbauzeitpunkt bereits laufenden Bestandsclub(s) gilt und bewusst nicht generalisiert wird.
+|===
+
+[[adr-017-automatische-bundesland-ableitung]]
+=== ADR-017: Automatische statt manuelle Bundesland-Zuordnung pro Club
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-22
+
+| *Kontext*
+| Der Multi-Club-Umbau organisiert Clubs über eine Bundesland-Ebene in der URL-Struktur (`generated/<bundesland-slug>/<club-slug>/...`). Ein Verein kann Teams in mehreren Ligen und damit mehreren Landesverbänden gleichzeitig haben (z.B. Jugendteams in einer Bezirksliga, eine Herrenmannschaft in einer bundesweiten Liga), und diese Zusammensetzung ändert sich über Zeit durch Auf- und Abstieg.
+
+| *Entscheidung*
+| Das Bundesland eines Clubs wird bei jedem Cron-Lauf neu aus den ohnehin abgerufenen API-Liga-Daten berechnet (`src/verbandMapping.js`, `deriveClubBundesland`): für jedes Team wird der Verband seiner aktuellen Liga ermittelt (`verbandId`), Verbände die auf keinen einzelnen Bundesland abbilden (z.B. bundesweite Ligen) werden ignoriert, und das häufigste verbleibende Bundesland gewinnt. Der Ordnername unter `clubs/<bundesland-slug>/<club-slug>/` im Quellbaum ist davon unabhängig — er ist nur eine Organisationshilfe für Menschen im Repo und wird nicht als Datenquelle verwendet.
+
+| *Begründung*
+a|
+* Eine manuell gepflegte Bundesland-Zuordnung würde bei jedem Auf-/Abstieg zwischen Landesverbänden veralten und müsste manuell nachgepflegt werden — die API liefert diese Information aber bereits strukturiert (`verbandId`/`verbandName` in `ligaData`).
+* Die Mehrheitsregel bildet die tatsächliche regionale Verwurzelung eines Vereins ab, auch wenn einzelne Mannschaften bundesweit spielen.
+* Die Trennung zwischen Repo-Ordnername (Mensch-lesbare Organisation) und berechnetem Wert (verbindliche Quelle) vermeidet, dass ein falsch benannter Ordner stillschweigend zu einer falschen URL führt.
+
+| *Konsequenzen*
+a|
+* Positive: Keine manuelle Pflege der Bundesland-Zuordnung nötig, bleibt automatisch korrekt bei Liga-Wechseln.
+* Negative: Ein Club kann bei einem Cron-Lauf theoretisch das Bundesland wechseln (wenn sich die Mehrheitsverhältnisse seiner Ligen ändern), was seine URL ändert und dadurch bestehende Links auf diesen Club brechen könnte — dieses Risiko ist für die aktuell einzige betroffene Konstellation (Fibalon, `legacyRootOutput: true`, siehe <<adr-016-alt-pfad-duplikat-ausgabe,ADR-016>>) durch die Alt-Pfad-Duplikat-Ausgabe abgefedert, gilt aber uneingeschränkt für alle künftig hinzukommenden Clubs ohne diese Absicherung.
+|===
+
+[[adr-018-verzeichnis-pro-club]]
+=== ADR-018: Verzeichnis-pro-Club (`clubs/<bundesland>/<club>/config.json`) statt zentraler Config-Datei mit Array
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-22
+
+| *Kontext*
+| Ersetzt <<adr-002-eine-clubid-als-einzige-konfiguration,ADR-002>>: Das Projekt unterstützt jetzt mehrere Clubs. Es musste entschieden werden, ob deren Konfiguration in einer einzigen Datei (z.B. `config.json` mit einem `clubs`-Array) oder über mehrere Dateien organisiert wird.
+
+| *Entscheidung*
+| Jeder Club bekommt eine eigene `config.json` unter `clubs/<bundesland-slug>/<club-slug>/`. Ein neues Modul `src/clubs.js` (`loadClubs`) liest diese Struktur rekursiv ein.
+
+| *Begründung*
+a|
+* Neue Vereine werden über einen neuen Ordner hinzugefügt, nicht über eine Änderung an einer bestehenden, gemeinsam genutzten Datei — das minimiert Merge-Konflikte, wenn mehrere Vereine gleichzeitig via Pull Request hinzugefügt oder geändert werden.
+* Die Ordnerstruktur macht das Repo für Menschen navigierbar, ohne eine große JSON-Datei durchsuchen zu müssen.
+* Passt zu dem in <<adr-017-automatische-bundesland-ableitung,ADR-017>> etablierten Prinzip, dass der Ordnername nur Organisationshilfe ist.
+
+| *Konsequenzen*
+a|
+* Positive: Isolierte, unabhängig review- und mergebare Änderungen pro Club. Einfaches Onboarding: ein neuer Ordner mit einer `config.json` genügt.
+* Negative: Ein Überblick über alle Clubs auf einmal erfordert das Einlesen mehrerer Dateien (`loadClubs` kapselt das), statt eine einzige Datei zu öffnen.
+|===
+
+[[adr-019-testbreite-multi-club]]
+=== ADR-019: Mindestbreite für Multi-Club-Orchestrierungstests (9 Clubs, 6+ Bundesländer, 1 bundesweit)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-22
+
+| *Kontext*
+| Beim End-to-End-Test gegen die reale Basketball-Bund.net-API mit 10 echten Clubs aus 9 verschiedenen Bundesländern wurde ein kritischer Bug gefunden: Der Teams-Cache in `src/storage.js` war eine einzige globale Datei ohne Club-Bezug, sodass jeder Club nach dem ersten stillschweigend die gecachte Team-Liste des ERSTEN Clubs erhielt — falsche Teams, falsche Spiele, falsch hergeleitetes Bundesland. Keiner der zu diesem Zeitpunkt 176 bestehenden Tests fand diesen Bug, weil kein Integrationstest, der `updateAll()`/`updateClub()` aufruft, mit mehr als zwei Clubs gleichzeitig testete (der bis dahin einzige Multi-Club-Test deckte genau zwei Clubs ab).
+
+| *Entscheidung*
+| Integrationstests, die `updateAll()`/`updateClub()` aufrufen und clubübergreifendes Orchestrierungsverhalten prüfen (nicht reine Einzelfunktionslogik), müssen mit mindestens 9 Clubs aus mindestens 6 verschiedenen Bundesländern testen, plus mindestens einem Club, dessen Teams ausschließlich in bundesweiten Wettbewerben spielen (verbandId ohne Bundesland-Zuordnung, z.B. Bundesligen). Diese Regel ist in `CLAUDE.md` unter „Testregeln“ verbindlich festgehalten.
+
+| *Begründung*
+a|
+* Die eigentliche Eigenschaft — keine Datenlecks zwischen Clubs — ließe sich bereits mit zwei Clubs nachweisen (siehe der bestehende Zwei-Club-Regressionstest). Die höhere Schwelle ist bewusst deutlich über diesem Minimum gewählt, damit ein Test nicht nur "gerade so" die Mindestanforderung einer zweiten Instanz erfüllt, sondern echte Vielfalt erzwingt.
+* 9 Clubs über mindestens 6 Bundesländer stellen sicher, dass ein Test gleichzeitig mehrere Klassen von Kollisionsrisiken abdeckt, die bei nur zwei Clubs unsichtbar bleiben können: echte Bundesland-Gruppierung (mehrere Clubs im selben Bundesland, um Verwechslung innerhalb einer Gruppe auszuschließen), alphabetisch benachbarte Bundesland-Slugs (die sich bei fehlerhafter String-Verarbeitung eher gegenseitig überschreiben würden) und Verarbeitungsreihenfolge-Effekte, die bei nur zwei Elementen zufällig unauffällig bleiben können.
+* Der verpflichtende bundesweite Club deckt den einzigen Sonderfall ab, der nicht über die "Mehrheits-Bundesland"-Logik läuft (siehe <<adr-017-automatische-bundesland-ableitung,ADR-017>>), sondern direkt auf `bundesweit` fällt — ein Bug, der nur diesen Pfad betrifft, würde von einer reinen Bundesland-zu-Bundesland-Stichprobe nicht gefunden.
+* Die konkrete Zahl 9 ist damit kein Zufallswert, sondern die kleinste Zahl, mit der sich 6+ Bundesländer UND mindestens eine Bundesland-Gruppe mit mehr als einem Club UND ein bundesweiter Sonderfall gleichzeitig in einem einzigen Testlauf realistisch abbilden lassen.
+
+| *Konsequenzen*
+a|
+* Positive: Multi-Club-Orchestrierungsbugs, die nur bei echter Vielfalt auftreten (wie der Cache-Contamination-Bug), werden künftig vor dem Merge gefunden statt erst im realen Cron-Lauf.
+* Negative: Neue Multi-Club-Integrationstests sind aufwändiger zu schreiben und langsamer in der Ausführung als ein einfacher Zwei-Club-Test (siehe `tests/e2e/cron-update-integration.test.js` für das etablierte Muster mit einer einzigen Clubs-Tabelle als Quelle der Wahrheit für Mock-Setup und erwartete Pfade).
+|===
+
+[[adr-020-aggregation-aus-laufzeit-ergebnissen]]
+=== ADR-020: Bund-/Land-Aggregation aus den Laufzeit-Ergebnissen statt aus `metadata.json`-Dateien
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-29
+
+| *Kontext*
+| Für die Bund-/Land-Seiten müssen die Daten aller Clubs zusammengeführt werden. Zwei Wege standen zur Wahl: (a) die pro Club geschriebenen `metadata.json`-Dateien unter `generated/` nach der Club-Schleife wieder einlesen, (b) die von `updateClub()` ohnehin zurückgegebenen Ergebnisse (`{ club, bundesland, meta }`) direkt weiterreichen.
+
+| *Entscheidung*
+| `aggregatePages(results, …)` (`src/aggregatePages.js`) erhält die Ergebnisliste von `updateAll()` im Speicher. Clubs mit leeren Team-Daten (`meta.length === 0`, z.B. API-Ausfall) werden auf den Portal-Seiten nicht aufgelistet.
+
+| *Begründung*
+a|
+* Kein Wieder-Einlesen von Dateien: keine veralteten Ordner entfernter Clubs (`generated/<land>/<club>/` bliebe sonst bei lokalen Läufen liegen und würde weiter gelistet), kein Widerspruch zwischen Datei-Quelle und Config-Quelle (Banner-Bedingung), keine Sonderbehandlung des Legacy-Roots.
+* Die Alternative (Datei-basiert) bleibt für ein späteres Matrix-Batching (Plan C) offen: ein Merge-Job kann die Ergebnisliste aus `metadata.json`-Dateien rekonstruieren und dieselbe Funktion aufrufen. Das ist bewusst NICHT Teil von Plan B (YAGNI).
+* Ohne den Leer-Filter würde ein API-Ausfall einen Club unter `bundesweit` ohne Teams auf der Bund-Seite erscheinen lassen.
+
+| *Konsequenzen*
+a|
+* Positive: einfachere Datenquelle, deterministisch pro Lauf.
+* Negative: `aggregatePages` ist an den Prozesslauf gekoppelt; ein separater Aggregationslauf ohne Club-Verarbeitung ist erst mit einem Loader möglich.
+|===
+
+[[adr-021-wam-cache-versioniert]]
+=== ADR-021: Quartalsweiser, versionierter WAM-Cache statt Live-Abruf pro Cron-Lauf
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-29
+
+| *Kontext*
+| `POST /rest/wam/liga/list?startAtIndex=<n>` (Body `{"token":0,"verbandIds":[<id>]}`) liefert paginiert (10/Seite, Antwort unter `data.ligen`, Fortsetzung über `hasMoreData`) alle Ligen eines Verbands inkl. Ebene (`skEbeneId` 0/1/2) und Bezirk/Kreis. Der Endpunkt ist in der OpenAPI-Spec des basketball-bund-api-Repos beschrieben (Tag `WAM`, operationId `searchLigen`). Abweichung Spec ↔ Realität (live geprüft am 2026-09-29): Die Spec beschreibt die Antwort verschachtelt unter `data.ligaListe.{ligen,hasMoreData,size}`, die reale API liefert `ligen`, `hasMoreData` und `size` flach unter `data`; der Client folgt der Realität. Bayern: 40 Seiten, ~391 Ligen (inkl. 9 Ligen mit `verbandId` 32). Verifiziert am 2026-09-29: alle 8 `ligaData.ligaId`-Werte aus `club/id/4468/actualmatches` kommen in der WAM-Liste vor — die `ligaId` ist der Join-Schlüssel zwischen Match-Daten und WAM.
+
+| *Entscheidung*
+| Die WAM-Daten werden alle 3 Monate per Workflow (`wam-refresh.yml`, `scripts/refresh-wam-cache.js`) für die Verbände der eingebundenen Bundesländer abgerufen und als `data/wam-ligen-cache.json` im Repo versioniert. Der 6-Stunden-Cron liest nur den Cache. TTL: 150 Tage (`WAM_CACHE_TTL_MS`, `src/wamCache.js`). Zugriff über `src/wamClient.js` (sequenzielle Pagination, `startAtIndex` als Query-Parameter).
+
+| *Begründung*
+a|
+* 40+ Requests pro Verband bei jedem 6-Stunden-Lauf wären unverhältnismäßig für Daten, die sich pro Saison ändern; der Cache hält die API-Last niedrig (Rate-Limit ~1 req/s).
+* Versionierung im Repo macht Änderungen nachvollziehbar und den Deploy unabhängig von WAM-Verfügbarkeit.
+* TTL 150 Tage statt exakt einem Quartal, damit der Cache kurz vor jedem Refresh nicht als veraltet gilt.
+* Es gibt keine Stabilitätszusage der Plattform für diesen Endpunkt; er kann sich ändern — der Cache entkoppelt das Portal davon.
+
+| *Konsequenzen*
+a|
+* Positive: geringe Last, deterministische Builds, Struktur für die spätere "alle Ligen bundesweit"-Vision liegt bereit.
+* Negative: Liga-Metadaten sind bis zu ~3 Monate alt; Schedule-Workflows laufen nur auf dem Default-Branch (auf `v2` nur per `workflow_dispatch` testbar); Pushes mit `GITHUB_TOKEN` lösen kein Deployment aus, der nächste 6-Stunden-Lauf übernimmt den Cache.
+|===
+
+[[adr-022-graceful-degradation-wam-cache]]
+=== ADR-022: Graceful Degradation bei fehlendem/veraltetem WAM-Cache und Erhalt des alten Stands bei Teilabrufen
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-29
+
+| *Kontext*
+| Der WAM-Cache ist eine Anreicherung (Gruppierung der Land-Seiten nach Ebene/Bezirk/Kreis), keine Voraussetzung für die Seiten. Zudem kann ein Abruf mitten in der Pagination fehlschlagen.
+
+| *Entscheidung*
+| (1) Fehlt der Cache, ist er unlesbar oder älter als 150 Tage, erzeugt `aggregatePages` die Land-Seiten trotzdem — flach, alphabetisch, ohne Ebenen-Gruppierung — und loggt `console.warn`; der Lauf bricht nie ab. (2) `fetchLeaguesForVerband` liefert `{ ligen, complete }`. Schlägt eine Seite fehl, ist `complete=false`; `refreshWamCache` übernimmt dann für diesen Verband den ALTEN Cache-Stand (oder lässt ihn weg, falls keiner existiert), vermerkt ihn in `partialVerbandIds` und der Refresh-Job endet mit Fehlerstatus (kein Commit). Für `bundesweit` gibt es keine Anreicherung.
+
+| *Begründung*
+a|
+* Portal-Seiten dürfen nicht von der Verfügbarkeit eines externen Endpunkts ohne Stabilitätszusage abhängen.
+* Ein Teilabruf mit frischem `generatedAt` würde Lücken tarnen und einen guten Cache durch einen schlechteren ersetzen.
+
+| *Konsequenzen*
+a|
+* Positive: Robustheit; Fehler bleiben in CI sichtbar.
+* Negative: Ohne Cache sind die Land-Seiten weniger strukturiert; unbekannte Ligen erscheinen unter "Weitere Ligen".
+|===
+
+[[adr-023-wegfall-legacy-html]]
+=== ADR-023: Wegfall der Alt-Pfad-HTML — Rückwärtskompatibilität nur für ICS
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert (ersetzt den HTML-Teil von <<adr-016-alt-pfad-duplikat-ausgabe,ADR-016>>)
+
+| *Datum*
+| 2026-09-29
+
+| *Kontext*
+| <<adr-016-alt-pfad-duplikat-ausgabe,ADR-016>> ließ Clubs mit `legacyRootOutput: true` (Fibalon) zusätzlich HTML unter dem flachen Alt-Pfad schreiben. Plan B braucht `generated/index.html` für die Bund-Seite. Schützenswert waren immer die Kalender-Abonnenten (ICS-URLs), nicht die HTML-Seite.
+
+| *Entscheidung*
+| `legacyRootOutput` erzeugt nur noch die Alt-Pfad-ICS (`generated/{teamId}_{kind}.ics`, mit Migrations-VEVENT und echten Spielen). Kein `generated/index.html`, keine `generated/teams/*.html`, kein Root-`metadata.json` mehr. `generated/index.html` ist ausschließlich die Bund-Seite; der Migrationshinweis erscheint als generischer Banner darauf (genau dann, wenn mindestens ein Club das Flag hat).
+
+| *Begründung*
+a|
+* Kein Konflikt zweier Schreiber am selben Pfad; die ICS-Garantie bleibt vollständig erhalten.
+* `generated/` ist gitignored und wird pro Deploy frisch gebaut — alte HTML-Dateien verschwinden ohne Migrationsschritt.
+* Der Banner ist generisch, damit er unabhängig von der Anzahl betroffener Clubs korrekt bleibt; die handlungsrelevante neue URL steht im ICS-Migrations-VEVENT.
+
+| *Konsequenzen*
+a|
+* Positive: eindeutige Zuständigkeit für `generated/index.html`.
+* Negative: alte HTML-URLs (z.B. `/teams/<id>.html`) liefern nach dem Deploy 404; bewusst akzeptiert.
+|===
+
+[[adr-024-bundesweit-eigener-block]]
+=== ADR-024: `bundesweit` als eigener Block mit eigener Seite; reservierter Slug `index`
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-29
+
+| *Kontext*
+| Clubs, deren Teams nur in bundesweiten Wettbewerben spielen, haben kein Bundesland (`bundesweit`, siehe <<adr-017-automatische-bundesland-ableitung,ADR-017>>). Die Navigation Bund → Land braucht dafür ein Ziel.
+
+| *Entscheidung*
+| `bundesweit` wird wie ein Bundesland behandelt (eigene Seite `generated/bundesweit/index.html` mit `buildLandPage`), auf der Bund-Seite als Block "Bundesweite Wettbewerbe" nach allen Bundesländern. Keine WAM-Anreicherung. Zusätzlich ist der Slug `index` reserviert (`sanitizeSlug`, `RESERVED_SLUGS`).
+
+| *Begründung*
+a|
+* Einheitliche Navigation ohne Sonderfälle im Nutzerfluss.
+* `index` ist vorsorglich reserviert (mehrdeutige URLs `/land/index` vs. `/land/index.html` bei manchen Servern). Es gibt KEINEN Dateisystem-Konflikt: Ordner `index/` und Datei `index.html` haben verschiedene Namen.
+
+| *Konsequenzen*
+a|
+* Positive: keine Sonderlogik in der Navigation; der bundesweite Fall ist getestet (ADR-019).
+* Negative: `bundesweit` ist ein Pseudo-Bundesland in Slug-Listen und Nav.
+|===
+
+[[adr-025-fehlerisolation-pro-club]]
+=== ADR-025: Fehlerisolation pro Club und tolerantes Deployment
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-29
+
+| *Kontext*
+| `updateAll()` brach bei einem Fehler in einem Club (`sanitizeSlug`, `updateClub`) die gesamte Schleife ab — alle folgenden Clubs und die Aggregation fielen aus.
+
+| *Entscheidung*
+| `updateAll()` fängt Fehler pro Club, loggt sie und gibt `{ results, failures }` zurück. Der CLI-Einstieg setzt `process.exitCode = 1`, wenn `failures` nicht leer ist (auch bei einem Fehler in der Portal-Aggregation, z.B. fehlender `portal.json`). `deploy.yml` führt `npm run update` mit `continue-on-error` aus, prüft, dass mindestens eine ICS-Datei existiert, deployt und markiert den Job am Ende rot. Eine Portal-Seite ohne Impressum wird nie veröffentlicht: fehlt `portal.json` oder sind Pflichtfelder leer, entstehen keine Bund-/Land-Seiten (zum privaten Betrieb ohne Impressum siehe <<adr-027-privater-portalbetrieb,ADR-027>>).
+
+| *Begründung*
+a|
+* Ein defekter Club darf die Kalender aller anderen nicht blockieren; sichtbar bleibt der Fehler über den roten Job.
+* Der ICS-Guard verhindert, dass ein Totalausfall die funktionierende Seite durch eine leere ersetzt.
+* Der Exitcode wird im CLI-Einstieg statt in `updateAll()` gesetzt, damit `node:test`-Läufe nicht beeinflusst werden.
+
+| *Konsequenzen*
+a|
+* Positive: Teilausfälle sind toleriert und trotzdem sichtbar.
+* Negative: Ein Deploy mit Teilfehlern veröffentlicht einen unvollständigen Stand (bewusste Abwägung gegen Totalausfall).
+* Negative: Der Deploy-Guard prüft nur auf ICS-Dateien, nicht auf `generated/index.html`. Ohne `portal.json` wird ohne Bund-/Land-Seiten deployt (Job rot); Kalender-Abos haben Vorrang vor den Portal-Seiten.
+|===
+
+[[adr-026-saison-archiv-pro-club]]
+=== ADR-026: Saison-Archiv pro Club unter `generated/archive/<clubId>/`
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-09-29
+
+| *Kontext*
+a|
+* <<adr-014-saison-archivierung,ADR-014>> (Saison-Archivierung, entstanden im Single-Club-Betrieb) schreibt ein File pro Saison für *alle* Teams: `generated/archive/{seasonId}.json`. Mit der Zusammenführung in den Multi-Club-Zweig (Plan A/B) würden sich darin die Teams aller Clubs vermischen — dieselbe Fehlerklasse wie der geteilte Teams-Cache, der zur Testpolicy <<adr-019-testbreite-multi-club,ADR-019>> geführt hat (ein nicht nach Club gescopter Speicher, dessen Eindeutigkeit implizit angenommen, aber nirgends erzwungen wird).
+* Der Archiv-Tab einer Team-Seite liegt jetzt unter `generated/<bundesland>/<club-slug>/teams/`. Das Bundesland wird bei jedem Lauf aus den Liga-Daten abgeleitet (<<adr-017-automatische-bundesland-ableitung,ADR-017>>) und kann wechseln — insbesondere fällt ein Club bei einem API-Ausfall (keine Team-Daten) auf `bundesweit`.
+* Auf `main` sind zum Zeitpunkt der Entscheidung noch keine Archivdateien committet — es gibt keinen Migrationsbedarf.
+
+| *Entscheidung*
+a|
+* Pfad: `generated/archive/<clubId>/<seasonId>.json`. Schlüssel ist die `clubId` aus `clubs/<bundesland>/<club>/config.json`, nicht `<bundesland>/<club-slug>`.
+* `src/seasonArchive.js`: `saveArchive(clubId, season, data)`, `loadArchive(clubId, season)`, `updateArchiveForTeam(clubId, teamMeta, …)` und `clubArchiveDir(clubId)`. Die `clubId` wird wie im Teams-Cache strikt gegen `/^\d+$/` validiert (`Ungültige clubId: …`), ohne `clubId` wird geworfen (kein stiller globaler Fallback). Die `season`-Validierung (`/^\d{4}$/`) bleibt als Path-Traversal-Schutz bestehen. Neue Archivdateien enthalten zusätzlich das Feld `clubId`.
+* `generateHTML.genHTML(…, { archiveDir })` liest nur das übergebene Club-Archiv; ohne `archiveDir` wird kein Archiv gelesen (kein Fallback auf `generated/archive/`).
+* Ein Archiv-Fehler (z.B. defekte Archivdatei) wird pro Team in `updateClub()` gefangen: das Team bleibt mit seiner aktuellen Saison auf der Club-Seite, in den ICS und auf den Portal-Seiten; `updateAll()` meldet den Club zusätzlich in `failures` (Exitcode 1, Job rot, vgl. <<adr-025-fehlerisolation-pro-club,ADR-025>>).
+* Der CI-Commit-Schritt (`file_pattern: 'generated/archive/**'`) und die `.gitignore`-Ausnahme `!/generated/archive/**` decken die Unterordner ohne Änderung ab.
+
+| *Begründung*
+a|
+* Die `clubId` ist stabil und eindeutig; das Bundesland ist ein pro Lauf berechneter, veränderlicher Wert. Ein Pfad über `<bundesland>/<club-slug>` würde das Archiv bei jedem Bundesland-Wechsel (Auf-/Abstieg, API-Ausfall → `bundesweit`) aufspalten; der Archiv-Tab zeigte dann nur noch einen Teil der Historie.
+* Auch der Club-Slug (Ordnername) ist weniger stabil als die `clubId` (Umbenennung des Ordners) und nicht zwingend bundesweit eindeutig.
+* Strikte Validierung statt Normalisierung verhindert, dass zwei verschiedene `clubId`-Werte auf dasselbe Verzeichnis abgebildet werden, und schützt vor Path-Traversal.
+* Archivdaten sind nicht wiederbeschaffbar (die API liefert alte Saisons irgendwann nicht mehr). Ein Archiv-Fehler darf deshalb weder unbemerkt bleiben (→ `failures`) noch die aktuelle Saison eines Clubs von der Seite nehmen.
+
+| *Konsequenzen*
+a|
+* Positive: Kein Vermischen von Clubs; das Archiv überlebt Bundesland-Wechsel; der bundesweite Club und Clubs verschiedener Bundesländer haben je ein eigenes Archiv. Abgesichert durch `tests/e2e/season-archive-multiclub.test.js` (10-Club-Fixture gemäß <<adr-019-testbreite-multi-club,ADR-019>>, inkl. Rolling-Update über mehrere Läufe, ausgefallenem Club, Bundesland-Wechsel und defekter Archivdatei).
+* Negative: Die Persistenz nicht gemeldeter Teams (`notCurrentlyListed`, <<adr-014-saison-archivierung,ADR-014>>) liest die `metadata.json` des vorherigen Laufs aus dem Club-Ausgabeverzeichnis `generated/<bundesland>/<club-slug>/` — sie ist damit (anders als das Archiv) nicht bundeslandstabil, und in CI existiert die vorherige `metadata.json` ohnehin nicht (`generated/` ist außer dem Archiv nicht versioniert). Die Archivdateien werden nicht bei Club-Entfernung aufgeräumt (bewusst: kein automatisches Löschen historischer Daten).
+|===
+
+[[adr-027-privater-portalbetrieb]]
+=== ADR-027: Privater Portalbetrieb ohne Impressum (Opt-in `private: true`)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-10-02
+
+| *Kontext*
+a|
+* Der Portal-Betreiber ist eine Privatperson, betreibt das Portal nicht geschäftsmäßig und möchte keine Privatadresse in einem Impressum veröffentlichen.
+* Bisher verlangte `portal.json` zwingend `operator`, `address` und `email` (<<adr-025-fehlerisolation-pro-club,ADR-025>>); ohne diese Angaben entstanden keine Portal-Seiten.
+
+| *Entscheidung*
+a|
+* Opt-in per `"private": true` in `portal.json` (nur der Boolean `true` aktiviert den Modus; Strings, Zahlen u.ä. lassen die bisherige strenge Prüfung greifen).
+* Im privaten Modus ist nur `operator` (Name) Pflicht, optional `contactUrl` (muss mit `https://` beginnen, Schutz vor `javascript:`-/`data:`-Links). `address`, `email`, `phone` und `responsible` werden ignoriert und nie ausgegeben.
+* Es wird kein `impressum.html` erzeugt; der Footer der Portal-Seiten zeigt statt des Impressum-Links (falls `contactUrl` gesetzt) einen Link „Kontakt". Datenschutz- und Barrierefreiheitsseite nennen den Namen als Verantwortlichen und verweisen auf den Kontaktlink bzw. „Bitte wenden Sie sich an den Seitenbetreiber."
+* Dies ist eine ausdrückliche Entscheidung des Betreibers. Es handelt sich nicht um eine rechtliche Feststellung und nicht um Rechtsberatung.
+
+| *Begründung*
+a|
+* Betreiber ist Privatperson und betreibt das Portal nicht geschäftsmäßig; die Privatadresse soll nicht veröffentlicht werden.
+* Ein Opt-in mit strikter Boolean-Prüfung verhindert, dass der Modus versehentlich (z.B. durch `"true"`) aktiviert wird; der strenge Modus bleibt der Default.
+
+| *Konsequenzen*
+a|
+* Verantwortung und Risiko der Entscheidung liegen beim Betreiber.
+* Ein Wechsel zurück auf den strengen Modus ist jederzeit möglich: `address`/`email` eintragen und `private` entfernen.
+* Club-Seiten behalten ihre eigenen Impressen (Club-`legal`); sie sind von dieser Betriebsart nicht betroffen.
+* Abgesichert durch Tests in `tests/e2e/portal-config.test.js`, `html-generation.test.js`, `portal-aggregation-integration.test.js` (10-Club-Fixture) und `tests/accessibility/portal.spec.js`.
 |===
 
 == Qualitätsanforderungen
@@ -1872,9 +2665,9 @@ BBB ICS Generator — Qualitätsanforderungen
 | Entweder in `icsGenerator.js` integrieren (GPS-Koordinaten in LOCATION-Property einbinden) oder aus dem Repository entfernen, um Verwirrung zu vermeiden.
 
 | TD-03
-| *Hartcodierte Base-URL in generateHTML.js*: `const BASE_URL = 'https://olieder.github.io/bbb-ics-generator/'` ist direkt im Code — nicht konfigurierbar.
-| Mittel
-| URL in `config.json` als `baseUrl`-Feld auslagern. `generateHTML.js` liest die URL aus der Konfiguration. Ermöglicht Einsatz des Systems für andere Vereine oder unter anderen GitHub-Usernamen ohne Code-Änderung.
+| *Hartcodierte Base-URL in generateHTML.js (durch Multi-Club-Umbau größtenteils behoben)*: `generateHTML.js` enthielt `const BASE_URL = 'https://olieder.github.io/bbb-ics-generator/'` fest im Code. Seit dem Multi-Club-Umbau akzeptiert `genHTML(theme, legal, options)` einen `options.baseUrl`-Parameter, der `DEFAULT_BASE_URL` überschreibt; `cronUpdate.js` berechnet für jeden Club die passende `baseUrl` (`${PORTAL_BASE_URL}${bundesland}/${club.slug}/`, mit `PORTAL_BASE_URL` überschreibbar via Umgebungsvariable `BBB_PORTAL_BASE_URL`) und übergibt sie pro Aufruf. Der ursprünglich vorgesehene Weg — Auslagerung nach `config.json` — existiert nicht mehr in dieser Form, da die Root-`config.json` im Zuge des Umbaus entfernt wurde; funktional äquivalent liest jetzt jeder Club seine eigene `clubs/<bundesland>/<club>/config.json`, und `cronUpdate.js` reicht die daraus abgeleitete `baseUrl` weiter.
+| Niedrig (Restrisiko)
+| Der Konfigurierbarkeits-Mechanismus (`options.baseUrl`) existiert und wird produktiv genutzt — die ursprüngliche technische Schuld ist im Kern behoben. Verbleibendes Restrisiko: `DEFAULT_BASE_URL` und `PORTAL_BASE_URL` sind weiterhin auf `https://olieder.github.io/bbb-ics-generator/` hartcodiert (als Fallback bzw. Default), und `PORTAL_BASE_URL` wird pro Prozess global gesetzt statt pro Club aus der jeweiligen `config.json` gelesen — ein Multi-Owner-Szenario (mehrere Betreiber mit unterschiedlichen GitHub-Pages-Domains in derselben Cron-Ausführung) wäre damit noch nicht abgedeckt.
 
 | TD-04
 | *Kein Linting / Code-Formatting*: Es existieren keine ESLint- oder Prettier-Konfigurationen. Code-Stil ist inkonsistent (z. B. `var` vs. `const`, gemischte Callback- und Promise-Stile).
