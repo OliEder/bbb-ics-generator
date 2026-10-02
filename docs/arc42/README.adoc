@@ -177,7 +177,7 @@ flowchart TD
 
 | *Basketball-Bund REST-API — Tabelle*
 | BBB Vereinsportal ← API (HTTP GET)
-| Endpunkt: `/rest/competition/table/id/{ligaId}`. Liefert die Ligatabelle mit Rang, Teamname, Siege, Niederlagen, Punkte, Körbe, Korbdifferenz.
+| Endpunkt: `/rest/competition/table/id/{ligaId}`. Liefert die Ligatabelle mit Rang, Teamname, Siege, Niederlagen, Punkte, Körbe, Korbdifferenz sowie `data.ligaData.tableExists`/`crossTableExists` (Booleans; Grundlage der Wettbewerbsart-Erkennung für Namen ohne "liga", siehe <<adr-028-wettbewerbsart-erkennung,ADR-028>>).
 
 | *Basketball-Bund REST-API — Spielplan/Turnierplan*
 | BBB Vereinsportal ← API (HTTP GET)
@@ -426,12 +426,13 @@ a|
 * `writeClubIcs(meta, rawTeamData, clubOutputDir)` — ruft `writeIcsVariants` für alle Teams eines Clubs ohne Migrationshinweis auf (neuer, verschachtelter Pfad)
 * `writeLegacyOutput(rawTeamData, baseUrl)` — schreibt für Clubs mit `legacyRootOutput: true` ausschließlich die Alt-Pfad-ICS (`generated/{teamId}_{kind}.ics`, echte Spieldaten plus Migrationshinweis-VEVENT in jeder Variante); kein Alt-Pfad-HTML und kein Root-`metadata.json` mehr (siehe <<adr-023-wegfall-legacy-html,ADR-023>>)
 * `firstVerbandId(matches)` — liefert die `verbandId` des ersten (ungefilterten) Rohspiels eines Teams, das eine besitzt; Basis für die Bundesland-Mehrheitsentscheidung
-* `isLiga(liganame)` — Namensheuristik: enthält der Wettbewerbsname "liga", gilt er als Liga (Tabelle), sonst als Cup/Pokal (Turnierbaum)
+* Wettbewerbsart: `fetchTeamData` löst Wettbewerbe über `competitionKind.resolveCompetition` auf (Liga → Tabelle, Pokal → Turnierbaum; <<adr-028-wettbewerbsart-erkennung,ADR-028>>) und ruft danach `mapMatches(seasonMatches, teamId, details, ligaKindMap)` auf, das je Spiel `isCup` setzt (ohne Map: Namensregel)
 
 | *Schnittstellen (ausgehend)*
 | `clubs.js`: `loadClubs(clubsRootDir)` +
 `verbandMapping.js`: `deriveClubBundesland(teamVerbandIds)` +
-`apiClient.js`: `fetchTeamMatches(teamId)`, `fetchMatchInfo(matchId)`, `fetchClubTeams(clubId)`, `fetchLeagueTable(ligaId, ownTeamId)`, `fetchTournamentRounds(ligaId)`, `mapWithConcurrency(items, limit, mapper)` +
+`apiClient.js`: `fetchTeamMatches(teamId)`, `fetchMatchInfo(matchId)`, `fetchClubTeams(clubId)`, `fetchLeagueTable(ligaId, ownTeamId)`, `fetchLeagueTableWithMeta(ligaId, ownTeamId)`, `fetchTournamentRounds(ligaId)`, `mapWithConcurrency(items, limit, mapper)` +
+`competitionKind.js`: `resolveCompetition(comp, ownTeamId, apiFns)`, `isCupForMatch(match, ligaKindMap)` +
 `icsGenerator.js`: `generateICS(matches, details, teamId, type, teamName, migrationNotice)` +
 `storage.js`: `saveICS(teamId, type, data, outputDir)`, `saveTeamsCache(teams, clubId)`, `loadTeamsCache(clubId)`, `sanitizeSlug(slug)` +
 `seasonArchive.js`: `groupBySeasonId(matches)`, `updateArchiveForTeam(clubId, teamMeta, groupedBySeason, currentSeasonId, details, apiFns)`, `clubArchiveDir(clubId)` +
@@ -506,6 +507,27 @@ a|
 | Keine (reine Funktionen, keine I/O)
 |===
 
+=== Modul: competitionKind.js (neu — Wettbewerbsart-Erkennung)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Beschreibung
+
+| *Verantwortlichkeit*
+| Einzige Implementierung der Klassifikation Liga vs. Pokal/Turnier (<<adr-028-wettbewerbsart-erkennung,ADR-028>>): Namensregel, Auflösung eines Wettbewerbs inkl. Tabelle bzw. Turnierbaum und Fallback-Helfer für die Anzeige-Schicht.
+
+| *Exportierte Funktionen*
+a|
+* `kindFromName(liganame)` → `'cup'` (pokal/cup/turnier/qualifikation) \| `'league'` (enthält "liga") \| `'unknown'`
+* `isLeagueByName(liganame)` → Boolean (nur `'league'`)
+* `resolveCompetition(comp, ownTeamId, apiFns)` → `Promise<{ ...comp, isLiga, table, bracket }>`; bei `'unknown'` genau ein `fetchLeagueTableWithMeta`-Abruf, `crossTableExists === true` → Liga (Zeilen wiederverwendet), sonst/bei Fehler Pokal
+* `compIsLiga(comp)` / `matchIsCup(match)` — Anzeige-Schicht: gespeichertes `comp.isLiga` bzw. `m.isCup`, Namensregel nur als Fallback für alte Daten
+* `isCupForMatch(rawMatch, ligaKindMap)` — von `mapMatches` genutzt (Map `ligaId` → `isLiga`)
+
+| *Abhängigkeiten*
+| Keine (reine Funktionen; `apiFns` werden injiziert)
+|===
+
 === Modul: apiClient.js (API-Facade)
 
 [cols="2,5", options="header"]
@@ -521,6 +543,7 @@ a|
 * `fetchMatchInfo(matchId)` → `MatchInfo \| null` (null bei Fehler)
 * `fetchClubTeams(clubId)` → `Array<Team> \| null` (null bei Fehler, leer wenn keine Matches)
 * `fetchLeagueTable(ligaId, ownTeamId)` → `Array<TableRow> \| null` (null bei Fehler); jede `TableRow` enthält zusätzlich `teamId` (`teamPermanentId` als String oder `null`), mit dem `aggregatePages.js` Tabellenzeilen eingebundener Teams auf die Club-Seite verlinkt
+* `fetchLeagueTableWithMeta(ligaId, ownTeamId)` → `{ rows, tableExists, crossTableExists } \| null` (null bei Fehler); die Flags stammen aus `data.ligaData` der Table-Antwort (in Match-Daten sind sie `null`); `fetchLeagueTable` ist ein dünner Wrapper darauf und liefert nur `rows`
 * `fetchTournamentRounds(ligaId)` → `Array<Round> \| null` (null bei Fehler oder keinen Runden)
 * `mapWithConcurrency(items, limit, mapper)` → `Promise<Array>` (geänderte/neue Funktion, siehe unten)
 
@@ -637,7 +660,7 @@ a|
 | *Exportierte Funktionen*
 a|
 * `groupBySeasonId(matches)` → `{ [seasonId]: Array<Match> }` — gruppiert die rohen API-Matches eines Teams anhand von `ligaData.seasonId`; Matches ohne numerische `seasonId` werden übersprungen.
-* `buildArchiveTeamEntry(teamMeta, seasonMatches, details, apiFns)` → `Promise<ArchiveTeamEntry>` — baut den Archiv-Eintrag eines Teams für eine Saison: aufsteigend sortierte, angereicherte `matches[]` (Gegner, Heim/Auswärts, Ergebnis, Liganame) sowie `competitions[]` mit Tabelle (`fetchLeagueTable`) oder Turnierbaum (`fetchTournamentRounds`) je nach Liga-Heuristik (`isLiga`, gleiche Namens-Heuristik wie ADR-009).
+* `buildArchiveTeamEntry(teamMeta, seasonMatches, details, apiFns)` → `Promise<ArchiveTeamEntry>` — baut den Archiv-Eintrag eines Teams für eine Saison: aufsteigend sortierte, angereicherte `matches[]` (Gegner, Heim/Auswärts, Ergebnis, Liganame) sowie `competitions[]` mit Tabelle (`fetchLeagueTable`) oder Turnierbaum (`fetchTournamentRounds`) je nach Klassifikation über `competitionKind.resolveCompetition` (gleiche Regel wie im aktuellen Lauf, <<adr-028-wettbewerbsart-erkennung,ADR-028>>; fehlt `apiFns.fetchLeagueTableWithMeta`, gelten Namen ohne "liga" als Pokal); `matches[]` tragen `isCup`.
 * `clubArchiveDir(clubId)` → `string` — Archiv-Verzeichnis eines Clubs, `generated/archive/<clubId>/` (Basis überschreibbar via `BBB_ICS_DIR`); legt nichts an.
 * `saveArchive(clubId, season, data)` → `string` (Dateipfad) — schreibt `generated/archive/<clubId>/{seasonId}.json` und legt das Club-Verzeichnis bei Bedarf an.
 * `loadArchive(clubId, season)` → `object \| null` — liest `generated/archive/<clubId>/{seasonId}.json`, `null` wenn nicht vorhanden (ohne Verzeichnis anzulegen).
@@ -1048,7 +1071,7 @@ sequenceDiagram
 . Post-Processing: VCALENDAR-Header wird mit X-WR-CALNAME, X-WR-TIMEZONE etc. angereichert.
 . `saveICS(teamId, type, ics)` schreibt die Datei nach `generated/{teamId}_{type}.ics`.
 . Vor der Verarbeitung der aktuellen Saison ruft `cronUpdate.js` pro Team `updateArchiveForTeam()` aus `seasonArchive.js` auf (siehe Szenario 3 für den Rolling-Update-Mechanismus).
-. Nach allen Teams: `metadata.json` wird je Team mit Update-Zeitstempel, Spielzahlen, `logoUrl`, `teamAkjId`, `teamNumber` und einem `matches`-Array geschrieben. Das `matches`-Array enthält alle Spiele der aktuellen Saison, ermittelt per `currentSeasonId(matches)` (höchste vorkommende `seasonId` in den Roh-API-Daten des Teams — siehe ADR-009-Update), gefiltert und aufsteigend nach Datum sortiert. Jeder Eintrag enthält: `date`, `time`, `opponent`, `isHome`, `result` (null = noch nicht gespielt), `competition` (Liga-Name), `isNext` (erstes Spiel ohne Ergebnis). Die `logoUrl` wird direkt konstruiert: `https://www.basketball-bund.net/media/team/{teamPermanentId}/logo` — kein zusätzlicher API-Aufruf. Ein Team, das nicht mehr in der aktuellen API-Team-Liste des Clubs auftaucht, wird stattdessen unverändert aus dem vorherigen Lauf (`metadata.json` im Club-Verzeichnis) übernommen und mit `notCurrentlyListed: true` markiert (siehe ADR-014).
+. Nach allen Teams: `metadata.json` wird je Team mit Update-Zeitstempel, Spielzahlen, `logoUrl`, `teamAkjId`, `teamNumber` und einem `matches`-Array geschrieben. Das `matches`-Array enthält alle Spiele der aktuellen Saison, ermittelt per `currentSeasonId(matches)` (höchste vorkommende `seasonId` in den Roh-API-Daten des Teams — siehe ADR-009-Update), gefiltert und aufsteigend nach Datum sortiert. Jeder Eintrag enthält: `date`, `time`, `opponent`, `isHome`, `result` (null = noch nicht gespielt), `competition` (Liga-Name), `isCup` (Pokal/Turnier statt Liga, aus der aufgelösten Wettbewerbsart, <<adr-028-wettbewerbsart-erkennung,ADR-028>>), `isNext` (erstes Spiel ohne Ergebnis). Die `logoUrl` wird direkt konstruiert: `https://www.basketball-bund.net/media/team/{teamPermanentId}/logo` — kein zusätzlicher API-Aufruf. Ein Team, das nicht mehr in der aktuellen API-Team-Liste des Clubs auftaucht, wird stattdessen unverändert aus dem vorherigen Lauf (`metadata.json` im Club-Verzeichnis) übernommen und mit `notCurrentlyListed: true` markiert (siehe ADR-014).
 . `cronUpdate.js` ruft direkt im Anschluss `genHTML()` je Club auf, das `index.html` aus `metadata.json` erzeugt (Tab-UI mit Logos, ARIA-Tab-Pattern, eingebettetem Keyboard-Nav-JS). Ein separater `npm run generate-html`-CI-Schritt existiert nicht mehr. Jeder Tab-Panel zeigt oben den gefilterten Spielplan (Alle/Heim/Auswärts) mit H/A-Badges und Wettbewerbs-Label, darunter die Kalender-Abo-Buttons.
 . Das `generated/`-Verzeichnis wird als GitHub Pages Artefakt hochgeladen und deployed.
 
@@ -1846,7 +1869,7 @@ a|
 | Die Übersichtsseite soll pro Team den Spielplan der aktuellen Saison anzeigen — vergangene Spiele mit Ergebnis, kommende ohne — direkt in den Tab-Panels, oberhalb der Kalender-Abo-Buttons.
 
 | *Entscheidung*
-| `cronUpdate.js` filtert die rohen API-Matches auf die aktuelle Saison, sortiert sie aufsteigend und speichert sie als `matches[]`-Array in `metadata.json`. `generateHTML.js` rendert dieses Array als HTML-Tabelle im jeweiligen Tab-Panel (Alle/Heim/Auswärts). Liga-Erkennung per Namens-Heuristik: enthält `liganame` das Wort "Liga" → Liga-Typ, sonst Cup/Pokal. Cup-Farbe ist konfigurierbar via `config.theme.cupColor` (Default `#7c3aed`).
+| `cronUpdate.js` filtert die rohen API-Matches auf die aktuelle Saison, sortiert sie aufsteigend und speichert sie als `matches[]`-Array in `metadata.json`. `generateHTML.js` rendert dieses Array als HTML-Tabelle im jeweiligen Tab-Panel (Alle/Heim/Auswärts). Liga-Erkennung per Namens-Heuristik: enthält `liganame` das Wort "Liga" → Liga-Typ, sonst Cup/Pokal (ersetzt durch die zentrale Klassifikation aus <<adr-028-wettbewerbsart-erkennung,ADR-028>>). Cup-Farbe ist konfigurierbar via `config.theme.cupColor` (Default `#7c3aed`).
 +
 *Update 2026-09-08:* Die anfängliche Implementierung nutzte eine harte Konstante `CURRENT_SEASON` auf Modul-Ebene. Das führte zu einem Produktionsbug: Beim Saisonwechsel 2026/27 lieferte die API ausschließlich Matches mit `seasonId: 2026`, während `CURRENT_SEASON` noch auf `2025` stand — `matches[]` und `competitions[]` liefen für alle Teams leer, obwohl die (ungefiltert erzeugten) ICS-Kalender die neuen Spiele korrekt enthielten. Die Konstante wurde durch `currentSeasonId(matches)` ersetzt, das pro Team die höchste vorkommende `seasonId` aus den geladenen Matches ermittelt (die API liefert Matches mehrerer Saisons gemischt zurück, z.B. während der Übergangsphase).
 
@@ -2454,6 +2477,48 @@ a|
 * Ein Wechsel zurück auf den strengen Modus ist jederzeit möglich: `address`/`email` eintragen und `private` entfernen.
 * Club-Seiten behalten ihre eigenen Impressen (Club-`legal`); sie sind von dieser Betriebsart nicht betroffen.
 * Abgesichert durch Tests in `tests/e2e/portal-config.test.js`, `html-generation.test.js`, `portal-aggregation-integration.test.js` (10-Club-Fixture) und `tests/accessibility/portal.spec.js`.
+|===
+
+[[adr-028-wettbewerbsart-erkennung]]
+=== ADR-028: Wettbewerbsart-Erkennung (Liga vs. Pokal/Turnier)
+
+[cols="2,5", options="header"]
+|===
+| Aspekt | Inhalt
+
+| *Status*
+| Akzeptiert
+
+| *Datum*
+| 2026-10-02
+
+| *Kontext*
+a|
+* Bug: Bei den Damen von Fibalon wurde ein Turnier-Bracket gerendert, obwohl "OPF Bezirksklasse Damen 2026/27" (ligaId 54891) eine normale Liga mit Tabelle ist.
+* Ursache: Die Klassifikation stützte sich überall auf `liganame.toLowerCase().includes('liga')` (`cronUpdate.js`, `seasonArchive.js`, `generateHTML.js`). Namen wie "Bezirksklasse …" oder "Kreisklasse …" enthalten "liga" nicht, wurden als Turnier behandelt, und `fetchTournamentRounds` baute aus den inline-Matches mit `matchDay` 1–10 "Runden".
+* Betroffen sind in Bayern ca. 90 Wettbewerbe (Bezirksklasse 55, Kreisklasse 36).
+
+| *Entscheidung*
+a|
+* Die Klassifikation liegt zentral in `src/competitionKind.js` (keine Kopien mehr). Regeln:
+. Name enthält (case-insensitiv) `pokal`, `cup`, `turnier` oder `qualifikation` → Pokal (auch bei "Ligapokal").
+. Sonst enthält der Name `liga` → Liga (kein Zusatzrequest).
+. Sonst (`unknown`, z.B. Bezirksklasse/Kreisklasse): ein Abruf der Table-Antwort mit Metadaten (`apiClient.fetchLeagueTableWithMeta`); `ligaData.crossTableExists === true` → Liga (die geholten Zeilen werden wiederverwendet), sonst Pokal. Schlägt der Abruf fehl → Pokal (bisheriges Verhalten).
+* `resolveCompetition(comp, ownTeamId, apiFns)` wird von `fetchTeamData` (`cronUpdate.js`) und `buildArchiveTeamEntry` (`seasonArchive.js`) genutzt und liefert `{ ...comp, isLiga, table, bracket }`.
+* Die Anzeige-Schicht klassifiziert nicht mehr nach Namen, wenn die Daten es wissen: `generateHTML.js` nutzt `comp.isLiga` (gespeichert in `metadata.json`/Archiv) und je Spiel `m.isCup` (von `mapMatches` aus der aufgelösten Klassifikation der Liga abgeleitet). Nur wenn diese Felder fehlen (alte `metadata.json`/Archive), greift die Namensregel als Fallback.
+
+| *Begründung*
+a|
+* Es gibt kein einzelnes zuverlässiges Flag. `crossTableExists`/`tableExists` stehen nur in der Table-Antwort (in Match-Daten sind sie `null`) und sind für Pokale nicht verlässlich: "OPF Bezirkspokal Herren 26-27" hat `crossTableExists=false` aber `tableExists=true` (22 Zeilen), "OPF Bezirkspokal Damen 26-27" dagegen `crossTableExists=true`, `tableExists=false`; "Bayernpokal 2027 Herren" und "Qualifikationsspiel bayerische Meisterschaft" haben beide `false`.
+* Bezirksoberliga/Kreisliga/Bezirksliga/Landesliga/Regionalliga/Bayernliga und Bezirksklasse/Kreisklasse haben `crossTableExists=true`.
+* Daher: Pokale sind am Namen erkennbar, Klassen am Flag.
+
+| *Konsequenzen*
+a|
+* Ein Zusatzrequest fällt nur bei `unknown`-Namen an; die Tabellenzeilen werden wiederverwendet (kein zweiter Tabellenabruf).
+* Alte `metadata.json` und Archive ohne `isLiga`/`isCup` nutzen den Namens-Fallback und werden beim nächsten Lauf korrigiert; bereits archivierte Vorsaisons werden bis zur nächsten Aktualisierung (provisional) nicht rückwirkend umklassifiziert.
+* Die Namensregel (Schritt 1+2) bleibt eine Heuristik; ein neuer Pokalname ohne die Schlüsselwörter wird über `crossTableExists` entschieden und kann dort falsch liegen.
+* Abgesichert durch `tests/e2e/competition-kind.test.js`, `api-client-league-table.test.js`, `html-generation.test.js`, `competition-kind-integration.test.js` (10-Club-Fixture) und den `@network`-Vertragstest in `tests/ui/api.spec.js`.
 |===
 
 == Qualitätsanforderungen
