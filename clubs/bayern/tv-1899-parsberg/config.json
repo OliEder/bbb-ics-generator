@@ -1,6 +1,6 @@
 {
   "clubId": "78",
-  "legacyRootOutput": true,
+  "legacyRootOutput": false,
   "legal": {
     "operator": "TV 1899 Parsberg e.V.",
     "address": "Jahnstraße 21, 92331 Parsberg",
